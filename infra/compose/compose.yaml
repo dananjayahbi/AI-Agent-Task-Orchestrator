@@ -1,0 +1,226 @@
+# Compose stack — AI Agent Task Orchestrator (WP-0.2, parent plan Section 16.1)
+#
+# Eight services from the Section 16.1 table with the exact dependency edges,
+# one internal network and dev/prod profile split (MT-0.2-02), the documented
+# environment template (MT-0.2-03), and the Section 16.1 health checks
+# (MT-0.2-04). Configuration is environment-only (NFR-06): every value that
+# differs per host is interpolated from the environment file — see
+# infra/compose/.env.example. Bring-up/tear-down: README.md in this folder.
+#
+# Placeholder images for `backend` and `web` are built from ./stubs (real images
+# arrive with WP-1.1 / WP-4.1; service names and health paths never change).
+
+name: orchestrator
+
+# ---------------------------------------------------------------------------
+# Services (Section 16.1 table, in table order)
+# ---------------------------------------------------------------------------
+services:
+
+  # --- postgres: official Postgres, no ports, data volume -----------------
+  postgres:
+    image: ${ORCHESTRATOR_IMAGE_POSTGRES:-postgres:16-alpine}
+    environment:
+      # Image-mandated names (configuration.md rule 7): mapped from the
+      # canonical ORCHESTRATOR_DATABASE_* values in the template.
+      POSTGRES_USER: ${ORCHESTRATOR_DATABASE_USER:-orchestrator}
+      POSTGRES_PASSWORD: ${ORCHESTRATOR_DATABASE_PASSWORD:-change-me}
+      POSTGRES_DB: ${ORCHESTRATOR_DATABASE_NAME:-orchestrator}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck: # Section 16.1: Postgres readiness probe
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    # No published ports (Section 16.1): reachable only on the internal network.
+
+  # --- redis: official Redis, no ports, optional persistence ---------------
+  redis:
+    image: ${ORCHESTRATOR_IMAGE_REDIS:-redis:7.4-alpine}
+    # Optional persistence (Section 16.1): the canonical true/false value is
+    # mapped to Redis's mandated `--appendonly yes|no` flag here (rule 7).
+    command: ["sh", "-c", "if [ \"${ORCHESTRATOR_CACHE_APPENDONLY:-true}\" = \"true\" ]; then exec redis-server --appendonly yes; else exec redis-server --appendonly no; fi"]
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+    healthcheck: # Section 16.1: ping
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # --- migrate: one-shot, backend image, gated by its exit code ------------
+  migrate:
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    build:
+      context: ./stubs/backend
+    # One-shot migration runner. The exit code is this service's "health
+    # check" per Section 16.1; WP-1.1 swaps the stub command for real
+    # `manage.py migrate` without changing the service name.
+    command: ["python", "/opt/stub/stub.py", "migrate"]
+    environment: &backend-env
+      # Derived from ORCHESTRATOR_DATABASE_* by default; set
+      # ORCHESTRATOR_DATABASE_URL in .env only to point at an external
+      # database. Canonical names reach the container too (NFR-06: one
+      # vocabulary everywhere).
+      ORCHESTRATOR_DATABASE_URL: ${ORCHESTRATOR_DATABASE_URL:-postgresql://${ORCHESTRATOR_DATABASE_USER:-orchestrator}:${ORCHESTRATOR_DATABASE_PASSWORD:-change-me}@postgres:5432/${ORCHESTRATOR_DATABASE_NAME:-orchestrator}} # pragma: allowlist secret
+      ORCHESTRATOR_CACHE_URL: ${ORCHESTRATOR_CACHE_URL:-redis://redis:6379/0}
+      ORCHESTRATOR_CACHE_BROKER_URL: ${ORCHESTRATOR_CACHE_BROKER_URL:-redis://redis:6379/0}
+      ORCHESTRATOR_SECRET_KEY: ${ORCHESTRATOR_SECRET_KEY:-change-me}
+      ORCHESTRATOR_DEBUG: ${ORCHESTRATOR_DEBUG:-true}
+      ORCHESTRATOR_ALLOWED_HOSTS: ${ORCHESTRATOR_ALLOWED_HOSTS:-localhost}
+      ORCHESTRATOR_STORAGE_MEDIA_ROOT: ${ORCHESTRATOR_STORAGE_MEDIA_ROOT:-/media}
+    networks: [internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Section 16.1 health check for a one-shot service is its exit code: the
+    # `service_completed_successfully` condition on dependents is that check.
+
+  # --- backend: ASGI server, LAN-published API port, media volume ----------
+  backend:
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    build:
+      context: ./stubs/backend
+    environment: *backend-env
+    ports:
+      # LAN-interface-only binding (Section 16.1); the bind address comes from
+      # the environment so the same file works on Docker Desktop and a VPS
+      # (NFR-06). Unset falls back to loopback — see .env.example (MT-0.2-03).
+      - "${ORCHESTRATOR_BIND_ADDR:-127.0.0.1}:${ORCHESTRATOR_PORT_BACKEND:-8000}:8000"
+    volumes:
+      - backend_media:/media
+    networks: [internal]
+    healthcheck: # Section 16.1: /health/ready (real endpoint in WP-1.1; path stays)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      # Exact Section 16.1 edges: postgres, redis, migrate.
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # --- worker: backend image, Celery worker role, media volume -------------
+  worker:
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    build:
+      context: ./stubs/backend
+    command: ["python", "/opt/stub/stub.py", "worker"]
+    environment: *backend-env
+    volumes:
+      - backend_media:/media
+    networks: [internal]
+    healthcheck: # Section 16.1: worker ping (stub answers :8001/ping; WP-1.7 swaps in `celery inspect ping`)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8001/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --- beat: backend image, Celery beat role, no volumes -------------------
+  beat:
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    build:
+      context: ./stubs/backend
+    command: ["python", "/opt/stub/stub.py", "beat"]
+    environment: *backend-env
+    networks: [internal]
+    healthcheck: # Section 16.1: process check (the beat loop is PID 1's task)
+      test: ["CMD-SHELL", "ps | grep -q '[s]tub.py beat'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # --- web: Next.js image, LAN-published web port, no volumes --------------
+  web:
+    image: ${ORCHESTRATOR_IMAGE_WEB:-orchestrator-web:stub}
+    build:
+      context: ./stubs/web
+    ports:
+      # LAN-interface-only binding, environment-driven like `backend`.
+      - "${ORCHESTRATOR_BIND_ADDR:-127.0.0.1}:${ORCHESTRATOR_PORT_WEB:-3000}:3000"
+    networks: [internal]
+    healthcheck: # Section 16.1: HTTP check
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # --- cloudflared: official image, no ports, outbound-only tunnel ----------
+  cloudflared:
+    image: ${ORCHESTRATOR_IMAGE_CLOUDFLARED:-cloudflare/cloudflared:2026.10.0}
+    # M0 placeholder: a tokenless quick tunnel (WP-5.1 replaces this with the
+    # named-tunnel command and ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN
+    # configuration).
+    # Fixed metrics port so the `tunnel ready` health probe can find it.
+    command: ["--metrics", "0.0.0.0:20240", "tunnel", "--url", "http://web:3000"]
+    environment:
+      ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN: ${ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks: [internal]
+    healthcheck: # Section 16.1: tunnel status (cloudflared's own readiness probe; distroless = exec form only)
+      test: ["CMD", "cloudflared", "--metrics", "0.0.0.0:20240", "tunnel", "ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  # --- mailhog-style helper tooling (Section 16.1: "dev" profile) ----------
+  # dev-profile only: SMTP catcher for outbound mail during development.
+  # Publishes no host port (MT-0.2-02 acceptance: only backend and web do);
+  # the backend reaches it at smtp://mailhog:1025 on the internal network.
+  mailhog:
+    image: ${ORCHESTRATOR_IMAGE_MAILHOG:-mailhog/mailhog:v1.0.1}
+    profiles: [dev]
+    networks: [internal]
+    healthcheck: # helper service — SMTP listener check so `--wait` covers it too
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 1025 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# ---------------------------------------------------------------------------
+# Networking (Section 16.1): exactly one internal network for all services.
+# Deliberately a plain bridge (not Docker's `internal: true` flag): `cloudflared`
+# needs outbound internet for the tunnel, while isolation is achieved by
+# publishing host ports only for `backend` and `web`.
+# ---------------------------------------------------------------------------
+networks:
+  internal:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Volumes (Section 16.1 / 16.3: local named volumes by default)
+# ---------------------------------------------------------------------------
+volumes:
+  postgres_data:
+  redis_data:
+  backend_media:

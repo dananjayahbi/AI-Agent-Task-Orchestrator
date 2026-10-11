@@ -1,0 +1,97 @@
+# Container build quality gate — MT-0.3-03 (parent plan Sections 16.1, 18;
+# requirements NFR-07, NFR-11). One concern per workflow file.
+#
+# Discovery is PATTERN-BASED, never a hardcoded image list: every `Dockerfile` in the
+# repository (excluding VCS/tool caches) is built on every PR, so images added in later
+# waves — the real backend image (WP-1.1), the real web image (WP-4.1), worker/beat
+# reusing the backend image — are picked up without rewriting this job, and a broken
+# Dockerfile or base-image change blocks merge from day one.
+#
+# Build-only posture (NFR-07, untrusted-PR rule): no registry login, no push, no
+# deployment, no privileged secrets — this job needs only `contents: read`
+# (Section 20.4 item 3). Image CVE scanning belongs to M6 hardening; the bridge is a
+# host-side package (Section 10.11), not an image.
+#
+# The job is a single stable status check (`container-build`) rather than a per-image
+# matrix, so the required-check configuration cannot drift as images are added (matrix
+# checks would generate new check names per image).
+#
+# Docker layer caching (MT-0.3-05): builds run through buildx with the GitHub Actions
+# cache backend, one stable scope per Dockerfile path (`img-<cleaned path>`). Layers
+# are content-addressed, so a Dockerfile or context change invalidates exactly the
+# affected layers (no stale-cache false greens); `ignore-error=true` keeps a cache
+# export problem (e.g. fork-PR cache restrictions) from failing the build gate — the
+# gate is about build success, never about cache availability. Caches hold image
+# layers only, no credential material (Section 20.4 item 3).
+#
+# Actions are pinned to major version tags (the parent plan prescribes no SHA
+# pinning — recorded here per the WP-0.3 risk note).
+name: container-build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container-build:
+    name: container-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Buildx driver required for the `type=gha` cache exporter (the default
+      # docker-driver builder cannot export it).
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Discover every image definition (pattern-based)
+        id: discover
+        run: |
+          set -euo pipefail
+          files="$(find . \
+            -name Dockerfile \
+            -not -path './.git/*' \
+            -not -path '*/node_modules/*' \
+            -not -path '*/.venv/*' \
+            -not -path '*/.dart_tool/*' \
+            | sort)"
+          if [ -z "$files" ]; then
+            echo "::error::No Dockerfile discovered — discovery pattern broken, or image definitions were removed while Compose still references images (Section 18 container-build gate)."
+            exit 1
+          fi
+          json="$(printf '%s\n' "$files" | jq -R -s -c 'split("\n") | map(select(length > 0))')"
+          echo "list=$json" >> "$GITHUB_OUTPUT"
+          echo "Discovered image definitions:"
+          printf '%s\n' "$files" | sed 's/^/  /'
+
+      # One build per discovered Dockerfile; each image is its own log group with the
+      # file path in the group title and in any ::error:: line (clear attribution to
+      # the failing image). All images are attempted; the step fails at the end if
+      # any build failed, so one broken image still blocks merge.
+      - name: Build every discovered image (build-only, no push, no credentials)
+        run: |
+          set -euo pipefail
+          failed=""
+          while IFS= read -r df; do
+            context="$(dirname "$df")"
+            scope="img-$(printf '%s' "$df" | tr '/.' '--' | tr '[:upper:]' '[:lower:]' | sed 's/^-*//')"
+            echo "::group::image $df (context $context)"
+            if ! docker buildx build \
+              --file "$df" \
+              --cache-from "type=gha,scope=$scope" \
+              --cache-to "type=gha,mode=max,scope=$scope,ignore-error=true" \
+              "$context"; then
+              echo "::error file=$df::container build FAILED for image definition $df"
+              failed="$failed $df"
+            fi
+            echo "::endgroup::"
+          done < <(jq -r '.[]' <<< '${{ steps.discover.outputs.list }}')
+          if [ -n "$failed" ]; then
+            echo "::error::container build failed for:$failed"
+            exit 1
+          fi
+          echo "All discovered image definitions built successfully."

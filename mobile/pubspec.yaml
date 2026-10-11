@@ -1,0 +1,16 @@
+# Flutter mobile client package (parent plan Section 6.6 / Section 14).
+# This is a tooling placeholder only: the real app skeleton (navigation, state
+# management, push, biometrics) is built in WP-5.5.
+name: orchestrator_mobile
+description: Mobile client for the AI Agent Task Orchestrator.
+publish_to: "none"
+version: 0.0.1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_lints: ^6.0.0

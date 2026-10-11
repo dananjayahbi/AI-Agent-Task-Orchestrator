@@ -1,0 +1,155 @@
+# Lint, format and type-check quality gates — MT-0.3-01 (parent plan Section 18;
+# requirements NFR-07, NFR-11). One concern per workflow file — never a combined
+# pipeline (see CONTRIBUTING.md "Continuous integration" for the workflow map).
+#
+# Command strings are VERBATIM copies of CONTRIBUTING.md "Tooling commands", which are
+# also what .pre-commit-config.yaml runs — change the command there first, then mirror
+# it here so hooks, docs and CI can never drift.
+#
+# Section 20.4 item 3 (no secrets, no environment-specific paths):
+#   * every command is repo-relative; no absolute or host-specific paths;
+#   * no secrets, tokens or credentials — jobs need only `contents: read`;
+#   * toolchain versions are pinned to the WP-0.1-verified ones (RISK-15 cross-host
+#     drift): uv 0.12.10, Node 22 LTS (see note in type-check job), Flutter 3.35.6.
+#
+# Actions are pinned to major version tags: the parent plan does not prescribe
+# commit-SHA pinning (Section 18 lists no action pins), so major tags are used and
+# recorded here per the WP-0.3 risk note.
+name: lint-type
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Toolchains (pinned; caches keyed on the lockfiles — MT-0.3-05).
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.6"
+          channel: stable
+
+      # --- backend (Python) — lint + format check ---
+      - name: "backend: lint (ruff check)"
+        run: uv run --directory backend ruff check .
+      - name: "backend: format check (ruff format --check)"
+        run: uv run --directory backend ruff format --check .
+
+      # --- bridge (Python) — lint + format check ---
+      - name: "bridge: lint (ruff check)"
+        run: uv run --directory bridge ruff check .
+      - name: "bridge: format check (ruff format --check)"
+        run: uv run --directory bridge ruff format --check .
+
+      # --- web (Next.js) — lint + format check ---
+      - name: web install (npm ci)
+        run: npm ci --prefix web
+      - name: "web: lint (eslint)"
+        run: npm --prefix web run lint
+      - name: "web: format check (prettier --check)"
+        run: npm --prefix web run format:check
+
+      # --- mobile (Flutter/Dart) — format check ---
+      # Mobile's lint/analysis command (`flutter analyze`, documented as the mobile
+      # type check) runs in the type-check job below, so each job covers all four
+      # packages without running the analyzer twice.
+      - name: "mobile: format check (dart format --set-exit-if-changed)"
+        run: dart format --set-exit-if-changed mobile/
+
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+      # No .nvmrc/engines pin exists yet; Node 22 LTS is the recorded CI choice
+      # (Next.js 16 requires >=20.9). Raise an open question before changing it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.6"
+          channel: stable
+
+      # --- backend (Python) — type check ---
+      - name: "backend: type check (mypy)"
+        run: uv run --directory backend mypy .
+
+      # --- bridge (Python) — type check ---
+      - name: "bridge: type check (mypy)"
+        run: uv run --directory bridge mypy .
+
+      # --- web (Next.js) — type check ---
+      - name: web install (npm ci)
+        run: npm ci --prefix web
+      - name: "web: type check (tsc --noEmit)"
+        run: npm --prefix web run typecheck
+
+      # --- mobile (Flutter/Dart) — analyze (Dart lint + type check in one) ---
+      - name: "mobile: analyze (flutter analyze)"
+        run: flutter analyze
+        working-directory: mobile
+
+  # Section 18 quality gates list both "migration check (no unapplied model changes)"
+  # and "schema diff check"; WP-0.3's deliverable is the placeholder that passes now
+  # and turns into the real Django check when models arrive (WP-1.1, MT-1.1-01).
+  # Public-contract (OpenAPI) schema diffing is wired by WP-1.1 / MT-1.1-04 and is
+  # deliberately not simulated here.
+  migration-schema-diff:
+    name: migration-schema-diff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe for the Django project (placeholder until WP-1.1)
+        id: probe
+        run: |
+          set -euo pipefail
+          if [ -f backend/manage.py ]; then
+            echo "mode=real" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=placeholder" >> "$GITHUB_OUTPUT"
+            echo "::notice title=migration-schema-diff::backend/manage.py not present yet — passing placeholder (Section 18 schema-diff/migration gate becomes real with WP-1.1)."
+          fi
+
+      - uses: astral-sh/setup-uv@v6
+        if: steps.probe.outputs.mode == 'real'
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      # Real gate from WP-1.1 on: fails when model changes lack migrations
+      # (`--check --dry-run` makes no writes). WP-1.1 supplies the settings module
+      # and any required environment for manage.py in this job at that point.
+      - name: "migration check: makemigrations --check --dry-run"
+        if: steps.probe.outputs.mode == 'real'
+        run: uv run --directory backend python manage.py makemigrations --check --dry-run

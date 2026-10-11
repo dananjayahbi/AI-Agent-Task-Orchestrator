@@ -1949,24 +1949,32 @@ Every micro-task lists its WP and requirement ids. Appendix B maps requirement g
 
 ## 22. Open Questions and Decisions Needed
 
-Each item has a recommended default so work is never blocked. The owner confirms or overrides in WP-0.4.
+Each item has a recommended default so work is never blocked. WP-0.4's decision review
+session (2026-10-11; notes in `docs/plan/m0-decision-review-notes.md`) recorded an
+outcome for every row: OQ-01, OQ-02, OQ-03, OQ-04 and OQ-06 were **decided** by
+confirming their recommended default with no overrides (owner ratification requested —
+an unattended default-confirmation, per the notes), and every remaining question was
+**consciously deferred** to the decision milestone shown in the Decision column. Rows
+whose decision is embodied in an architecture decision record cross-reference its ADR;
+all thirteen ADRs (Section 23) are recorded as accepted in `docs/adr/`. No Section 23
+wording changed as a result of this session — no ADR amendments were flagged.
 
-| ID | Question | Recommended default | Needed by |
-|---|---|---|---|
-| OQ-01 | Realtime: SSE only, or WebSocket as well? | SSE only for v1; revisit if bidirectional streaming is needed | M1 start |
-| OQ-02 | DRF or Django Ninja for the API layer? | DRF with schema generation (more mature ecosystem for permissions, throttling, schema) | M1 start |
-| OQ-03 | How to handle several agents on one repository? | Default one concurrent task per project; optional per-task worktrees as a later improvement | M2 |
-| OQ-04 | Should the bridge send automatic liveness pings that extend leases? | Off by default (explicit checkpoints only, as the spec states); available per project with a hard cap | M1 |
-| OQ-05 | Which agents are verified first? | Claude Code, then VS Code Copilot, then OpenCode, Aider, DeepSeek harness | M2 |
-| OQ-06 | Should projects without a local merge step (manual or PR-based) be supported? | Yes, via `merge_strategy` set to `manual`: approval marks `completed` without executor involvement | M3 |
-| OQ-07 | Which provider generates visual descriptions, and what monthly budget? | Disabled by default; enable a configured vision model per project when needed | M1 |
-| OQ-08 | Mobile distribution path (stores, TestFlight, internal testing, sideload)? | Android internal build first; iOS via TestFlight when developer account is available | M5 |
-| OQ-09 | Owner authentication strength (password only, TOTP, passkeys)? | Strong password plus optional TOTP in v1; passkeys later | M1 |
-| OQ-10 | Retention periods for checkpoints, patches, attachments, events? | Events 1 year; checkpoints and patches 180 days after completion; attachments until archive plus 30 days | M6 |
-| OQ-11 | Domain and Cloudflare account ownership for the tunnel hostname? | Owner supplies a domain; hostname `orchestrator.<domain>` | M5 |
-| OQ-12 | Is task creation from mobile in scope for v1? | No (Could), review and monitoring only | M5 |
-| OQ-13 | Notification digests for completed work? | Off by default; per-event toggles only | M5 |
-| OQ-14 | Should the orchestrator register itself as PID00001 and manage its own build? | Yes, after the minimum M3 set (dogfooding) | M3 |
+| ID | Question | Recommended default | Needed by | Decision | Decision date |
+|---|---|---|---|---|---|
+| OQ-01 | Realtime: SSE only, or WebSocket as well? | SSE only for v1; revisit if bidirectional streaming is needed | M1 start | SSE only for v1; revisit if bidirectional streaming is needed (ADR-002) | 2026-10-11 |
+| OQ-02 | DRF or Django Ninja for the API layer? | DRF with schema generation (more mature ecosystem for permissions, throttling, schema) | M1 start | DRF with schema generation (ADR-005) | 2026-10-11 |
+| OQ-03 | How to handle several agents on one repository? | Default one concurrent task per project; optional per-task worktrees as a later improvement | M2 | Default one concurrent task per project; optional per-task worktrees as a later improvement (ADR-013) | 2026-10-11 |
+| OQ-04 | Should the bridge send automatic liveness pings that extend leases? | Off by default (explicit checkpoints only, as the spec states); available per project with a hard cap | M1 | Off by default (explicit checkpoints only, as the spec states); available per project with a hard cap | 2026-10-11 |
+| OQ-05 | Which agents are verified first? | Claude Code, then VS Code Copilot, then OpenCode, Aider, DeepSeek harness | M2 | Deferred to M2 | 2026-10-11 (deferral recorded) |
+| OQ-06 | Should projects without a local merge step (manual or PR-based) be supported? | Yes, via `merge_strategy` set to `manual`: approval marks `completed` without executor involvement | M3 | Yes, via `merge_strategy` set to `manual`: approval marks `completed` without executor involvement (ADR-008 context) | 2026-10-11 |
+| OQ-07 | Which provider generates visual descriptions, and what monthly budget? | Disabled by default; enable a configured vision model per project when needed | M1 | Deferred to M1 | 2026-10-11 (deferral recorded) |
+| OQ-08 | Mobile distribution path (stores, TestFlight, internal testing, sideload)? | Android internal build first; iOS via TestFlight when developer account is available | M5 | Deferred to M5 | 2026-10-11 (deferral recorded) |
+| OQ-09 | Owner authentication strength (password only, TOTP, passkeys)? | Strong password plus optional TOTP in v1; passkeys later | M1 | Deferred to M1 | 2026-10-11 (deferral recorded) |
+| OQ-10 | Retention periods for checkpoints, patches, attachments, events? | Events 1 year; checkpoints and patches 180 days after completion; attachments until archive plus 30 days | M6 | Deferred to M6 | 2026-10-11 (deferral recorded) |
+| OQ-11 | Domain and Cloudflare account ownership for the tunnel hostname? | Owner supplies a domain; hostname `orchestrator.<domain>` | M5 | Deferred to M5 | 2026-10-11 (deferral recorded) |
+| OQ-12 | Is task creation from mobile in scope for v1? | No (Could), review and monitoring only | M5 | Deferred to M5 | 2026-10-11 (deferral recorded) |
+| OQ-13 | Notification digests for completed work? | Off by default; per-event toggles only | M5 | Deferred to M5 | 2026-10-11 (deferral recorded) |
+| OQ-14 | Should the orchestrator register itself as PID00001 and manage its own build? | Yes, after the minimum M3 set (dogfooding) | M3 | Deferred to M3 | 2026-10-11 (deferral recorded) |
 
 ---
 
@@ -2049,7 +2057,9 @@ orchestrator/
 
 ## Appendix C: Review Checklist Before Starting Micro-Task Expansion
 
-1. All Section 22 questions marked as decided or consciously deferred.
+1. All Section 22 questions marked as decided or consciously deferred — **satisfied in
+   WP-0.4** (decision review session 2026-10-11: OQ-01..OQ-14 all carry a decision and
+   date in Section 22 — 5 decided, 9 consciously deferred with assigned milestones).
 2. State names, review reasons, and error codes frozen as canonical catalogs (Sections 8.4, 9.2).
 3. Policy defaults and glob presets agreed per framework used in the owner's real projects.
 4. Priority clients for compatibility testing confirmed.

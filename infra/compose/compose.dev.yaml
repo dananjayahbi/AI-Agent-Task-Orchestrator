@@ -1,0 +1,28 @@
+# Dev overlay — hot-reload wiring for the `dev` profile (MT-0.2-02).
+#
+# Compose cannot vary a single service's config on the `--profile` flag alone,
+# so the dev-only concerns live in this override file and are always paired
+# with `--profile dev` (see README "Profiles"):
+#
+#   dev : docker compose -f compose.yaml -f compose.dev.yaml --profile dev ...
+#   prod: docker compose -f compose.yaml           --profile prod ...
+#
+# The prod render (base file only) therefore contains no bind mounts and no
+# debug flags (MT-0.2-02 risk note). WP-1.1 / WP-4.1 add their real reload
+# commands (--reload / next dev) here — never to the base file.
+
+services:
+  backend:
+    volumes:
+      # Hot-reload source mount: repo backend/ appears at /app. Harmless for
+      # the M0 stub (which runs from /opt/stub); the WP-1.1 image reads /app.
+      - ../../backend:/app
+    environment:
+      ORCHESTRATOR_DEBUG: "true" # debug on in dev; the base/prod render is "false"
+
+  web:
+    volumes:
+      # Hot-reload source mount: repo web/ appears at /app (WP-4.1 image).
+      - ../../web:/app
+    environment:
+      NODE_ENV: development # debug/dev mode marker; prod render omits it

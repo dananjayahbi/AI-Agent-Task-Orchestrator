@@ -1,0 +1,5 @@
+# Analyzer and lint configuration for the Flutter client (MT-0.1-04).
+# Rule set: flutter_lints (the stable baseline recommended by the Flutter team).
+# Project-specific rules are tuned once real app code lands in WP-5.5 — do not lower
+# the baseline to make placeholder code pass (MT-0.1-04 risk notes).
+include: package:flutter_lints/flutter.yaml

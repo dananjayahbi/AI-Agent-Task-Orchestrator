@@ -1,0 +1,107 @@
+# Pre-commit hooks for the AI Agent Task Orchestrator monorepo (MT-0.1-05).
+#
+# Every command below is copied VERBATIM from CONTRIBUTING.md "Tooling commands" —
+# that table is the single source of truth. Change a command there first, then mirror it.
+#
+# Install on a fresh clone (one command):  uvx pre-commit install
+# Run the whole set manually:              uvx pre-commit run --all-files
+#
+# Prerequisites on PATH: uv, Node.js (npm), Flutter/Dart SDK, git.
+# Dependency sync if a package has not been set up yet:
+#   uv sync --directory backend
+#   uv sync --directory bridge
+#   npm ci --prefix web
+#   flutter pub get -C mobile
+
+repos:
+  # Secret scan over every staged file: conservative default patterns covering config
+  # files and .env-style assignments (parent plan Section 18, RISK-08). detect-secrets is
+  # used because gitleaks' own pre-commit hooks require a Go toolchain; the hook builds
+  # its own isolated environment, so no global install is needed.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+
+  # Per-package format / lint / type checks using the exact documented commands.
+  # Each hook only triggers when files in its package change; the command itself runs
+  # over the whole package so the documented command stays a single source of truth.
+  - repo: local
+    hooks:
+      # --- backend (Python) ---
+      - id: backend-lint
+        name: "backend: lint (ruff check)"
+        entry: uv run --directory backend ruff check .
+        language: system
+        pass_filenames: false
+        files: ^backend/
+      - id: backend-format-check
+        name: "backend: format check (ruff format --check)"
+        entry: uv run --directory backend ruff format --check .
+        language: system
+        pass_filenames: false
+        files: ^backend/
+      - id: backend-typecheck
+        name: "backend: type check (mypy)"
+        entry: uv run --directory backend mypy .
+        language: system
+        pass_filenames: false
+        files: ^backend/
+
+      # --- bridge (Python) ---
+      - id: bridge-lint
+        name: "bridge: lint (ruff check)"
+        entry: uv run --directory bridge ruff check .
+        language: system
+        pass_filenames: false
+        files: ^bridge/
+      - id: bridge-format-check
+        name: "bridge: format check (ruff format --check)"
+        entry: uv run --directory bridge ruff format --check .
+        language: system
+        pass_filenames: false
+        files: ^bridge/
+      - id: bridge-typecheck
+        name: "bridge: type check (mypy)"
+        entry: uv run --directory bridge mypy .
+        language: system
+        pass_filenames: false
+        files: ^bridge/
+
+      # --- web (Next.js) ---
+      - id: web-lint
+        name: "web: lint (eslint)"
+        entry: npm --prefix web run lint
+        language: system
+        pass_filenames: false
+        files: ^web/
+      - id: web-typecheck
+        name: "web: type check (tsc --noEmit)"
+        entry: npm --prefix web run typecheck
+        language: system
+        pass_filenames: false
+        files: ^web/
+      - id: web-format-check
+        name: "web: format check (prettier --check)"
+        entry: npm --prefix web run format:check
+        language: system
+        pass_filenames: false
+        files: ^web/
+
+      # --- mobile (Flutter) ---
+      # flutter analyze has no directory argument: it runs from mobile/ (and re-runs
+      # "pub get" automatically). A python wrapper sets the working directory so the
+      # hook works cross-platform without relying on a shell (cmd resolves flutter.bat
+      # on Windows; sh resolves flutter on POSIX).
+      - id: mobile-analyze
+        name: "mobile: analyze (flutter analyze)"
+        entry: python -c "import subprocess, sys; sys.exit(subprocess.call('flutter analyze', cwd='mobile', shell=True))"
+        language: python
+        pass_filenames: false
+        files: ^mobile/
+      - id: mobile-format-check
+        name: "mobile: format check (dart format --set-exit-if-changed)"
+        entry: dart format --set-exit-if-changed mobile/
+        language: system
+        pass_filenames: false
+        files: ^mobile/

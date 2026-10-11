@@ -1,0 +1,124 @@
+# Dependency and secret scanning gates — MT-0.3-04 (parent plan Sections 12.1, 12.4,
+# 18; requirements NFR-07/NFR-11 — OWASP ASVS Level 1 baseline). One concern per
+# workflow file. Both jobs are required status checks, so findings block merge
+# (RISK-08, RISK-14: CI is the authoritative gate; the pre-commit hooks are the
+# local first line and use the same pattern source).
+#
+# SEVERITY THRESHOLDS (documented per ecosystem, per MT-0.3-04 scope):
+#   * Python (pip-audit): LOW and above — every advisory fails. pip-audit has no
+#     severity filter, and it DOES support per-advisory waivers (--ignore-vuln), so
+#     the strictest threshold is sustainable here.
+#   * npm (`npm audit --audit-level=critical`): CRITICAL and above fails the gate.
+#     npm audit has no per-advisory ignore list, so a single unfixable upstream
+#     advisory would otherwise hard-block every merge with no remediation path —
+#     the threshold is therefore the class npm can enforce meaningfully today.
+#     The full dependency tree is audited (dev tooling included) and non-failing
+#     findings stay visible in the job log.
+#   Threshold changes are a reviewed edit to this file with a recorded rationale —
+#   never `continue-on-error`, never deleting a job.
+#
+# RECORDED WAIVER (the documented exception process, applied — never a disabled gate):
+#   * GHSA-vfj7-8cjw-p6xm (braces, HIGH, stack-exhaustion DoS through deeply nested
+#     patterns) — dev-only chain eslint-config-next → @next/eslint-plugin-next →
+#     fast-glob → micromatch → braces. NO fixed braces release exists (OSV: affected
+#     0..3.0.3; upstream micromatch/braces#70), so no upgrade, pin or overrides entry
+#     can clear it; `npm audit fix --force` would downgrade eslint-config-next to 14.x
+#     (breaking) and is rejected. Owner: repository maintainer. Expiry: re-evaluate
+#     when braces ships a fixed release (or at WP-4.1 at the latest) and then tighten
+#     this threshold back to `low`. Until then the gate still blocks every CRITICAL
+#     advisory.
+#
+# WAIVER / EXCEPTION PROCESS for a NEW flagged dependency (never disable the gate):
+#   1. Preferred: upgrade or pin to a fixed version (a normal dependency-bump PR);
+#      the gate goes green by itself.
+#   2. If no fixed release exists (Python): add a commented line next to the audit
+#      step — `# waiver: --ignore-vuln <GHSA-ID> — <owner>, <justification>,
+#      expires <YYYY-MM-DD>` — and only then append the actual `--ignore-vuln
+#      <GHSA-ID>` flag, keeping the comment beside it. Waivers are per-advisory,
+#      owned and time-bounded.
+#   3. If no fixed release exists (npm): npm has no per-advisory ignore list, so
+#      raise an issue, pin an unaffected alternative via `overrides` if one exists,
+#      and otherwise handle it as an explicit, reviewed threshold decision recorded
+#      next to this header (like the braces waiver above) — still not a deleted or
+#      `continue-on-error` job.
+#
+# The secret scan runs the SAME scanner and pattern source as the pre-commit hook:
+# `uvx pre-commit run detect-secrets --all-files` invokes the hook id, repo and
+# pinned rev from .pre-commit-config.yaml (Yelp/detect-secrets v1.5.0), over every
+# tracked file. It scans the full worktree; pairing with human review of config
+# changes addresses the pattern-scanning blind spot (RISK-08).
+#
+# Section 20.4 item 3: no credentials anywhere in this file — scans are read-only and
+# need only `contents: read`. Mobile (pub) dependency scanning is a recorded
+# follow-up with the real Flutter app (WP-5.5), not silently skipped (MT-0.3-04
+# out-of-scope note). External/managed secret scanner integration is scheduled M3
+# (RISK-08); runtime container CVE scanning is M6.
+#
+# Actions are pinned to major version tags (the parent plan prescribes no SHA
+# pinning — recorded here per the WP-0.3 risk note).
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-scan:
+    name: dependency-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      # --- backend (Python) — audit the synced environment (uv.lock graph) ---
+      - name: backend sync (uv)
+        run: uv sync --directory backend
+      - name: "backend: dependency audit (pip-audit, threshold: any severity)"
+        run: uvx pip-audit --path backend/.venv
+
+      # --- bridge (Python) — audit the synced environment (uv.lock graph) ---
+      - name: bridge sync (uv)
+        run: uv sync --directory bridge
+      - name: "bridge: dependency audit (pip-audit, threshold: any severity)"
+        run: uvx pip-audit --path bridge/.venv
+
+      # --- web (npm) — audit the whole lockfile graph at threshold `critical` ---
+      # (threshold rationale + recorded braces waiver: see the header of this file)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: web install (npm ci)
+        run: npm ci --prefix web
+      - name: "web: dependency audit (npm audit --audit-level=critical)"
+        run: npm --prefix web audit --audit-level=critical
+
+  # Full-worktree secret scan through the exact hook the pre-commit config defines —
+  # same patterns, same pinned scanner revision, zero duplication (RISK-08/RISK-14).
+  # A committed credential anywhere in the repository fails this check and blocks
+  # merge once required.
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      - name: "pre-commit detect-secrets over every tracked file"
+        run: uvx pre-commit run detect-secrets --all-files

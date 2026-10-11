@@ -1,0 +1,187 @@
+# Unit and integration test quality gates — MT-0.3-02 (parent plan Section 18;
+# requirements NFR-07, NFR-11). Separate concern from lint/type (lint-type.yaml),
+# container build (container-build.yaml) and scans (security.yaml).
+#
+# Commands are VERBATIM copies of CONTRIBUTING.md "Test commands (unit and
+# integration)" — the single source of truth alongside the pre-commit hooks.
+# Empty suites are skipped by a DOCUMENTED, EXPLICIT allow-empty policy: each job
+# detects the packages' suites, prints a ::notice:: for every empty one, and runs
+# whatever a suite contains when it is non-empty. No placeholder tests are invented
+# (MT-0.3-02 risk note) and no job is allowed to soft-fail — any failing test fails
+# the job and blocks merge once required (no-new-failures enforcement).
+#
+# Section 20.4 item 3 / RISK-14: no secrets are committed. Integration service
+# credentials are CI-provided, ephemeral and runner-local: Postgres runs with
+# trust auth on the runner's loopback interface, so no password material exists
+# anywhere in this file or in any cache.
+#
+# Actions are pinned to major version tags (the parent plan prescribes no SHA
+# pinning — recorded here per the WP-0.3 risk note).
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Documented allow-empty detection: one flag per package suite.
+      - name: Detect package unit suites (allow-empty policy)
+        id: suites
+        run: |
+          set -euo pipefail
+          backend=false; bridge=false; web=false; mobile=false
+          if [ -n "$(find backend -path '*/.venv' -prune -o -name 'test_*.py' -print -quit)" ]; then
+            backend=true
+          fi
+          if [ -n "$(find bridge -path '*/.venv' -prune -o -name 'test_*.py' -print -quit)" ]; then
+            bridge=true
+          fi
+          if [ -n "$(find web \( -path web/node_modules -o -path web/.next \) -prune -o \( -name '*.test.*' -o -name '*.spec.*' \) -print -quit)" ]; then
+            web=true
+          fi
+          if [ -d mobile/test ] && [ -n "$(find mobile/test -name '*_test.dart' -print -quit)" ]; then
+            mobile=true
+          fi
+          {
+            echo "backend=$backend"
+            echo "bridge=$bridge"
+            echo "web=$web"
+            echo "mobile=$mobile"
+          } >> "$GITHUB_OUTPUT"
+          for pair in "backend:$backend" "bridge:$bridge" "web:$web" "mobile:$mobile"; do
+            name="${pair%%:*}"; present="${pair##*:}"
+            if [ "$present" = "false" ]; then
+              echo "::notice title=allow-empty::$name unit suite is empty — explicit documented skip (CONTRIBUTING.md, MT-0.3-02); the job still fails on any test the suite does contain."
+            fi
+          done
+
+      # --- backend / bridge (Python, pytest) — runner installed when suites land ---
+      - uses: astral-sh/setup-uv@v6
+        if: steps.suites.outputs.backend == 'true' || steps.suites.outputs.bridge == 'true'
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+      - name: "backend: unit suite (pytest)"
+        if: steps.suites.outputs.backend == 'true'
+        run: uv run --directory backend pytest
+      - name: "bridge: unit suite (pytest)"
+        if: steps.suites.outputs.bridge == 'true'
+        run: uv run --directory bridge pytest
+
+      # --- web (Next.js, `npm --prefix web run test`) ---
+      - uses: actions/setup-node@v4
+        if: steps.suites.outputs.web == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: web install (npm ci)
+        if: steps.suites.outputs.web == 'true'
+        run: npm ci --prefix web
+      - name: "web: unit suite (npm test)"
+        if: steps.suites.outputs.web == 'true'
+        run: npm --prefix web run test
+
+      # --- mobile (Flutter, `flutter test`) ---
+      - uses: subosito/flutter-action@v2
+        if: steps.suites.outputs.mobile == 'true'
+        with:
+          flutter-version: "3.35.6"
+          channel: stable
+      - name: "mobile: unit suite (flutter test)"
+        if: steps.suites.outputs.mobile == 'true'
+        run: flutter test
+        working-directory: mobile
+
+  # Section 18: "Integration: API with database and Redis". The job provisions the
+  # real services as GitHub Actions service containers (the alternative to Compose
+  # named in MT-0.3-02), pinned to the same image versions as infra/compose
+  # (postgres:16-alpine, redis:7.4-alpine — NFR-06 parity). Container health checks
+  # gate the job: an unhealthy service fails it. The integration suite itself runs
+  # against these services via CI-provided environment; while it is empty the same
+  # documented allow-empty policy applies.
+  integration-tests:
+    name: integration-tests
+    runs-on: ubuntu-latest
+    env:
+      # CI-provided, ephemeral, runner-local endpoints (WP-0.5 env naming).
+      # Trust auth means no password exists to commit, log or cache
+      # (Section 20.4 item 3, RISK-14).
+      ORCHESTRATOR_DATABASE_URL: postgres://orchestrator@127.0.0.1:5432/orchestrator
+      ORCHESTRATOR_CACHE_URL: redis://127.0.0.1:6379/0
+    services:
+      postgres:
+        image: postgres:16-alpine
+        # The POSTGRES_* keys below are the postgres image's mandated
+        # interface (configuration.md rule 7); the job's own consumers read
+        # the canonical names (ORCHESTRATOR_DATABASE_URL /
+        # ORCHESTRATOR_CACHE_URL) declared above.
+        env:
+          POSTGRES_USER: orchestrator
+          POSTGRES_DB: orchestrator
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U orchestrator -d orchestrator"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7.4-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect integration suites (allow-empty policy)
+        id: suites
+        run: |
+          set -euo pipefail
+          backend=false; bridge=false
+          if [ -n "$(find backend -path '*/.venv' -prune -o -path '*/integration/*' -name 'test_*.py' -print -quit)" ]; then
+            backend=true
+          fi
+          if [ -n "$(find bridge -path '*/.venv' -prune -o -path '*/integration/*' -name 'test_*.py' -print -quit)" ]; then
+            bridge=true
+          fi
+          {
+            echo "backend=$backend"
+            echo "bridge=$bridge"
+          } >> "$GITHUB_OUTPUT"
+          for pair in "backend:$backend" "bridge:$bridge"; do
+            name="${pair%%:*}"; present="${pair##*:}"
+            if [ "$present" = "false" ]; then
+              echo "::notice title=allow-empty::$name integration suite is empty — explicit documented skip (CONTRIBUTING.md, MT-0.3-02); Postgres and Redis were provisioned and health-checked regardless."
+            fi
+          done
+
+      - uses: astral-sh/setup-uv@v6
+        if: steps.suites.outputs.backend == 'true' || steps.suites.outputs.bridge == 'true'
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+      - name: "backend: integration suite (pytest, against Postgres + Redis)"
+        if: steps.suites.outputs.backend == 'true'
+        run: uv run --directory backend pytest backend/tests/integration
+      - name: "bridge: integration suite (pytest, against Postgres + Redis)"
+        if: steps.suites.outputs.bridge == 'true'
+        run: uv run --directory bridge pytest bridge/tests/integration

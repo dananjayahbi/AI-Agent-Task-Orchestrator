@@ -1,0 +1,39 @@
+# Tooling configuration for the Django control-plane backend (parent plan Section 6.6).
+# Application dependencies (Django, DRF, ...) arrive with WP-1.1; this file only fixes
+# the shared Python tooling baseline (MT-0.1-02).
+
+[project]
+name = "orchestrator-backend"
+version = "0.0.1"
+description = "Django control plane for the AI Agent Task Orchestrator"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff==0.17.0",
+    "mypy==2.4.0",
+]
+
+# --- Ruff: formatter + linter (kept identical in backend/ and bridge/) ---
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # import sorting
+    "B",  # flake8-bugbear
+    "UP", # pyupgrade
+]
+
+# --- mypy: type checker (kept identical in backend/ and bridge/) ---
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+exclude = ["\\.venv"]
