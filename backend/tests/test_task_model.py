@@ -115,9 +115,17 @@ def test_task_model_field_set_matches_section_7_2_exactly(project: Project) -> N
     asserted as such instead of polluting the table's field set.
     """
     names = {field.name for field in Task._meta.get_fields() if field.concrete}
-    assert names == PLAN_7_2_FIELDS, sorted(names ^ PLAN_7_2_FIELDS)
+    # WP-1.6 adds `lease_generation` (MT-1.6-05): Section 8.6's *internal*
+    # fencing counter — "every claim increments an internal lease generation"
+    # — the one column outside the Section 7.2 table, recorded in the WP
+    # changelog. Everything else stays verbatim (none added, dropped, renamed).
+    expected = PLAN_7_2_FIELDS | {"lease_generation"}
+    assert names == expected, sorted(names ^ expected)
     reverse = {field.name for field in Task._meta.get_fields() if not field.concrete}
-    assert reverse == {"dependency_edges", "dependent_edges"}, sorted(reverse)
+    # WP-1.5 adds `transitions` (TaskTransition's FK, MT-1.5-05) — the
+    # relation joins the two that the Section 7.1 dependency join owns;
+    # still relation metadata, never a column of the Section 7.2 table.
+    assert reverse == {"dependency_edges", "dependent_edges", "transitions"}, sorted(reverse)
 
     project_field = Task._meta.get_field("project")
     assert project_field.attname == "project_id", "the Section 7.2 FK column name"

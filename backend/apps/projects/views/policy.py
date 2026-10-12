@@ -11,9 +11,12 @@ Recorded notes (MT-1.3-04, WP changelog):
   (Section 12.5; FR-PRJ-05's validated write path) — the Policy Engine
   (WP-3.x), lease sweeper (WP-1.7) and claim limit (WP-1.6) read the rows
   it writes;
-* policy edits are state changes: the audit/event emission point is the
-  ``save`` call below, once WP-1.9's helper exists (Section 12.5 requires
-  policy edits in the audit trail — recorded hook, not emitted yet);
+* policy edits are state changes: each successful save writes one
+  ``project.updated`` event (Section 9.6 catalog — there is no separate
+  ``policy.updated`` type, catalog-first: Section 20.4 item 5) inside
+  the same transaction, with the caller as actor and Section 12.5's
+  correlation id (MT-1.9-02; Section 12.5 requires policy edits in the
+  audit trail);
 * bounds follow Section 7.2 only — nothing beyond it is clamped or
   invented (risk note); glob semantics stay with the Policy Engine.
 """
@@ -22,6 +25,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.request import Request
@@ -29,10 +33,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import CanManageProjects, HasProjectScope
+from apps.events.services import write_event
 
 from ..serializers.policy import ProjectPolicySerializer
 from ..services.projects import get_project_or_404
-from .projects import _READ_ERRORS
+from .projects import _READ_ERRORS, _actor_ref
 
 
 class ProjectPolicyDetailView(APIView):
@@ -69,8 +74,8 @@ class ProjectPolicyDetailView(APIView):
             "ignored. Unspecified fields keep their current values. "
             "`branch_prefix` is the G-09 canonical prefix (default "
             "`feat/{PID}-`) applied when bridge branch names are derived. "
-            "Caller: Owner only. Policy edits emit an audit event once "
-            "WP-1.9's helper exists."
+            "Caller: Owner only. Policy edits emit a `project.updated` "
+            "event (Section 9.6) inside the update transaction."
         ),
     )
     def patch(self, request: Request, pid: str, *args: Any, **kwargs: Any) -> Response:
@@ -80,7 +85,16 @@ class ProjectPolicyDetailView(APIView):
             project.agent_policy, data=request.data, partial=True
         )
         input_serializer.is_valid(raise_exception=True)
-        input_serializer.save()
-        # Audit/event hook (WP-1.9, Section 12.5): emit `policy.updated`
-        # (with actor + correlation id) after commit here.
+        with transaction.atomic():
+            input_serializer.save()
+            # Section 12.5 policy-edit audit event: `project.updated` with
+            # the policy scope discriminator (no `policy.updated` type
+            # exists — the catalog is closed; MT-1.9-02).
+            write_event(
+                type="project.updated",
+                project_id=project.pk,
+                actor_type="owner",
+                actor_ref=_actor_ref(request),
+                data={"scope": "policy", "fields": sorted(input_serializer.validated_data)},
+            )
         return Response(ProjectPolicySerializer(project.agent_policy).data)

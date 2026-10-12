@@ -7,15 +7,15 @@
  * of the plan is lost, re-read it before editing this data.
  */
 
-const TOTAL_DOCS = 328;
+const TOTAL_DOCS = 329; // series grew by MT-1.6-09 (agent-sessions, roadmap rule 4)
 
 const waves = [
   { id: 1, name: "Foundations",            total: 22, done: 22, status: "done" },
   { id: 2, name: "Backend foundation",     total: 23, done: 23, status: "done" },
-  { id: 3, name: "State machine & leases", total: 27, done: 3,  status: "active" },
-  { id: 4, name: "Events, attachments",    total: 32, done: 0,  status: "pending" },
-  { id: 5, name: "Bridge skeleton & web",  total: 32, done: 7,  status: "active" },
-  { id: 6, name: "Bridge core tools",      total: 36, done: 3,  status: "active" },
+  { id: 3, name: "State machine & leases", total: 27, done: 18, status: "active" },
+  { id: 4, name: "Events, attachments",    total: 32, done: 9,  status: "active" },
+  { id: 5, name: "Bridge skeleton & web",  total: 32, done: 11, status: "active" },
+  { id: 6, name: "Bridge core tools",      total: 36, done: 12, status: "active" },
   { id: 7, name: "Policy core & Kanban",   total: 34, done: 0,  status: "pending" },
   { id: 8, name: "Agent loop completion",  total: 42, done: 0,  status: "pending" },
   { id: 9, name: "Merge & review UIs",     total: 40, done: 0,  status: "pending" },
@@ -52,12 +52,13 @@ const timeline = [
   {
     date: "2026-10-12",
     status: "active",
-    event: "Max-parallel dispatch — 4 concurrent agents (58/328)",
+    event: "Max-parallel batch complete — 95/329 micro-docs (28.9%)",
     detail:
-      "Owner directive recorded in roadmap 4a: maximize dependency-safe parallelism. Running: " +
-      "wp-1.5 state machine (backend), wp-4.2 project UI + MT-4.1-03 (web), wp-5.3 device auth " +
-      "(backend/accounts territory), wp-2.2 manifest binding MT-01..03 (bridge). " +
-      "Deferred MTs tracked in WP changelogs (await WP-1.9/1.10, agent-sessions endpoint).",
+      "Post-storm batch finished: wp-1.5 state machine (6, 98% matrix coverage), wp-1.6 leases " +
+      "+ NEW MT-1.6-09 agent-sessions (9, NFR-01 race-proof on real Postgres), wp-1.9 event log (5), " +
+      "wp-2.3 bridge API client (5, 207 tests), wp-5.3 device auth (4), wp-2.2 binding (3), " +
+      "wp-4.2 project UI + MT-4.1-03 (5). Series grew 328 → 329 (sessions gap filled per roadmap rule 4). " +
+      "Convergence gate running next.",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

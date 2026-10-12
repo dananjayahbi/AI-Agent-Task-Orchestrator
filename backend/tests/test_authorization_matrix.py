@@ -53,8 +53,6 @@ from rest_framework.views import APIView
 from apps.accounts.exceptions import AuthForbiddenProject
 from apps.accounts.models import User
 from apps.accounts.permissions import (
-    CanClaimAuditTasks,
-    CanClaimPendingTasks,
     CanOperateMergeQueue,
     CanPublishTasks,
     CanReadEvents,
@@ -72,6 +70,13 @@ from apps.core.errors import (
     VALIDATION_ERROR,
 )
 from apps.projects.models import Project, ProjectPolicy
+from apps.tasks.models import Task, TaskState
+
+# WP-1.6: the two Claim rows now claim through the *real* route, whose
+# service calls ``ensure_wired()`` and replaces the T4/T6 stubs on the
+# process registry — autouse the restore fixture so the WP-1.5 suites
+# sharing this process still see their stubs (wp16_helpers' rule).
+from tests.wp16_helpers import restore_lease_registry  # noqa: F401
 
 PID_ONE = "PID00001"
 PID_TWO = "PID00002"
@@ -132,9 +137,9 @@ urlpatterns = [
     # left it in WP-1.4 — that row now runs on the real
     # ``POST /api/v1/projects/{pid}/tasks`` route with its Decomposer and
     # Device cells recorded as deferred in ``DEFERRED_MATRIX_CELLS``.
+    # WP-1.6 (MT-1.6-07) moved both *Claim* rows onto the real claim
+    # route — their probe paths retired with them.
     path("probe/publish", _probe_view(CanPublishTasks).as_view()),
-    path("probe/claim-pending", _probe_view(CanClaimPendingTasks).as_view()),
-    path("probe/claim-audit", _probe_view(CanClaimAuditTasks).as_view()),
     path("probe/resolution", _probe_view(CanSubmitResolution).as_view()),
     path("probe/verdict", _probe_view(CanSubmitAuditVerdict).as_view()),
     path("probe/review", _probe_view(CanReviewDecisions).as_view()),
@@ -150,6 +155,10 @@ urlpatterns = [
     # WP-1.4's real task routes — the Create-drafts row and both
     # cross-project cases run against them (MT-1.4-03's landing).
     path("api/v1/", include("apps.tasks.urls")),
+    # WP-1.6's real agent-work + agent-session routes (MT-1.6-07/09) — the
+    # two Claim rows and the landed-route cases below resolve here.
+    path("api/v1/", include("apps.leases.urls")),
+    path("api/v1/", include("apps.agents.urls")),
 ]
 
 
@@ -195,8 +204,27 @@ PROBES: tuple[_Probe, ...] = (
         ok=(201,),
     ),
     _Probe("Publish tasks", "/probe/publish", "POST", _cells(owner=True, device=True)),
-    _Probe("Claim pending", "/probe/claim-pending", "POST", _cells(coder=True)),
-    _Probe("Claim to_be_audited", "/probe/claim-audit", "POST", _cells(auditor=True)),
+    # Both *Claim* rows run on the real WP-1.6 route (MT-1.6-07): the
+    # service answers 200 (claimed) — or, for the to_be_audited row, 409:
+    # the auditor path runs through the T11 transition guard and WP-3.x
+    # wires it, so "allowed" there means "passed authorization, reached
+    # the state machine". Denied actors never reach the service (403).
+    _Probe(
+        "Claim pending",
+        f"/api/v1/tasks/{PID_ONE}-T001/claim",
+        "POST",
+        _cells(coder=True),
+        payload={"session_id": "sess-matrix-claim", "worker_agent_id": "matrix-coder"},
+        ok=(200, 409),
+    ),
+    _Probe(
+        "Claim to_be_audited",
+        f"/api/v1/tasks/{PID_ONE}-T002/claim",
+        "POST",
+        _cells(auditor=True),
+        payload={"session_id": "sess-matrix-audit", "worker_agent_id": "matrix-auditor"},
+        ok=(200, 409),
+    ),
     _Probe("Submit resolution", "/probe/resolution", "POST", _cells(coder=True)),
     _Probe("Submit verdict", "/probe/verdict", "POST", _cells(auditor=True)),
     _Probe("Review decisions", "/probe/review", "POST", _cells(owner=True, device=True)),
@@ -278,6 +306,28 @@ def matrix(owner_client: APIClient) -> Iterator[_Authz]:
             default_branch="main",
             agent_policy=ProjectPolicy.objects.create(),
         )
+
+    # Two real task rows for the two Claim rows (WP-1.6, MT-1.6-07): a
+    # pending task the coder cell claims and a to_be_audited one the
+    # auditor cell reaches (answered 409 until WP-3.x wires the T11
+    # guard). Direct rows keep the matrix self-contained.
+    project = Project.objects.get(id=PID_ONE)
+    Task.objects.create(
+        id=f"{PID_ONE}-T001",
+        project=project,
+        title="Claim probe (pending)",
+        state=TaskState.PENDING,
+    )
+    Task.objects.create(
+        id=f"{PID_ONE}-T002",
+        project=project,
+        title="Claim probe (to_be_audited)",
+        state=TaskState.TO_BE_AUDITED,
+    )
+    # The seeds occupy indices 1-2: advance the allocator's counter (it
+    # lives on the project row) so the Create-drafts probe's first
+    # allocation lands on T003 instead of colliding with T001.
+    Project.objects.filter(id=PID_ONE).update(task_counter=2)
 
     def _headers(actor: str) -> dict[str, str] | None:
         if actor in AGENT_ROLES:
@@ -437,12 +487,18 @@ def test_revoked_agent_token_fails_on_its_very_next_request(
 ) -> None:
     """Revoke through the Owner API; the next bearer call is AUTH_REQUIRED."""
     token = matrix.agents["coder"]
-    assert matrix.call("coder", "POST", "/probe/claim-pending").status_code == 200
+    claim_path = f"/api/v1/tasks/{PID_ONE}-T001/claim"
+    claim_body = {"session_id": "sess-revoke-probe", "worker_agent_id": "matrix-coder"}
+    # The real WP-1.6 claim route (the probe retires with MT-1.6-07):
+    # pre-revoke the coder claims in its own project.
+    assert matrix.post("coder", claim_path, claim_body).status_code == 200
 
     revoke = owner_client.delete(f"/api/v1/tokens/{token['id']}")
     assert revoke.status_code == 200
 
-    after = matrix.call("coder", "POST", "/probe/claim-pending")
+    # Authentication runs before body parsing — the revoked bearer dies
+    # with AUTH_REQUIRED even though the payload alone would pass.
+    after = matrix.post("coder", claim_path, claim_body)
     assert after.status_code == 401
     assert _code(after) == AUTH_REQUIRED
 
@@ -472,6 +528,87 @@ def test_revoked_owner_session_fails_on_its_very_next_request(
     after = matrix.call("owner", "GET", "/api/v1/projects")
     assert after.status_code == 401
     assert _code(after) == AUTH_REQUIRED
+
+
+# --- WP-1.6 landing: the entries DEFERRED_ENDPOINTS retired (MT-1.6-07/09) -
+
+
+def test_wp16_landed_routes_enforce_their_callers(matrix: _Authz) -> None:
+    """Real-route cases for work/release/agent-sessions (removed deferred).
+
+    The two Claim rows now run as real-route probes above; this covers the
+    other three surfaces WP-1.6 landed, asserting the catalog codes of the
+    callers each deferred entry used to stand in for. The services'
+    full catalogs live in tests/test_claim_release_endpoints.py and
+    tests/test_agent_session_endpoints.py.
+    """
+    # Work (the agent offer list, caller Agent per Section 9.2):
+    # anonymous 401, owner 403 (IsAgentToken), agent 200.
+    anon_work = matrix.call("anonymous", "GET", f"/api/v1/projects/{PID_ONE}/work")
+    assert anon_work.status_code == 401
+    assert _code(anon_work) == AUTH_REQUIRED
+
+    owner_work = matrix.call("owner", "GET", f"/api/v1/projects/{PID_ONE}/work")
+    assert owner_work.status_code == 403
+    assert _code(owner_work) == ROLE_NOT_PERMITTED
+
+    coder_work = matrix.call("coder", "GET", f"/api/v1/projects/{PID_ONE}/work")
+    assert coder_work.status_code == 200
+
+    # Release (agent-only): anonymous 401, owner 403, coder 200 on the
+    # lease it claims first (the matrix rows above claim T001 only in
+    # their own test — each test gets a fresh database).
+    claim = matrix.post(
+        "coder",
+        f"/api/v1/tasks/{PID_ONE}-T001/claim",
+        {"session_id": "sess-landed", "worker_agent_id": "matrix-coder"},
+    )
+    assert claim.status_code == 200
+
+    anon_release = matrix.call("anonymous", "POST", f"/api/v1/tasks/{PID_ONE}-T001/release")
+    assert anon_release.status_code == 401
+    assert _code(anon_release) == AUTH_REQUIRED
+
+    release = matrix.post(
+        "coder",
+        f"/api/v1/tasks/{PID_ONE}-T001/release",
+        {"session_id": "sess-landed", "lease_generation": 1},
+    )
+    assert release.status_code == 200
+
+    # Owner override (T6's O actor, by design): after re-claiming, the
+    # owner releases without the fencing pair — the retired deferred
+    # entry stood in for this route; test_release_owner_override covers
+    # the service path, this proves the matrix cell.
+    reclaim = matrix.post(
+        "coder",
+        f"/api/v1/tasks/{PID_ONE}-T001/claim",
+        {"session_id": "sess-landed", "worker_agent_id": "matrix-coder"},
+    )
+    assert reclaim.status_code == 200
+
+    owner_release = matrix.post("owner", f"/api/v1/tasks/{PID_ONE}-T001/release", {})
+    assert owner_release.status_code == 200
+
+    # Agent sessions (MT-1.6-09): anonymous 401, owner 403 (agent-only
+    # surface), agent 201 open + 200 end on its own session.
+    anon_open = matrix.call("anonymous", "POST", "/api/v1/agent-sessions")
+    assert anon_open.status_code == 401
+    assert _code(anon_open) == AUTH_REQUIRED
+
+    owner_open = matrix.post("owner", "/api/v1/agent-sessions", {})
+    assert owner_open.status_code == 403
+    assert _code(owner_open) == ROLE_NOT_PERMITTED
+
+    opened = matrix.post(
+        "coder",
+        "/api/v1/agent-sessions",
+        {"id": "sess-matrix-open", "transport": "stdio"},
+    )
+    assert opened.status_code == 201
+
+    ended = matrix.call("coder", "POST", "/api/v1/agent-sessions/sess-matrix-open/end")
+    assert ended.status_code == 200
 
 
 # --- FR-SEC-05 case inside the matrix suite (MT-1.2-06) ---------------------
@@ -512,10 +649,17 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     # the Create-drafts row runs on the real route above (its printed
     # Decomposer/Device cells recorded in DEFERRED_MATRIX_CELLS), and
     # test_task_api.py asserts the real routes' catalog codes.
-    "/api/v1/tasks/1/transition",  # Publish tasks (WP-1.5)
-    f"/api/v1/projects/{PID_ONE}/work",  # Claim pending (WP-1.5)
-    "/api/v1/tasks/1/claim",  # Claim pending / to_be_audited (WP-1.5)
-    "/api/v1/tasks/1/release",  # WP-1.5
+    # WP-1.5 landed the transition *service* only: MT-1.5-02 keeps the
+    # POST /tasks/{id}/transition wiring out of scope (service behavior
+    # asserted in its own suites), so this entry stays deferred — its
+    # Publish-tasks probe below remains the row under test until the
+    # route lands (WP-1.15 hardening) and forces this line's replacement.
+    "/api/v1/tasks/1/transition",  # Publish tasks (service in WP-1.5; endpoint deferred)
+    # WP-1.6 (MT-1.6-07/09) removed its entries as it landed them: the
+    # work/claim/release routes now carry real cases (both Claim rows run
+    # as real-route probes above; test_wp16_landed_routes_enforce_their_
+    # callers below covers work + release), and the agent-sessions pair
+    # moved to the real MT-1.6-09 routes there too.
     "/api/v1/tasks/1/checkpoints",  # WP-1.6
     "/api/v1/tasks/1/resolution",  # Submit resolution (WP-1.6)
     "/api/v1/tasks/1/resolutions",  # WP-1.6
@@ -529,8 +673,6 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     "/api/v1/tasks/1/attachments",  # WP-1.11
     "/api/v1/attachments/1",  # WP-1.11
     "/api/v1/attachments/1/content",  # WP-1.11
-    "/api/v1/agent-sessions",  # Bridge (WP-2.x)
-    "/api/v1/agent-sessions/1/end",  # Bridge (WP-2.x)
     "/api/v1/events",  # Read events — Owner only (WP-1.8)
     "/api/v1/events/stream",  # Read events — Owner only (WP-1.8)
     "/api/v1/dashboard/summary",  # Owner (WP-1.8)

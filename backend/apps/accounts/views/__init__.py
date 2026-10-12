@@ -7,12 +7,12 @@ adapter over ``apps.accounts.services`` — business logic never lives here.
 from __future__ import annotations
 
 from .auth import LoginView, LogoutView, RefreshView
-from .devices import DeviceRegisterView, DeviceRevokeView
+from .devices import DeviceCollectionView, DeviceRevokeView
 from .tokens import AgentTokenIssueView, TokenListView, TokenRevokeView
 
 __all__ = [
     "AgentTokenIssueView",
-    "DeviceRegisterView",
+    "DeviceCollectionView",
     "DeviceRevokeView",
     "LoginView",
     "LogoutView",

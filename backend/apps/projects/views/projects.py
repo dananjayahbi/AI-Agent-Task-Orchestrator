@@ -18,14 +18,17 @@ Recorded readings (MT-1.3-03, WP changelog):
 * Unknown ``{pid}`` → ``VALIDATION_ERROR``/400 via the documented
   generic-NotFound mapping (the catalog has no ``PROJECT_NOT_FOUND`` —
   asymmetry with ``TASK_NOT_FOUND`` recorded in the changelog).
-* ``project.created`` / ``project.updated`` emission point: the services/
-  view call sites below, once WP-1.9's event helper exists.
+* ``project.created`` / ``project.updated`` emissions: written inside
+  the same transaction as the change through WP-1.9's event helper
+  (``write_event``) — Section 9.6, MT-1.9-02; the schema description
+  below says so on the wire.
 """
 
 from __future__ import annotations
 
 from typing import Any, cast
 
+from django.db import transaction
 from django.db.models import QuerySet
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -36,6 +39,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import CanManageProjects, HasProjectScope
 from apps.core.pagination import decode_str_cursor, parse_page_size, string_id_cursor_page
 from apps.core.serializers import ErrorEnvelopeSerializer
+from apps.events.services import write_event
 
 from ..models import Project
 from ..serializers.projects import (
@@ -46,6 +50,18 @@ from ..serializers.projects import (
     ProjectUpdateSerializer,
 )
 from ..services.projects import create_project, get_project_or_404
+
+
+def _actor_ref(request: Request) -> str:
+    """Section 9.6 ``actor.ref`` for the caller: owner user id, else label.
+
+    Owner-session routes always carry a user pk; the label fallback only
+    covers a context without one (mirrors ``_created_by`` in the tasks
+    views — MT-1.9-02).
+    """
+    user_id = getattr(getattr(request, "user", None), "pk", None)
+    return str(user_id) if user_id is not None else "owner"
+
 
 # The owner-side error set shared by every endpoint in this module: bad
 # input/unknown pid (400), missing credential (401), wrong role or
@@ -138,8 +154,8 @@ class ProjectListCreateView(APIView):
             repo_path=validated["repo_path"],
             default_branch=validated["default_branch"],
             system_prompt_rules=validated.get("system_prompt_rules", ""),
+            actor_ref=_actor_ref(request),
         )
-        # Event hook (WP-1.9): emit `project.created` after commit here.
         return Response(
             ProjectSerializer(project).data,
             status=status.HTTP_201_CREATED,
@@ -179,7 +195,7 @@ class ProjectDetailView(APIView):
             "projects are never deleted). Unspecified fields keep their "
             "current values. The `id` is immutable (Section 7.3/7.4) and "
             "is rejected if sent. Caller: Owner only. Emits "
-            "`project.updated` once WP-1.9's event helper exists."
+            "`project.updated` (Section 9.6) inside the update transaction."
         ),
     )
     def patch(self, request: Request, pid: str, *args: Any, **kwargs: Any) -> Response:
@@ -187,6 +203,15 @@ class ProjectDetailView(APIView):
         project = get_project_or_404(pid)
         input_serializer = ProjectUpdateSerializer(project, data=request.data, partial=True)
         input_serializer.is_valid(raise_exception=True)
-        input_serializer.save()
-        # Event hook (WP-1.9): emit `project.updated` after commit here.
+        with transaction.atomic():
+            input_serializer.save()
+            # Section 9.6 `project.updated` in the same transaction as the
+            # change — rollback takes both (MT-1.9-02).
+            write_event(
+                type="project.updated",
+                project_id=project.pk,
+                actor_type="owner",
+                actor_ref=_actor_ref(request),
+                data={"scope": "project", "fields": sorted(input_serializer.validated_data)},
+            )
         return Response(ProjectSerializer(project).data)

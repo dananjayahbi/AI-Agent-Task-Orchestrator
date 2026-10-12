@@ -6,6 +6,119 @@ info:
     document is the single source of truth for web and mobile clients. Errors use
     the Section 9.2 envelope; list endpoints are cursor-paginated (docs/plan/conventions/pagination.md).'
 paths:
+  /api/v1/agent-sessions:
+    post:
+      operationId: open_agent_session
+      description: 'Open an agent session (Section 9.2 Sessions row; caller: Bridge).
+        The session id is bridge-issued and unguessable (G-18) and travels in the
+        body; `project_id` and `token_id` are taken from the authenticated agent token
+        — never from the payload (ADR-004; a body `project_id` is rejected as an unknown
+        field). `capability` defaults to `unknown` (Section 10.4); `transport` is
+        one of Section 10.2''s run modes. 201 returns the Section 7.2 row; a duplicate
+        id answers VALIDATION_ERROR; `Idempotency-Key` replays a retried open without
+        creating a second row.'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of opening
+          a second session.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSessionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AgentSessionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AgentSessionCreate'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSession'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/agent-sessions/{id}/end:
+    post:
+      operationId: end_agent_session
+      description: 'End an agent session (Section 9.2 Sessions row; caller: Bridge).
+        Sets `ended_at` exactly once; repeating the call returns the same row unchanged
+        (best-effort shutdown calls must be safe). The session''s project must match
+        the token''s scope (AUTH_FORBIDDEN_PROJECT otherwise); an unknown id answers
+        the standard no-catalog-code mapping (VALIDATION_ERROR, 400). `Idempotency-Key`
+        replays a retried end.'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of opening
+          a second session.
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSession'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/auth/login:
     post:
       operationId: api_v1_auth_login_create
@@ -102,9 +215,72 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
   /api/v1/devices:
+    get:
+      operationId: api_v1_devices_retrieve
+      description: 'List the caller''s registered devices as metadata (no push_token,
+        no token material) — the Section 13.1 account settings surface. Sort: id descending
+        (newest first). Pagination: cursor-based — pass `cursor` from the previous
+        `next_cursor`; `page_size` defaults to 25 and is clamped to 100. Revoked devices
+        stay listed with `revoked_at` set so settings can show history.'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
     post:
       operationId: api_v1_devices_create
-      description: Create Device + device token atomically; plaintext returned once.
+      description: Register a device after Owner login (Section 9.2 Devices row; Section
+        12.2). Creates the Device row and its `kind = device` API Token atomically;
+        the plaintext `token` is returned exactly once — store it in platform secure
+        storage (Section 12.2). `Idempotency-Key` replays a retried registration instead
+        of duplicating the device (ADR-012).
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original 201 outcome — the same
+          device id and token material — instead of registering a second device; reuse
+          with a different request is an open point (headers.md) and executes normally.
       tags:
       - api
       requestBody:
@@ -355,8 +531,8 @@ paths:
         `system_prompt_rules`, `active_status` (transitions among active | paused
         | archived — FR-PRJ-04; projects are never deleted). Unspecified fields keep
         their current values. The `id` is immutable (Section 7.3/7.4) and is rejected
-        if sent. Caller: Owner only. Emits `project.updated` once WP-1.9''s event
-        helper exists.'
+        if sent. Caller: Owner only. Emits `project.updated` (Section 9.6) inside
+        the update transaction.'
       parameters:
       - in: path
         name: pid
@@ -503,8 +679,8 @@ paths:
         prefix and glob lists when supplied; unknown fields are rejected, never ignored.
         Unspecified fields keep their current values. `branch_prefix` is the G-09
         canonical prefix (default `feat/{PID}-`) applied when bridge branch names
-        are derived. Caller: Owner only. Policy edits emit an audit event once WP-1.9''s
-        helper exists.'
+        are derived. Caller: Owner only. Policy edits emit a `project.updated` event
+        (Section 9.6) inside the update transaction.'
       parameters:
       - in: path
         name: pid
@@ -731,6 +907,101 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/projects/{pid}/work:
+    get:
+      operationId: list_work
+      description: 'List the project''s offerable work (Section 9.2 Agent-work row;
+        caller: Agent). `role=coder` (default) lists `pending` tasks whose dependencies
+        are completed; `role=auditor` lists `to_be_audited` (the audit claim arrives
+        with WP-3.3). Archived tasks are hidden (T19), a non-active project returns
+        an empty list (FR-PRJ-04), order is FR-TSK-05 canonical (priority, then oldest
+        first), cursor-paginated. This read is deliberately non-locking: the locking
+        select-and-claim twin is the claim-next service (Section 9.3).'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous next_cursor; valid only with
+          the same role/priority (pagination.md rule 1).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above are clamped).
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: priority
+        schema:
+          enum:
+          - urgent
+          - high
+          - medium
+          - low
+          type: string
+          minLength: 1
+        description: |-
+          FR-TSK-05 priority filter (single value).
+
+          * `urgent` - urgent
+          * `high` - high
+          * `medium` - medium
+          * `low` - low
+      - in: query
+        name: role
+        schema:
+          enum:
+          - coder
+          - auditor
+          type: string
+          default: coder
+          minLength: 1
+        description: |-
+          Which offer list to read: coder → pending (default); auditor → to_be_audited (the audit claim itself is WP-3.3's T11).
+
+          * `coder` - coder
+          * `auditor` - auditor
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/tasks/{id}:
     get:
       operationId: retrieve_task
@@ -853,6 +1124,174 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tasks/{id}/claim:
+    post:
+      operationId: claim_task
+      description: 'Atomically claim a pending task (Section 9.2 Agent-work row; caller:
+        Agent coder). One transaction takes the row with `FOR UPDATE SKIP LOCKED`,
+        re-validates state, project status, dependencies and `max_concurrent_tasks`
+        inside the lock, sets the Section 8.6 lease and bumps `lease_generation` and
+        `attempt_number` (FR-LEA-01/02; ADR-012 fencing). 200 returns task details,
+        the lease record and the Section 10.6 rules block. Errors: TASK_ALREADY_CLAIMED,
+        TASK_NOT_FOUND, TASK_STATE_CONFLICT, DEPENDENCY_UNMET, CONCURRENCY_LIMIT_REACHED,
+        AUTH_FORBIDDEN_PROJECT — all 409/404/403 per the documented mapping. `Idempotency-Key`
+        replays a retried claim without leasing twice (NFR-12).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of executing
+          the claim/release again.
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClaimRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClaimRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tasks/{id}/release:
+    post:
+      operationId: release_task
+      description: 'Voluntarily release a claimed task back to `pending` (Section
+        9.2; Section 8.2 T6 — actors C, O). No `failure_retry_count` increment (FR-LEA-06);
+        `attempt_number` is preserved. Agent callers must carry `session_id` and `lease_generation`
+        (ADR-012): a foreign session answers LEASE_NOT_OWNED, a stale generation or
+        dead lease LEASE_EXPIRED. An Owner session applies the documented override
+        without the fencing pair. Optional `reason` lands on the Transition note;
+        optional `version` enables the FR-TSK-06 stale-version check. 200 returns
+        the updated task.'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of executing
+          the claim/release again.
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReleaseRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReleaseRequest'
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
           content:
             application/json:
               schema:
@@ -1074,6 +1513,83 @@ components:
         worktree_mode:
           type: boolean
           description: 'Per-task worktree advice (Section 10.3 example: false; ADR-013).'
+    AgentSession:
+      type: object
+      description: The Section 7.2 Agent Session row as it goes over the wire.
+      properties:
+        id:
+          type: string
+          readOnly: true
+        project_id:
+          type: string
+          readOnly: true
+        token_id:
+          type: integer
+          readOnly: true
+        agent_label:
+          type: string
+          readOnly: true
+        client_name:
+          type: string
+          readOnly: true
+        capability:
+          allOf:
+          - $ref: '#/components/schemas/CapabilityEnum'
+          readOnly: true
+        transport:
+          allOf:
+          - $ref: '#/components/schemas/TransportEnum'
+          readOnly: true
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+        last_seen_at:
+          type: string
+          format: date-time
+          readOnly: true
+        ended_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - agent_label
+      - capability
+      - client_name
+      - ended_at
+      - id
+      - last_seen_at
+      - project_id
+      - started_at
+      - token_id
+      - transport
+    AgentSessionCreate:
+      type: object
+      description: '``POST /agent-sessions`` input — no project field exists here
+        (ADR-004).'
+      properties:
+        id:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$
+          maxLength: 128
+        agent_label:
+          type: string
+          default: ''
+          maxLength: 255
+        client_name:
+          type: string
+          default: ''
+          maxLength: 255
+        capability:
+          allOf:
+          - $ref: '#/components/schemas/CapabilityEnum'
+          default: unknown
+        transport:
+          $ref: '#/components/schemas/TransportEnum'
+      required:
+      - id
+      - transport
     AgentTokenIssueRequest:
       type: object
       description: 'POST /tokens/agent body: which project, which roles.'
@@ -1118,6 +1634,47 @@ components:
       - project_id
       - scopes
       - token
+    CapabilityEnum:
+      enum:
+      - vision
+      - text_only
+      - unknown
+      type: string
+      description: |-
+        * `vision` - vision
+        * `text_only` - text_only
+        * `unknown` - unknown
+    ClaimRequest:
+      type: object
+      description: '``POST /tasks/{id}/claim`` input (Section 10.5 claim_task minus
+        role).'
+      properties:
+        session_id:
+          type: string
+          description: Bridge-issued session id (G-18) — the lease's identity half.
+          maxLength: 255
+        worker_agent_id:
+          type: string
+          description: Human-readable worker label (Section 7.2 worker_agent_id; self-declared
+            and spoofable — a label only, G-18).
+          maxLength: 255
+      required:
+      - session_id
+      - worker_agent_id
+    ClaimResponse:
+      type: object
+      description: 'Section 9.3 step 6: task details, lease record, rules block.'
+      properties:
+        task:
+          $ref: '#/components/schemas/Task'
+        lease:
+          $ref: '#/components/schemas/LeaseRecord'
+        rules_block:
+          $ref: '#/components/schemas/RulesBlock'
+      required:
+      - lease
+      - rules_block
+      - task
     CodeEnum:
       enum:
       - AUTH_REQUIRED
@@ -1160,6 +1717,21 @@ components:
         * `RATE_LIMITED` - RATE_LIMITED
         * `VERSION_CONFLICT` - VERSION_CONFLICT
         * `SERVER_ERROR` - SERVER_ERROR
+    DeviceListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceSummary'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
     DeviceRegisterRequest:
       type: object
       description: POST /devices body.
@@ -1208,6 +1780,44 @@ components:
       - id
       - platform
       - token
+    DeviceSummary:
+      type: object
+      description: |-
+        GET /devices list item — metadata only (Section 12.4; Section 7.2).
+
+        Deliberately without ``push_token`` (sensitive at rest) and without any
+        token material: the credential's expiry is shown because settings needs
+        it, the hash/plaintext never leave the server.
+      properties:
+        id:
+          type: integer
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        biometric_bound:
+          type: boolean
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last request authenticated with this device's token (Section
+            7.2).
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Revocation instant; null = still active (lost-phone control).
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiry of the device-bound token (Section 9.10 lifetime).
+      required:
+      - biometric_bound
+      - expires_at
+      - id
+      - last_seen_at
+      - platform
+      - revoked_at
     ErrorEnvelope:
       type: object
       description: |-
@@ -1281,6 +1891,49 @@ components:
       description: |-
         * `checkpoint_only` - checkpoint only
         * `checkpoint_and_liveness` - checkpoint and liveness
+    LeaseRecord:
+      type: object
+      description: The Section 8.6 lease JSON — the stored claim record, as documented.
+      properties:
+        task_id:
+          type: string
+        assigned_agent:
+          type: string
+        session_id:
+          type: string
+        role:
+          type: string
+        lease_generation:
+          type: integer
+        lease_acquired_at:
+          type: string
+          format: date-time
+          nullable: true
+        lease_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        lease_hard_cap_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_checkpoint:
+          type: string
+          format: date-time
+          nullable: true
+        failure_retry_count:
+          type: integer
+      required:
+      - assigned_agent
+      - failure_retry_count
+      - last_checkpoint
+      - lease_acquired_at
+      - lease_expires_at
+      - lease_generation
+      - lease_hard_cap_at
+      - role
+      - session_id
+      - task_id
     LoginRequest:
       type: object
       description: POST /auth/login body (Section 9.2 Auth row, caller Owner).
@@ -1711,6 +2364,34 @@ components:
           format: date-time
       required:
       - expires_at
+    ReleaseRequest:
+      type: object
+      description: '``POST /tasks/{id}/release`` input (ADR-012 fencing carrier).'
+      properties:
+        session_id:
+          type: string
+          nullable: true
+          description: Lease-holding session id — required for agent callers; omitted
+            for the Owner override.
+          maxLength: 255
+        lease_generation:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Fencing generation from the claim response (Section 8.6) —
+            required for agent callers; a stale value answers LEASE_EXPIRED.
+        reason:
+          type: string
+          default: ''
+          description: Free-text reason recorded on the T6 Transition row's note (Section
+            10.5 release_task input).
+          maxLength: 500
+        version:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'Optional FR-TSK-06 optimistic check: when present, a stale
+            value answers VERSION_CONFLICT.'
     Revoked:
       type: object
       description: 'POST /auth/logout: the instant the session token stopped working.'
@@ -1720,6 +2401,19 @@ components:
           format: date-time
       required:
       - revoked_at
+    RulesBlock:
+      type: object
+      description: 'Section 10.6 rules block: standard rules + project rules appended.'
+      properties:
+        standard_rules:
+          type: array
+          items:
+            type: string
+        project_rules:
+          type: string
+      required:
+      - project_rules
+      - standard_rules
     StateEnum:
       enum:
       - draft
@@ -2003,6 +2697,14 @@ components:
       - project_id
       - revoked_at
       - scopes
+    TransportEnum:
+      enum:
+      - stdio
+      - http
+      type: string
+      description: |-
+        * `stdio` - stdio
+        * `http` - http
     UserSummary:
       type: object
       description: The owner identity as returned by login.

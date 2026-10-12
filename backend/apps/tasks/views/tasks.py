@@ -302,6 +302,7 @@ class TaskDetailView(APIView):
             task=task,
             validated=validated,
             expected_version=expected_version,
+            actor_ref=_created_by(request),
         )
         response = Response(TaskSerializer(task).data)
         _store_outcome(request, response)

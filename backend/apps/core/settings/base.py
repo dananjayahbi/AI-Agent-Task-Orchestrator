@@ -70,12 +70,21 @@ DATABASES = {
 
 # Cache / pub-sub (Section 9.10). The compose stack points this at Redis on the
 # internal network; bare host runs default to the documented local endpoint.
+_CACHE_URL = get_str("ORCHESTRATOR_CACHE_URL", "redis://localhost:6379/0")
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": get_str("ORCHESTRATOR_CACHE_URL", "redis://localhost:6379/0"),
+        "LOCATION": _CACHE_URL,
     }
 }
+
+# Event publish channel (Section 9.6 post-commit fan-out; MT-1.9-03) —
+# Section 9.10 group `EVENTS_`, documented defaults per configuration.md:
+# the channel name is a fixed default; the publish URL falls back to the
+# cache Redis so the Compose stack needs no additional wiring, and can be
+# pointed elsewhere only through its canonical env name.
+EVENTS_CHANNEL = get_str("ORCHESTRATOR_EVENTS_CHANNEL", "orchestrator:events")
+EVENTS_REDIS_URL = get_str("ORCHESTRATOR_EVENTS_REDIS_URL", _CACHE_URL)
 
 # --- Section 9.10 group: allowed hosts and CORS/CSRF origins ----------------
 # Dev/test fallback includes loopback plus `testserver` so a fresh clone and

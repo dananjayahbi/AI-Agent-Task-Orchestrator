@@ -33,6 +33,15 @@ log_format = "json"
 # Backend request timeout in seconds (parent plan Section 10.10): number > 0.
 timeout_seconds = 30
 
+# Response-size cap in MB (MT-2.3-01; Section 9.10): number > 0.
+max_response_mb = 64
+
+# Retry attempt bound per call (MT-2.3-02; Section 10.10): whole number >= 1.
+retry_max_attempts = 3
+
+# First retry backoff delay in seconds (MT-2.3-02; Section 10.10): number > 0.
+retry_base_delay_seconds = 1
+
 # Manifest path override — test/passthrough hook for WP-2.2 discovery.
 # manifest_path = ""
 

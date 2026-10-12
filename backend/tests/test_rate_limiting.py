@@ -211,10 +211,10 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
     # --- Devices row (Mobile): present with MT-1.2-04, throttled by MT-1.2-06
     _Route(REGISTER_URL, DeviceEndpointThrottle, "MT-1.2-04", True),
     _Route(REVOKE_URL, DeviceEndpointThrottle, "MT-1.2-04", True),
-    # --- Agent work row (Agent): WP-1.4/1.5
-    _Route("/api/v1/projects/PID00001/work", AgentEndpointThrottle, "WP-1.4", False),
-    _Route("/api/v1/tasks/1/claim", AgentEndpointThrottle, "WP-1.5", False),
-    _Route("/api/v1/tasks/1/release", AgentEndpointThrottle, "WP-1.5", False),
+    # --- Agent work row (Agent): landed with MT-1.6-07 (WP-1.6) --------
+    _Route("/api/v1/projects/PID00001/work", AgentEndpointThrottle, "MT-1.6-07", True),
+    _Route("/api/v1/tasks/1/claim", AgentEndpointThrottle, "MT-1.6-07", True),
+    _Route("/api/v1/tasks/1/release", AgentEndpointThrottle, "MT-1.6-07", True),
     # --- Progress row (Agent / Owner): WP-1.6
     _Route("/api/v1/tasks/1/checkpoints", AgentEndpointThrottle, "WP-1.6", False),
     # --- Submission row (Agent / Owner): WP-1.6
@@ -225,9 +225,10 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
     _Route("/api/v1/merge/pending", AgentEndpointThrottle, "WP-3.x", False),
     _Route("/api/v1/merge/1/start", AgentEndpointThrottle, "WP-3.x", False),
     _Route("/api/v1/merge/1/result", AgentEndpointThrottle, "WP-3.x", False),
-    # --- Sessions row (Bridge): WP-2.x
-    _Route("/api/v1/agent-sessions", AgentEndpointThrottle, "WP-2.x", False),
-    _Route("/api/v1/agent-sessions/1/end", AgentEndpointThrottle, "WP-2.x", False),
+    # --- Sessions row: landed with MT-1.6-09 (WP-1.6; the bridge caller
+    # uses these routes from WP-2.x)
+    _Route("/api/v1/agent-sessions", AgentEndpointThrottle, "MT-1.6-09", True),
+    _Route("/api/v1/agent-sessions/1/end", AgentEndpointThrottle, "MT-1.6-09", True),
     # --- Attachments row reads (Owner / Agent): WP-1.11
     _Route("/api/v1/tasks/1/attachments", AgentEndpointThrottle, "WP-1.11", False),
     _Route("/api/v1/attachments/1", AgentEndpointThrottle, "WP-1.11", False),

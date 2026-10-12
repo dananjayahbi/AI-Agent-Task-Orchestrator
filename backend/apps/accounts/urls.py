@@ -11,7 +11,7 @@ from django.urls import URLPattern, path
 
 from .views import (
     AgentTokenIssueView,
-    DeviceRegisterView,
+    DeviceCollectionView,
     DeviceRevokeView,
     LoginView,
     LogoutView,
@@ -27,6 +27,6 @@ urlpatterns: list[URLPattern] = [
     path("tokens/agent", AgentTokenIssueView.as_view(), name="agent-token-issue"),
     path("tokens", TokenListView.as_view(), name="token-list"),
     path("tokens/<int:pk>", TokenRevokeView.as_view(), name="token-revoke"),
-    path("devices", DeviceRegisterView.as_view(), name="device-register"),
+    path("devices", DeviceCollectionView.as_view(), name="device-collection"),
     path("devices/<int:pk>", DeviceRevokeView.as_view(), name="device-revoke"),
 ]

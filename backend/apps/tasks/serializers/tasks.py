@@ -125,7 +125,7 @@ class TaskSerializer(serializers.Serializer[Any]):
         """Edges for *obj* — reuse the prefetch cache when one was primed."""
         cache = getattr(obj, "_prefetched_objects_cache", None) or {}
         if "dependency_edges" in cache:
-            edges = obj.dependency_edges.all()  # type: ignore[attr-defined]
+            edges = obj.dependency_edges.all()
             return sorted(edge.depends_on_id for edge in edges)
         return list(
             TaskDependency.objects.filter(task=obj)

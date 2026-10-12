@@ -191,6 +191,13 @@ class Task(models.Model):
         blank=True,
         help_text="Lease deadline (Section 8.6; WP-1.6 owns the behavior).",
     )
+    lease_generation = models.PositiveIntegerField(
+        default=0,
+        help_text="Fencing counter (Section 8.6, not part of the Section 7.2 "
+        "column list — recorded in MT-1.6-05): every successful claim "
+        "increments it, and mutating agent calls carry it so a slow former "
+        "owner can never overwrite state after reclamation (ADR-012).",
+    )
     last_checkpoint_at = models.DateTimeField(
         null=True,
         blank=True,

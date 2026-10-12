@@ -60,4 +60,9 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # WP-1.4 task surface under the same base path (MT-1.4-03: create +
     # detail; the list half and sub-resources join from their owning MTs).
     path("api/v1/", include("apps.tasks.urls")),
+    # WP-1.6 agent-work surface (MT-1.6-07): claim, release, work list.
+    path("api/v1/", include("apps.leases.urls")),
+    # WP-1.6 agent sessions (MT-1.6-09 — the Section 9.2 Sessions row the
+    # bridge calls): open and end.
+    path("api/v1/", include("apps.agents.urls")),
 ]

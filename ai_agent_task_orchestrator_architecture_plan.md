@@ -1975,6 +1975,7 @@ wording changed as a result of this session — no ADR amendments were flagged.
 | OQ-12 | Is task creation from mobile in scope for v1? | No (Could), review and monitoring only | M5 | Deferred to M5 | 2026-10-11 (deferral recorded) |
 | OQ-13 | Notification digests for completed work? | Off by default; per-event toggles only | M5 | Deferred to M5 | 2026-10-11 (deferral recorded) |
 | OQ-14 | Should the orchestrator register itself as PID00001 and manage its own build? | Yes, after the minimum M3 set (dogfooding) | M3 | Deferred to M3 | 2026-10-11 (deferral recorded) |
+| OQ-16 | Section 12.5 requires an Event row for every token event and login, but the Section 9.6 catalog has no `token.*`/`login.*` type — does an existing type cover them or must the catalog be amended first? | Catalog-first (Section 20.4 item 5): decide explicitly before any emission — either map token/login actions onto an existing catalog type or amend Section 9.6 and then wire them; WP-1.9 emits nothing for token actions until decided (raised by MT-1.9-02 risk note; OQ-15 reserved for the Section 9.2 route amendment in flight) | M1 | | |
 
 ---
 

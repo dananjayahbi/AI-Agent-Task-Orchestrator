@@ -12,6 +12,8 @@ from __future__ import annotations
 from django.db import transaction
 from rest_framework.exceptions import NotFound
 
+from apps.events.services import write_event
+
 from ..models import Project, ProjectPolicy
 from .pids import allocate_project_id, ensure_valid_pid
 
@@ -22,6 +24,7 @@ def create_project(
     repo_path: str,
     default_branch: str,
     system_prompt_rules: str = "",
+    actor_ref: str | None = None,
 ) -> Project:
     """Create the Section 7.1 pair atomically: default policy + new project.
 
@@ -31,9 +34,11 @@ def create_project(
     editing it later is ``PATCH /projects/{pid}/policy`` — MT-1.3-04).
     Either the pair exists after this call or neither row does.
 
-    Section 9.6 event hook (MT-1.3-03 scope note): ``project.created`` is
-    emitted here once WP-1.9's after-commit event helper exists — until
-    then this comment is the recorded emission point, not an event.
+    Section 9.6: exactly one ``project.created`` event is written inside
+    the creating transaction (MT-1.9-02), so a rollback takes the pair
+    and its event together. ``actor_ref`` is the API caller's owner user
+    id; direct service calls without a user context fall back to the
+    role label (Section 9.6 ``actor.ref`` is a free label).
     """
     with transaction.atomic():
         pid = allocate_project_id()  # raises PidSequenceExhausted → rollback
@@ -45,6 +50,12 @@ def create_project(
             default_branch=default_branch,
             system_prompt_rules=system_prompt_rules,
             agent_policy=policy,
+        )
+        write_event(
+            type="project.created",
+            project_id=project.pk,
+            actor_type="owner",
+            actor_ref=actor_ref or "owner",
         )
     return project
 

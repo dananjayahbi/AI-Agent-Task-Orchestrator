@@ -11,9 +11,12 @@ Decisions recorded here (WP changelog):
 * **Creation composes the single allocator** (MT-1.4-02) inside one
   transaction with the INSERT — Section 7.3's "creating transaction"
   owns lock, increment and row together; a rollback refunds everything.
-* **``task.created`` emission hook** — the comment at the end of
-  ``create_task`` is the Section 9.6 event point WP-1.9 activates; this
-  WP records it, never fakes it (MT-1.4-03 out-of-scope note).
+* **``task.created`` / ``task.updated`` emission** — both writes emit
+  their Section 9.6 catalog event inside the same transaction through
+  the state machine's single seam (``emit_transition_event`` →
+  WP-1.9's ``write_event``), exactly once per successful change; the
+  emission points are the comments WP-1.4 recorded here, now active
+  (MT-1.9-02).
 * **Update is a compare-and-swap on ``version``** behind a row lock:
   read the row with ``select_for_update`` (Postgres serializes writers;
   SQLite's single-writer store serializes anyway), compare, apply,
@@ -41,6 +44,7 @@ from apps.projects.models import Project
 
 from ..exceptions import TaskNotFound, TaskStateConflict, VersionConflict
 from ..models import Task, TaskPriority, TaskState
+from ..state_machine.hooks import emit_transition_event
 from .dependencies import set_dependencies
 from .ids import allocate_task_id, ensure_valid_task_id, is_valid_task_id
 
@@ -154,8 +158,22 @@ def create_task(
             # Same transaction: edges land with the row (or not at all) —
             # validation failure rolls the whole create back (MT-1.4-05).
             set_dependencies(task=task, dependency_ids=depends_on)
-    # Event hook (WP-1.9): emit `task.created` after commit here — the
-    # Section 9.6 catalog entry; this WP records the point, never fakes it.
+        # T1's event point (Section 9.6 `task.created`) — inside the
+        # creating transaction, so a rollback takes the row and its event
+        # together (Section 9.3 discipline; MT-1.9-02). Emitter is the
+        # state machine's single seam; `created_by` is the API path's
+        # owner user id, with the role label as the no-user-context
+        # fallback for direct service calls.
+        emit_transition_event(
+            {
+                "type": "task.created",
+                "project_id": task.project_id,
+                "task_id": task.pk,
+                "occurred_at": timezone.now(),
+                "actor": {"type": "owner", "ref": created_by or "owner"},
+                "data": {"task_version": task.version},
+            }
+        )
     return task
 
 
@@ -164,6 +182,7 @@ def update_task(
     task: Task,
     validated: dict[str, Any],
     expected_version: int,
+    actor_ref: str | None = None,
 ) -> Task:
     """Apply a partial update under FR-TSK-06 optimistic concurrency.
 
@@ -180,6 +199,12 @@ def update_task(
     service as a replace-the-set write, still under the row lock and the
     same transaction — a change to the dependency set counts as a change
     and increments ``version`` like any other edit.
+
+    A change (any applied field, or the dependency set) also emits
+    exactly one ``task.updated`` event inside the same transaction
+    (Section 9.6; MT-1.9-02), stamped with ``actor_ref`` — the API
+    caller's owner user id (the role label ``owner`` when a caller has
+    no user context). No change → no version bump → no event.
     """
     with transaction.atomic():
         locked = Task.objects.select_for_update().get(pk=task.pk)
@@ -208,6 +233,19 @@ def update_task(
             # "incremented on every change" (7.2) — no change, no bump
             locked.version += 1
             locked.save()
+            # `task.updated` (Section 9.6) inside the update transaction —
+            # exactly one row per successful change (MT-1.9-02).
+            changed = sorted({*fields, *({"depends_on"} if dependency_ids is not None else set())})
+            emit_transition_event(
+                {
+                    "type": "task.updated",
+                    "project_id": locked.project_id,
+                    "task_id": locked.pk,
+                    "occurred_at": timezone.now(),
+                    "actor": {"type": "owner", "ref": actor_ref or "owner"},
+                    "data": {"task_version": locked.version, "fields": changed},
+                }
+            )
     return locked
 
 

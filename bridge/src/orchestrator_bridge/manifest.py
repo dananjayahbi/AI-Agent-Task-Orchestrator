@@ -19,8 +19,9 @@ boundary).
 The binding derives nothing the backend owns (Section 19.3): the returned
 manifest is the validated document as-is — no policy, no token decoding, no
 project comparison. The manifest holds no secrets and is not a configuration
-source (FR-SEC-04); ``orchestrator_api`` precedence versus ``api_base_url`` is
-deferred to WP-2.3 and flagged in the WP changelog.
+source (FR-SEC-04); ``orchestrator_api`` precedence versus ``api_base_url``,
+deferred here to WP-2.3, is resolved there — the manifest wins
+(``transport.ApiClient.for_binding``).
 """
 
 from __future__ import annotations

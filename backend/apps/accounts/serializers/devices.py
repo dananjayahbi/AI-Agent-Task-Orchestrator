@@ -65,4 +65,64 @@ class DeviceRegisterResponseSerializer(serializers.Serializer[Any]):
     )
 
 
-__all__ = ["DeviceRegisterRequestSerializer", "DeviceRegisterResponseSerializer"]
+class DeviceSummarySerializer(serializers.Serializer[Any]):
+    """GET /devices list item — metadata only (Section 12.4; Section 7.2).
+
+    Deliberately without ``push_token`` (sensitive at rest) and without any
+    token material: the credential's expiry is shown because settings needs
+    it, the hash/plaintext never leave the server.
+    """
+
+    id = serializers.IntegerField()
+    platform = serializers.ChoiceField(choices=Platform.choices)
+    biometric_bound = serializers.BooleanField()
+    last_seen_at = serializers.DateTimeField(
+        allow_null=True,
+        help_text="Last request authenticated with this device's token (Section 7.2).",
+    )
+    revoked_at = serializers.DateTimeField(
+        allow_null=True,
+        help_text="Revocation instant; null = still active (lost-phone control).",
+    )
+    expires_at = serializers.DateTimeField(
+        source="token.expires_at",
+        allow_null=True,
+        help_text="Expiry of the device-bound token (Section 9.10 lifetime).",
+    )
+
+
+class DeviceListEnvelopeSerializer(serializers.Serializer[Any]):
+    """pagination.md envelope: exactly ``results`` + ``next_cursor``."""
+
+    results = DeviceSummarySerializer(many=True)
+    next_cursor = serializers.CharField(
+        allow_null=True,
+        help_text="Opaque cursor for the next page; null = end of list.",
+    )
+
+
+class DeviceListQuerySerializer(serializers.Serializer[Any]):
+    """GET /devices query parameters (cursor contract)."""
+
+    cursor = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Opaque cursor from the previous page's next_cursor.",
+    )
+    page_size = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        help_text=(
+            "Items per page (default 25, maximum 100; values above the "
+            "maximum are clamped — pagination.md documented defaults)."
+        ),
+    )
+
+
+__all__ = [
+    "DeviceListEnvelopeSerializer",
+    "DeviceListQuerySerializer",
+    "DeviceRegisterRequestSerializer",
+    "DeviceRegisterResponseSerializer",
+    "DeviceSummarySerializer",
+]

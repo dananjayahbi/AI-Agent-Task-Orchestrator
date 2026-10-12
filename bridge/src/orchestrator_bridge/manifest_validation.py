@@ -20,8 +20,8 @@ manifest never gets near a credential):
    manifest renderer (MT-1.3-05) and WP-2.12's writer (Section 19.6; one schema,
    two consumers). The schema is loaded from disk at runtime and never fetched
    over the network (MT-2.2-02 out of scope): repository checkouts read the
-   canonical ``schemas/`` file; an installed wheel reads the copy the build
-   force-includes from that same file (see ``bridge/pyproject.toml``), so a
+   canonical ``schemas/`` file; an installed wheel reads the copy the custom
+   build hook places from that same file (see ``bridge/hatch_build.py``), so a
    schema diff is one reviewed change (Section 20.4 item 4).
 """
 
@@ -51,7 +51,7 @@ _PACKAGE_DIR = Path(__file__).resolve().parent
 #: Source checkout: bridge/src/orchestrator_bridge → repo root holding schemas/.
 _REPO_ROOT = _PACKAGE_DIR.parents[2]
 _SCHEMA_RELPATH = Path("schemas") / "manifest.v1.json"
-#: Wheel copy, force-included from the canonical file by the build.
+#: Wheel copy, force-included from the canonical file by bridge/hatch_build.py.
 _PACKAGED_SCHEMA = _PACKAGE_DIR / "schemas" / "manifest.v1.json"
 
 

@@ -27,6 +27,7 @@ in ``repr()``; the logging layer scrubs it again at the single redaction point
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 import tomllib
@@ -41,7 +42,10 @@ __all__ = [
     "DEFAULT_API_BASE_URL",
     "DEFAULT_LOG_FORMAT",
     "DEFAULT_LOG_LEVEL",
+    "DEFAULT_MAX_RESPONSE_MB",
     "DEFAULT_MODE",
+    "DEFAULT_RETRY_BASE_DELAY_SECONDS",
+    "DEFAULT_RETRY_MAX_ATTEMPTS",
     "DEFAULT_TIMEOUT_SECONDS",
     "LogFormat",
     "LogLevel",
@@ -74,6 +78,13 @@ DEFAULT_LOG_LEVEL: Final[LogLevel] = "INFO"
 DEFAULT_LOG_FORMAT: Final[LogFormat] = "json"
 DEFAULT_MODE: Final = RunMode.STDIO
 DEFAULT_TIMEOUT_SECONDS: Final = 30.0
+#: Response-size cap (MT-2.3-01; Section 9.10). 64 MB clears the Section 9.5
+#: 25 MB attachment ceiling with base64 inflation (~33 MB) plus JSON overhead.
+DEFAULT_MAX_RESPONSE_MB: Final = 64.0
+#: Retry attempt bound (MT-2.3-02; Section 10.10): total attempts per call.
+DEFAULT_RETRY_MAX_ATTEMPTS: Final = 3
+#: First backoff delay (MT-2.3-02; Section 10.10): doubles each retry.
+DEFAULT_RETRY_BASE_DELAY_SECONDS: Final = 1.0
 
 _LOG_LEVELS: Final[frozenset[str]] = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 _LOG_FORMATS: Final[frozenset[str]] = frozenset({"json", "text"})
@@ -88,6 +99,9 @@ _ENV_KEYS: Final[Mapping[str, str]] = {
     "log_format": "ORCHESTRATOR_LOG_FORMAT",
     "mode": "ORCHESTRATOR_BRIDGE_MODE",
     "timeout_seconds": "ORCHESTRATOR_BRIDGE_TIMEOUT_SECONDS",
+    "max_response_mb": "ORCHESTRATOR_BRIDGE_MAX_RESPONSE_MB",
+    "retry_max_attempts": "ORCHESTRATOR_BRIDGE_RETRY_MAX_ATTEMPTS",
+    "retry_base_delay_seconds": "ORCHESTRATOR_BRIDGE_RETRY_BASE_DELAY_SECONDS",
     "merge_repo_paths": "ORCHESTRATOR_MERGE_REPO_PATHS",
 }
 _FILE_KEYS: Final[frozenset[str]] = frozenset(_ENV_KEYS)
@@ -104,6 +118,9 @@ class Settings:
     log_format: LogFormat
     mode: RunMode
     timeout_seconds: float
+    max_response_mb: float
+    retry_max_attempts: int
+    retry_base_delay_seconds: float
     merge_repo_paths: tuple[str, ...]
 
     def __repr__(self) -> str:
@@ -114,6 +131,9 @@ class Settings:
             f"manifest_path={self.manifest_path!r}, log_level={self.log_level!r}, "
             f"log_format={self.log_format!r}, mode={self.mode!r}, "
             f"timeout_seconds={self.timeout_seconds!r}, "
+            f"max_response_mb={self.max_response_mb!r}, "
+            f"retry_max_attempts={self.retry_max_attempts!r}, "
+            f"retry_base_delay_seconds={self.retry_base_delay_seconds!r}, "
             f"merge_repo_paths={self.merge_repo_paths!r})"
         )
 
@@ -176,6 +196,34 @@ def _as_text(attr: str, value: object, *, secret: bool = False) -> str:
         shown = "(secret value not shown)" if secret else repr(value)
         raise ConfigError(f"{_ENV_KEYS[attr]} ({attr}) must be a string, got {shown}") from None
     return value
+
+
+def _positive_float(attr: str, value: object, *, unit: str) -> float:
+    """Parse a finite number > 0 (timeout, size, delay); message names the key."""
+    reason = f"must be a number of {unit} > 0, got {value!r}"
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ConfigError(f"{_ENV_KEYS[attr]} ({attr}) {reason}") from None
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise ConfigError(f"{_ENV_KEYS[attr]} ({attr}) {reason}") from None
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise ConfigError(f"{_ENV_KEYS[attr]} ({attr}) {reason}") from None
+    return parsed
+
+
+def _positive_int(attr: str, value: object) -> int:
+    """Parse a whole number >= 1 (attempt count); message names the key."""
+    reason = f"must be a positive whole number of attempts >= 1, got {value!r}"
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ConfigError(f"{_ENV_KEYS[attr]} ({attr}) {reason}") from None
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise ConfigError(f"{_ENV_KEYS[attr]} ({attr}) {reason}") from None
+    if not math.isfinite(parsed) or parsed < 1 or parsed != int(parsed):
+        raise ConfigError(f"{_ENV_KEYS[attr]} ({attr}) {reason}") from None
+    return int(parsed)
 
 
 def load_settings(
@@ -246,23 +294,24 @@ def load_settings(
     value = _pick("timeout_seconds", file_values, environ)
     timeout_seconds = DEFAULT_TIMEOUT_SECONDS
     if value is not None:
-        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
-            raise ConfigError(
-                f"{_ENV_KEYS['timeout_seconds']} (timeout_seconds) must be a number of "
-                f"seconds > 0, got {value!r}"
-            ) from None
-        try:
-            timeout_seconds = float(value)
-        except ValueError:
-            raise ConfigError(
-                f"{_ENV_KEYS['timeout_seconds']} (timeout_seconds) must be a number of "
-                f"seconds > 0, got {value!r}"
-            ) from None
-        if timeout_seconds <= 0:
-            raise ConfigError(
-                f"{_ENV_KEYS['timeout_seconds']} (timeout_seconds) must be > 0, "
-                f"got {timeout_seconds!r}"
-            ) from None
+        timeout_seconds = _positive_float("timeout_seconds", value, unit="seconds")
+
+    value = _pick("max_response_mb", file_values, environ)
+    max_response_mb = DEFAULT_MAX_RESPONSE_MB
+    if value is not None:
+        max_response_mb = _positive_float("max_response_mb", value, unit="MB")
+
+    value = _pick("retry_max_attempts", file_values, environ)
+    retry_max_attempts = DEFAULT_RETRY_MAX_ATTEMPTS
+    if value is not None:
+        retry_max_attempts = _positive_int("retry_max_attempts", value)
+
+    value = _pick("retry_base_delay_seconds", file_values, environ)
+    retry_base_delay_seconds = DEFAULT_RETRY_BASE_DELAY_SECONDS
+    if value is not None:
+        retry_base_delay_seconds = _positive_float(
+            "retry_base_delay_seconds", value, unit="seconds"
+        )
 
     value = _pick("merge_repo_paths", file_values, environ)
     merge_repo_paths: tuple[str, ...] = ()
@@ -284,6 +333,9 @@ def load_settings(
         log_format=log_format,
         mode=mode,
         timeout_seconds=timeout_seconds,
+        max_response_mb=max_response_mb,
+        retry_max_attempts=retry_max_attempts,
+        retry_base_delay_seconds=retry_base_delay_seconds,
         merge_repo_paths=merge_repo_paths,
     )
 

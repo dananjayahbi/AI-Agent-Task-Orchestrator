@@ -207,6 +207,7 @@ Goal: Atomic claim with skip-locked semantics, fencing, extension, release, conc
 | MT-1.6-06 | Enforce per-project max_concurrent_tasks at claim time |
 | MT-1.6-07 | Implement claim and release REST endpoints |
 | MT-1.6-08 | Write claim race tests (50 concurrent claimants, exactly one winner) |
+| MT-1.6-09 | Implement the agent session open and end endpoints (plan gap: Section 9.2 Sessions row had no owning MT) |
 
 #### WP-1.7 Lease sweeper and retry policy — `m1-core-engine/wp-1.7-lease-sweeper/`
 Goal: Celery beat job reclaiming expired leases and escalating retry exhaustion (FR-LEA-04/05/07). Size M.
