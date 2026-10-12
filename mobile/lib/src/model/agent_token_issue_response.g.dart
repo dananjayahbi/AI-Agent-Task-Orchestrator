@@ -10,7 +10,7 @@ class _$AgentTokenIssueResponse extends AgentTokenIssueResponse {
   @override
   final int id;
   @override
-  final KindEnum kind;
+  final KindE0dEnum kind;
   @override
   final String? projectId;
   @override
@@ -88,9 +88,9 @@ class AgentTokenIssueResponseBuilder
   int? get id => _$this._id;
   set id(int? id) => _$this._id = id;
 
-  KindEnum? _kind;
-  KindEnum? get kind => _$this._kind;
-  set kind(KindEnum? kind) => _$this._kind = kind;
+  KindE0dEnum? _kind;
+  KindE0dEnum? get kind => _$this._kind;
+  set kind(KindE0dEnum? kind) => _$this._kind = kind;
 
   String? _projectId;
   String? get projectId => _$this._projectId;

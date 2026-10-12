@@ -21,6 +21,8 @@ class _$PatchedTaskUpdate extends PatchedTaskUpdate {
   final String? testCommand;
   @override
   final PriorityEnum? priority;
+  @override
+  final BuiltList<String>? dependsOn;
 
   factory _$PatchedTaskUpdate(
           [void Function(PatchedTaskUpdateBuilder)? updates]) =>
@@ -33,7 +35,8 @@ class _$PatchedTaskUpdate extends PatchedTaskUpdate {
       this.acceptanceCriteria,
       this.targetScope,
       this.testCommand,
-      this.priority})
+      this.priority,
+      this.dependsOn})
       : super._();
   @override
   PatchedTaskUpdate rebuild(void Function(PatchedTaskUpdateBuilder) updates) =>
@@ -53,7 +56,8 @@ class _$PatchedTaskUpdate extends PatchedTaskUpdate {
         acceptanceCriteria == other.acceptanceCriteria &&
         targetScope == other.targetScope &&
         testCommand == other.testCommand &&
-        priority == other.priority;
+        priority == other.priority &&
+        dependsOn == other.dependsOn;
   }
 
   @override
@@ -66,6 +70,7 @@ class _$PatchedTaskUpdate extends PatchedTaskUpdate {
     _$hash = $jc(_$hash, targetScope.hashCode);
     _$hash = $jc(_$hash, testCommand.hashCode);
     _$hash = $jc(_$hash, priority.hashCode);
+    _$hash = $jc(_$hash, dependsOn.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -79,7 +84,8 @@ class _$PatchedTaskUpdate extends PatchedTaskUpdate {
           ..add('acceptanceCriteria', acceptanceCriteria)
           ..add('targetScope', targetScope)
           ..add('testCommand', testCommand)
-          ..add('priority', priority))
+          ..add('priority', priority)
+          ..add('dependsOn', dependsOn))
         .toString();
   }
 }
@@ -120,6 +126,12 @@ class PatchedTaskUpdateBuilder
   PriorityEnum? get priority => _$this._priority;
   set priority(PriorityEnum? priority) => _$this._priority = priority;
 
+  ListBuilder<String>? _dependsOn;
+  ListBuilder<String> get dependsOn =>
+      _$this._dependsOn ??= ListBuilder<String>();
+  set dependsOn(ListBuilder<String>? dependsOn) =>
+      _$this._dependsOn = dependsOn;
+
   PatchedTaskUpdateBuilder() {
     PatchedTaskUpdate._defaults(this);
   }
@@ -134,6 +146,7 @@ class PatchedTaskUpdateBuilder
       _targetScope = $v.targetScope?.toBuilder();
       _testCommand = $v.testCommand;
       _priority = $v.priority;
+      _dependsOn = $v.dependsOn?.toBuilder();
       _$v = null;
     }
     return this;
@@ -164,6 +177,7 @@ class PatchedTaskUpdateBuilder
             targetScope: _targetScope?.build(),
             testCommand: testCommand,
             priority: priority,
+            dependsOn: _dependsOn?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -172,6 +186,9 @@ class PatchedTaskUpdateBuilder
         _acceptanceCriteria?.build();
         _$failedField = 'targetScope';
         _targetScope?.build();
+
+        _$failedField = 'dependsOn';
+        _dependsOn?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
             r'PatchedTaskUpdate', _$failedField, e.toString());

@@ -65,4 +65,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # WP-1.6 agent sessions (MT-1.6-09 — the Section 9.2 Sessions row the
     # bridge calls): open and end.
     path("api/v1/", include("apps.agents.urls")),
+    # WP-1.10 realtime gateway (MT-1.10-01 — the Section 9.2 Events row:
+    # /events/stream and /events).
+    path("api/v1/", include("apps.events.urls")),
 ]

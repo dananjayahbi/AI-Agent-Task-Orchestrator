@@ -133,12 +133,97 @@ Short notes per parent plan Section 20.4, item 7 — one entry per micro-task of
   token absent from every raised binding error; `bind_startup` end-to-end
   with a temp manifest + fixture token.
 
-## 2026-10-12 — Deferral notes (roadmap §4a rule 1)
+## 2026-10-12 — MT-2.2-04: Open and end agent sessions with a cached project context
 
-* **MT-2.2-04 (backend session open/end with project context caching)** —
-  deferred: blocked on the backend `POST /agent-sessions` endpoint (being
-  traced); finish when it lands.
-* **MT-2.2-05 (project-mismatch abort with a clear startup error)** —
-  deferred with MT-2.2-04: its startup abort compares the session-open
-  response's project context against the bound manifest, i.e. the same
-  not-yet-landed endpoint; both complete together.
+* New `orchestrator_bridge.session` — Section 10.3 steps 4–5, run by the
+  stdio entry point immediately after `bind_startup` (steps 1–3), sharing
+  one `ApiClient` with the tool runtime:
+  * **Step 4 open.** `POST /api/v1/agent-sessions` with a bridge-minted,
+    unguessable id (`uuid4().hex`, G-18 — the backend *issues* nothing; the
+    open body is exactly `{id, client_name, capability, transport}` and
+    never a `project_id`, ADR-004: the backend derives the project from the
+    token, which is the server-verified binding of FR-SEC-01). The returned
+    id becomes the process's `agent_session_id` (deliberately *not* named
+    "session" bare — MCP protocol handshake vs. backend session is the MT's
+    named integration-bug risk; logged and threaded under the distinct
+    name). `transport` maps Section 10.2 run modes onto the backend's
+    `TransportEnum` (`stdio|http`).
+  * **Step 5 cache.** `fetch_project_context` reads
+    `GET /api/v1/projects/{pid}` (name + `system_prompt_rules`) **and**
+    `GET /api/v1/projects/{pid}/policy` (the structured policy summary) —
+    no single endpoint returns the Section 10.3 triple today, so two reads
+    feed one immutable `ProjectContext{project_id, name, rules,
+    policy_summary}`; only the Section 10.3 set is cached (MT risk note:
+    extra fields invite client-side policy drift, §19.3), in process memory
+    only, never on disk (asserted). `endpoints.py` gains the
+    `project_policy` catalog entry (already in the OpenAPI document; the
+    MT-2.3-05 contract test validates it, with a `ProjectPolicy` response
+    sample added).
+  * **End.** `close_session` posts `/agent-sessions/{id}/end` with a
+    **2-second timeout and a single attempt** (`dataclasses.replace` on the
+    settings — stdio teardown must never hang; §10.10); failure logs
+    `session_end_failed` and returns `False` without raising. A crashed
+    bridge never ends the session — the **backend's stale-session sweep is
+    the safety net** (dependency recorded: M1 owns it; the end call is
+    idempotent per the OpenAPI description, so a replayed best-effort end
+    is safe).
+* **Error mapping.** Backend rejections at open/context-fetch become
+  `SessionOpenError` (new `BindingError` subclass, `errors.py`) naming the
+  canonical code; `AUTH_FORBIDDEN_PROJECT` becomes `ProjectMismatchError`
+  (MT-2.2-05). Transient failures ride the WP-2.3 bounded retry (observed:
+  one 5xx → retried → open succeeds); exhaustion aborts clearly. Messages
+  run through `scrub_text`; tests assert the fixture token never appears.
+* **Entry-point wiring.** `stdio.run` now serves only a fully-bound session
+  (open before `create_server`, tools registered against the bound runtime
+  with MT-2.4 — the five core tools land here later), ends the session
+  best-effort after `server.run` returns; the startup log carries
+  `agent_session_id`. HTTP/executor entry points are unchanged stubs (their
+  session work is WP-2.9/WP-3.7).
+* **Tests** (`tests/test_session_lifecycle.py`, 14; plus entry-point
+  reconciliation): open body/headers/idempotency/read-only cache/no-disk;
+  context shape is exactly the §10.3 set fetched once per open; retry-then-
+  open and retry-then-abort; `AUTH_REQUIRED`/`RATE_LIMITED`/`SERVER_ERROR`/
+  `VALIDATION_ERROR` map distinguishably, token never leaks; end called
+  with the session id, bounded, one attempt, failure logged not raised.
+  `test_entrypoints.py` gains the loopback `StubHttpBackend` (conftest) so
+  the in-process and real-subprocess stdio tests bind through a real
+  socket; the subprocess handshake test now asserts the WP-2.4 tool set
+  (MT-2.4-07's inspector-equivalent proof) plus open+end over the wire.
+* **Deviation notes:** (a) the MT named a single "Project Context
+  endpoint" — the backend exposes project + policy reads, so the cache
+  composes two calls (no contract invented); (b) end-call timeout is a
+  session-module constant (2 s), stricter than `settings.timeout_seconds`,
+  per the MT's "aggressively bounded" risk note.
+
+## 2026-10-12 — MT-2.2-05: Abort on project mismatch with a clear message
+
+* `ProjectMismatchError(SessionOpenError)` with
+  `canonical_code = "AUTH_FORBIDDEN_PROJECT"` — one abort vocabulary for
+  both detection paths. The backend's 403 at session open (the
+  server-verified half, FR-SEC-01) maps to a message that names: the
+  manifest's project id (repo-visible, safe), the canonical code, and both
+  remedies (`ORCHESTRATOR_AGENT_TOKEN`/user-config pointed at this
+  project's token, or `orchestrator init` in the right repository), plus
+  the backend's scrubbed message. Never the token or anything derived from
+  it (asserted against the fixture string).
+* **No local token decoding** (§12.2 opaque bearer): the optional early
+  pre-check was conditioned on MT-2.12-02 recording the token's issued
+  project — that metadata does not exist yet, so every mismatch costs the
+  one authoritative network round trip. Recorded here so WP-2.12 does not
+  assume a local pre-check exists; add one only if MT-2.12-02 ships the
+  metadata.
+* **Entry-point abort path:** stdio exit 1 (`EXIT_CONFIG_ERROR`), one
+  scrubbed `bridge startup error:` stderr line, empty stdout, a
+  `binding_failed` log record with `error_type=ProjectMismatchError`, and
+  no server built; the matching-project control starts, serves and ends
+  its session (stub backend). Message/log redaction asserted end to end.
+* Tests: `tests/test_project_mismatch.py` (7).
+
+## 2026-10-12 — WP-2.2 complete
+
+All five MTs done (deferral notes from earlier today superseded — the
+backend `POST /agent-sessions` + `/{id}/end` pair landed as MT-1.6-09, unblocking
+MT-2.2-04/05 the same day). Verification battery green:
+`uv run --directory bridge ruff check .`, `ruff format --check .`, `mypy .`,
+`pytest -q` — **313 passed, 5 skipped** (the skips are WP-2.4's opt-in live
+suite, not WP-2.2's).

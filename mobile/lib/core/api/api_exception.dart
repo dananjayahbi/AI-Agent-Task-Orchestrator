@@ -16,24 +16,27 @@ class OrchestratorApiException implements Exception {
     required this.correlationId,
   });
 
-  /// Builds from the generated [ErrorEnvelope] — all five fields present.
+  /// Builds from the generated [ErrorEnvelope] — the canonical nested
+  /// rendering (`{"error": {…five fields…}}`, Section 9.2) whose body type is
+  /// [ErrorEnvelopeBody].
   factory OrchestratorApiException.fromEnvelope(
     ErrorEnvelope envelope, {
     int? statusCode,
   }) {
+    final ErrorEnvelopeBody body = envelope.error;
     return OrchestratorApiException(
       statusCode: statusCode,
-      code: envelope.code,
-      message: envelope.message,
-      retryable: envelope.retryable,
-      details: envelope.details == null
+      code: body.code,
+      message: body.message,
+      retryable: body.retryable,
+      details: body.details == null
           ? null
           : <String, Object?>{
               for (final MapEntry<String, JsonObject?> entry
-                  in envelope.details!.entries)
+                  in body.details!.entries)
                 entry.key: entry.value?.value,
             },
-      correlationId: envelope.correlationId,
+      correlationId: body.correlationId,
     );
   }
 

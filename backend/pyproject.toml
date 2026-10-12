@@ -15,6 +15,7 @@ dependencies = [
     "drf-spectacular>=0.30.0",
     "psycopg[binary]>=3.3.6",
     "redis>=8.1.0",
+    "celery[redis]>=5.4,<6",
     "uvicorn>=0.54.0",
 ]
 
@@ -63,6 +64,12 @@ python_version = "3.12"
 strict = true
 exclude = ["\\.venv"]
 plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+
+# Celery ships no py.typed marker; the wrapped service functions are fully
+# typed and the two @shared_task decorators carry per-site ignores.
+[[tool.mypy.overrides]]
+module = ["celery", "celery.*"]
+ignore_missing_imports = true
 
 # django-stubs plugin options (typeddjango/django-stubs): type-check settings
 # access strictly against the dev module, which imports with no environment.

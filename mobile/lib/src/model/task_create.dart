@@ -19,6 +19,7 @@ part 'task_create.g.dart';
 /// * [targetScope] - Repo-relative globs, validated on creation (Section 12.3).
 /// * [testCommand]
 /// * [priority] - FR-TSK-05; default medium (documented default — not a plan fact).  * `urgent` - urgent * `high` - high * `medium` - medium * `low` - low
+/// * [dependsOn] - Task ids this task waits on (Section 7.1 relation; FR-TSK-07). Same-project ids only; existence, self and cycles validated — a refusal rolls the whole create back (VALIDATION_ERROR).
 @BuiltValue()
 abstract class TaskCreate implements Built<TaskCreate, TaskCreateBuilder> {
   @BuiltValueField(wireName: r'title')
@@ -43,6 +44,10 @@ abstract class TaskCreate implements Built<TaskCreate, TaskCreateBuilder> {
   @BuiltValueField(wireName: r'priority')
   PriorityEnum? get priority;
   // enum priorityEnum {  urgent,  high,  medium,  low,  };
+
+  /// Task ids this task waits on (Section 7.1 relation; FR-TSK-07). Same-project ids only; existence, self and cycles validated — a refusal rolls the whole create back (VALIDATION_ERROR).
+  @BuiltValueField(wireName: r'depends_on')
+  BuiltList<String>? get dependsOn;
 
   TaskCreate._();
 
@@ -108,6 +113,13 @@ class _$TaskCreateSerializer implements PrimitiveSerializer<TaskCreate> {
       yield serializers.serialize(
         object.priority,
         specifiedType: const FullType(PriorityEnum),
+      );
+    }
+    if (object.dependsOn != null) {
+      yield r'depends_on';
+      yield serializers.serialize(
+        object.dependsOn,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
   }
@@ -183,6 +195,15 @@ class _$TaskCreateSerializer implements PrimitiveSerializer<TaskCreate> {
           ) as PriorityEnum?;
           if (valueDes == null) continue;
           result.priority = valueDes;
+          break;
+        case r'depends_on':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType:
+                const FullType.nullable(BuiltList, [FullType(String)]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.dependsOn.replace(valueDes);
           break;
         default:
           unhandled.add(key);

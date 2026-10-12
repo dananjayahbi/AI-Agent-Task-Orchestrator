@@ -26,6 +26,33 @@ export type AgentHints = {
 };
 
 /**
+ * The Section 7.2 Agent Session row as it goes over the wire.
+ */
+export type AgentSession = {
+    readonly id: string;
+    readonly project_id: string;
+    readonly token_id: number;
+    readonly agent_label: string;
+    readonly client_name: string;
+    capability: CapabilityEnum;
+    transport: TransportEnum;
+    readonly started_at: string;
+    readonly last_seen_at: string;
+    readonly ended_at: string | null;
+};
+
+/**
+ * ``POST /agent-sessions`` input — no project field exists here (ADR-004).
+ */
+export type AgentSessionCreate = {
+    id: string;
+    agent_label?: string;
+    client_name?: string;
+    capability?: CapabilityEnum;
+    transport: TransportEnum;
+};
+
+/**
  * POST /tokens/agent body: which project, which roles.
  */
 export type AgentTokenIssueRequest = {
@@ -44,7 +71,7 @@ export type AgentTokenIssueRequest = {
  */
 export type AgentTokenIssueResponse = {
     id: number;
-    kind: KindEnum;
+    kind: KindE0dEnum;
     project_id: string | null;
     scopes: unknown;
     expires_at: string | null;
@@ -52,6 +79,149 @@ export type AgentTokenIssueResponse = {
      * The plaintext bearer token — returned exactly once, now. The server stores only its SHA-256 hash and cannot show it again (Section 7.2); lost tokens must be revoked and reissued.
      */
     token: string;
+};
+
+/**
+ * * `vision` - vision
+ * * `text_only` - text_only
+ * * `unknown` - unknown
+ */
+export type CapabilityEnum = 'vision' | 'text_only' | 'unknown';
+
+/**
+ * One stored checkpoint — the Section 7.2 field list, as returned.
+ */
+export type Checkpoint = {
+    /**
+     * Server-generated row identity (7.2).
+     */
+    id: string;
+    /**
+     * The addressed task (Section 7.2).
+     */
+    task_id: string;
+    /**
+     * The coder claim attempt at write time (copied, never joined — MT-1.8-01 risk note).
+     */
+    attempt_number: number;
+    /**
+     * Bridge-issued session id of the reporting agent (G-18).
+     */
+    session_id: string;
+    /**
+     * Server clock at insertion (P7) — the feed's 'when'.
+     */
+    timestamp: string;
+    message: string;
+    /**
+     * 0-100 hint, or null when the caller omitted it (7.2).
+     */
+    percent: number | null;
+    /**
+     * Free JSON token accounting blob (Section 7.2).
+     */
+    token_usage: unknown;
+    /**
+     * progress | liveness | system (7.2).
+     */
+    kind: string;
+};
+
+/**
+ * ``POST /tasks/{id}/checkpoints`` input (Section 10.5 tool contract).
+ */
+export type CheckpointCreate = {
+    /**
+     * Lease-holding session id (G-18) — the fencing pair's identity half.
+     */
+    session_id: string;
+    /**
+     * Fencing generation from the claim response (Section 8.6; ADR-012); a stale value answers LEASE_EXPIRED.
+     */
+    lease_generation: number;
+    /**
+     * The agent's progress report text (Section 10.5 tool input).
+     */
+    message?: string;
+    /**
+     * Optional 0-100 completion hint (Section 7.2 bounds; out-of-range answers VALIDATION_ERROR).
+     */
+    percent?: number | null;
+    /**
+     * Free JSON token accounting blob (Section 7.2) — no fixed schema is invented here (MT-1.8-01 risk note; an OQ would freeze one).
+     */
+    token_usage?: unknown;
+    /**
+     * progress | liveness | system (Section 7.2); default progress — the extension-carrying kind (OQ-04 recorded reading).
+     *
+     * * `progress` - progress
+     * * `liveness` - liveness
+     * * `system` - system
+     */
+    kind?: CheckpointCreateKindEnum;
+};
+
+/**
+ * * `progress` - progress
+ * * `liveness` - liveness
+ * * `system` - system
+ */
+export type CheckpointCreateKindEnum = 'progress' | 'liveness' | 'system';
+
+/**
+ * pagination.md envelope: exactly ``results`` + ``next_cursor``.
+ */
+export type CheckpointListEnvelope = {
+    results: Array<Checkpoint>;
+    /**
+     * Opaque cursor for the next page; null = end of list.
+     */
+    next_cursor: string | null;
+};
+
+/**
+ * MT-1.8-03's frozen response — Section 10.5 "Returns new expiry".
+ */
+export type CheckpointWriteResponse = {
+    /**
+     * The stored row's identity and Section 7.2 fields.
+     */
+    checkpoint: Checkpoint;
+    /**
+     * False for a kind that does not extend under the project's lease_extension_mode (OQ-04 recorded reading).
+     */
+    lease_extended: boolean;
+    /**
+     * The Section 8.6 deadline after this call — the new expiry the bridge turns into its next_checkpoint_due hint.
+     */
+    lease_expires_at: string | null;
+    /**
+     * True when the hard cap clamped the extension — the owner must submit or release (MT-1.6-03's flag, consumed here).
+     */
+    capped: boolean;
+};
+
+/**
+ * ``POST /tasks/{id}/claim`` input (Section 10.5 claim_task minus role).
+ */
+export type ClaimRequest = {
+    /**
+     * Bridge-issued session id (G-18) — the lease's identity half.
+     */
+    session_id: string;
+    /**
+     * Human-readable worker label (Section 7.2 worker_agent_id; self-declared and spoofable — a label only, G-18).
+     */
+    worker_agent_id: string;
+};
+
+/**
+ * Section 9.3 step 6: task details, lease record, rules block.
+ */
+export type ClaimResponse = {
+    task: Task;
+    lease: LeaseRecord;
+    rules_block: RulesBlock;
 };
 
 /**
@@ -76,6 +246,17 @@ export type AgentTokenIssueResponse = {
  * * `SERVER_ERROR` - SERVER_ERROR
  */
 export type CodeEnum = 'AUTH_REQUIRED' | 'AUTH_FORBIDDEN_PROJECT' | 'VALIDATION_ERROR' | 'TASK_NOT_FOUND' | 'TASK_STATE_CONFLICT' | 'TASK_ALREADY_CLAIMED' | 'LEASE_EXPIRED' | 'LEASE_NOT_OWNED' | 'DEPENDENCY_UNMET' | 'CONCURRENCY_LIMIT_REACHED' | 'SCOPE_VIOLATION' | 'ROLE_NOT_PERMITTED' | 'AUDITOR_SAME_AS_CODER' | 'ATTACHMENT_NOT_READY' | 'ATTACHMENT_UNSUPPORTED_FORMAT' | 'POLICY_VIOLATION' | 'RATE_LIMITED' | 'VERSION_CONFLICT' | 'SERVER_ERROR';
+
+/**
+ * pagination.md envelope: exactly ``results`` + ``next_cursor``.
+ */
+export type DeviceListEnvelope = {
+    results: Array<DeviceSummary>;
+    /**
+     * Opaque cursor for the next page; null = end of list.
+     */
+    next_cursor: string | null;
+};
 
 /**
  * POST /devices body.
@@ -113,6 +294,31 @@ export type DeviceRegisterResponse = {
 };
 
 /**
+ * GET /devices list item — metadata only (Section 12.4; Section 7.2).
+ *
+ * Deliberately without ``push_token`` (sensitive at rest) and without any
+ * token material: the credential's expiry is shown because settings needs
+ * it, the hash/plaintext never leave the server.
+ */
+export type DeviceSummary = {
+    id: number;
+    platform: PlatformEnum;
+    biometric_bound: boolean;
+    /**
+     * Last request authenticated with this device's token (Section 7.2).
+     */
+    last_seen_at: string | null;
+    /**
+     * Revocation instant; null = still active (lost-phone control).
+     */
+    revoked_at: string | null;
+    /**
+     * Expiry of the device-bound token (Section 9.10 lifetime).
+     */
+    expires_at: string | null;
+};
+
+/**
  * The Section 9.2 wire envelope — five fields nested under ``error``.
  *
  * ``apps.core.errors.build_error_envelope`` emits the wrapper on the wire;
@@ -137,6 +343,107 @@ export type ErrorEnvelopeBody = {
 };
 
 /**
+ * Envelope ``actor`` — the structured Section 9.6 object, never flattened.
+ */
+export type EventActor = {
+    type: EventActorTypeEnum;
+    ref: string;
+};
+
+/**
+ * * `owner` - owner
+ * * `agent` - agent
+ * * `system` - system
+ */
+export type EventActorTypeEnum = 'owner' | 'agent' | 'system';
+
+/**
+ * The Section 9.6 event envelope — exactly the seven documented keys.
+ */
+export type EventEnvelope = {
+    /**
+     * Monotonic event id — the SSE event id (Section 9.6).
+     */
+    id: number;
+    /**
+     * One of the Section 9.6 catalog types (closed set).
+     *
+     * * `project.created` - project.created
+     * * `project.updated` - project.updated
+     * * `task.created` - task.created
+     * * `task.updated` - task.updated
+     * * `task.transitioned` - task.transitioned
+     * * `task.claimed` - task.claimed
+     * * `task.released` - task.released
+     * * `task.checkpoint` - task.checkpoint
+     * * `task.lease_expiring` - task.lease_expiring
+     * * `task.lease_expired` - task.lease_expired
+     * * `attachment.processing` - attachment.processing
+     * * `attachment.ready` - attachment.ready
+     * * `attachment.failed` - attachment.failed
+     * * `audit.claimed` - audit.claimed
+     * * `audit.passed` - audit.passed
+     * * `audit.escalated` - audit.escalated
+     * * `review.requested` - review.requested
+     * * `review.decided` - review.decided
+     * * `merge.started` - merge.started
+     * * `merge.succeeded` - merge.succeeded
+     * * `merge.failed` - merge.failed
+     * * `agent.session_started` - agent.session_started
+     * * `agent.session_ended` - agent.session_ended
+     * * `system.alert` - system.alert
+     */
+    type: EventEnvelopeTypeEnum;
+    project_id: string;
+    task_id: string | null;
+    /**
+     * UTC instant rendered as YYYY-MM-DDTHH:MM:SSZ (Section 9.6).
+     */
+    occurred_at: string;
+    actor: EventActor;
+    data: unknown;
+};
+
+/**
+ * * `project.created` - project.created
+ * * `project.updated` - project.updated
+ * * `task.created` - task.created
+ * * `task.updated` - task.updated
+ * * `task.transitioned` - task.transitioned
+ * * `task.claimed` - task.claimed
+ * * `task.released` - task.released
+ * * `task.checkpoint` - task.checkpoint
+ * * `task.lease_expiring` - task.lease_expiring
+ * * `task.lease_expired` - task.lease_expired
+ * * `attachment.processing` - attachment.processing
+ * * `attachment.ready` - attachment.ready
+ * * `attachment.failed` - attachment.failed
+ * * `audit.claimed` - audit.claimed
+ * * `audit.passed` - audit.passed
+ * * `audit.escalated` - audit.escalated
+ * * `review.requested` - review.requested
+ * * `review.decided` - review.decided
+ * * `merge.started` - merge.started
+ * * `merge.succeeded` - merge.succeeded
+ * * `merge.failed` - merge.failed
+ * * `agent.session_started` - agent.session_started
+ * * `agent.session_ended` - agent.session_ended
+ * * `system.alert` - system.alert
+ */
+export type EventEnvelopeTypeEnum = 'project.created' | 'project.updated' | 'task.created' | 'task.updated' | 'task.transitioned' | 'task.claimed' | 'task.released' | 'task.checkpoint' | 'task.lease_expiring' | 'task.lease_expired' | 'attachment.processing' | 'attachment.ready' | 'attachment.failed' | 'audit.claimed' | 'audit.passed' | 'audit.escalated' | 'review.requested' | 'review.decided' | 'merge.started' | 'merge.succeeded' | 'merge.failed' | 'agent.session_started' | 'agent.session_ended' | 'system.alert';
+
+/**
+ * pagination.md envelope: exactly ``results`` + ``next_cursor``.
+ */
+export type EventListEnvelope = {
+    results: Array<EventEnvelope>;
+    /**
+     * Opaque cursor for the next page; null = end of list.
+     */
+    next_cursor: string | null;
+};
+
+/**
  * Response body of GET /health/live.
  */
 export type HealthLive = {
@@ -158,13 +465,29 @@ export type HealthReady = {
  * * `agent` - agent
  * * `device` - device
  */
-export type KindEnum = 'owner_session' | 'agent' | 'device';
+export type KindE0dEnum = 'owner_session' | 'agent' | 'device';
 
 /**
  * * `checkpoint_only` - checkpoint only
  * * `checkpoint_and_liveness` - checkpoint and liveness
  */
 export type LeaseExtensionModeEnum = 'checkpoint_only' | 'checkpoint_and_liveness';
+
+/**
+ * The Section 8.6 lease JSON — the stored claim record, as documented.
+ */
+export type LeaseRecord = {
+    task_id: string;
+    assigned_agent: string;
+    session_id: string;
+    role: string;
+    lease_generation: number;
+    lease_acquired_at: string | null;
+    lease_expires_at: string | null;
+    lease_hard_cap_at: string | null;
+    last_checkpoint: string | null;
+    failure_retry_count: number;
+};
 
 /**
  * POST /auth/login body (Section 9.2 Auth row, caller Owner).
@@ -494,10 +817,40 @@ export type Refreshed = {
 };
 
 /**
+ * ``POST /tasks/{id}/release`` input (ADR-012 fencing carrier).
+ */
+export type ReleaseRequest = {
+    /**
+     * Lease-holding session id — required for agent callers; omitted for the Owner override.
+     */
+    session_id?: string | null;
+    /**
+     * Fencing generation from the claim response (Section 8.6) — required for agent callers; a stale value answers LEASE_EXPIRED.
+     */
+    lease_generation?: number | null;
+    /**
+     * Free-text reason recorded on the T6 Transition row's note (Section 10.5 release_task input).
+     */
+    reason?: string;
+    /**
+     * Optional FR-TSK-06 optimistic check: when present, a stale value answers VERSION_CONFLICT.
+     */
+    version?: number | null;
+};
+
+/**
  * POST /auth/logout: the instant the session token stopped working.
  */
 export type Revoked = {
     revoked_at: string;
+};
+
+/**
+ * Section 10.6 rules block: standard rules + project rules appended.
+ */
+export type RulesBlock = {
+    standard_rules: Array<string>;
+    project_rules: string;
 };
 
 /**
@@ -652,7 +1005,7 @@ export type TokenListEnvelope = {
  */
 export type TokenSummary = {
     id: number;
-    kind: KindEnum;
+    kind: KindE0dEnum;
     project_id: string | null;
     scopes: unknown;
     expires_at: string | null;
@@ -661,11 +1014,25 @@ export type TokenSummary = {
 };
 
 /**
+ * * `stdio` - stdio
+ * * `http` - http
+ */
+export type TransportEnum = 'stdio' | 'http';
+
+/**
  * The owner identity as returned by login.
  */
 export type UserSummary = {
     id: number;
     username: string;
+};
+
+/**
+ * Section 9.3 step 6: task details, lease record, rules block.
+ */
+export type ClaimResponseWritable = {
+    lease: LeaseRecord;
+    rules_block: RulesBlock;
 };
 
 /**
@@ -713,6 +1080,62 @@ export type TaskListEnvelopeWritable = {
      */
     next_cursor: string | null;
 };
+
+export type OpenAgentSessionData = {
+    body: AgentSessionCreate;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of opening a second session.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/agent-sessions';
+};
+
+export type OpenAgentSessionErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type OpenAgentSessionError = OpenAgentSessionErrors[keyof OpenAgentSessionErrors];
+
+export type OpenAgentSessionResponses = {
+    201: AgentSession;
+};
+
+export type OpenAgentSessionResponse = OpenAgentSessionResponses[keyof OpenAgentSessionResponses];
+
+export type EndAgentSessionData = {
+    body?: never;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of opening a second session.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/agent-sessions/{id}/end';
+};
+
+export type EndAgentSessionErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type EndAgentSessionError = EndAgentSessionErrors[keyof EndAgentSessionErrors];
+
+export type EndAgentSessionResponses = {
+    200: AgentSession;
+};
+
+export type EndAgentSessionResponse = EndAgentSessionResponses[keyof EndAgentSessionResponses];
 
 export type ApiV1AuthLoginCreateData = {
     body: LoginRequest;
@@ -774,8 +1197,44 @@ export type ApiV1AuthRefreshCreateResponses = {
 
 export type ApiV1AuthRefreshCreateResponse = ApiV1AuthRefreshCreateResponses[keyof ApiV1AuthRefreshCreateResponses];
 
+export type ApiV1DevicesRetrieveData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Opaque cursor from the previous page's next_cursor.
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults).
+         */
+        page_size?: number;
+    };
+    url: '/api/v1/devices';
+};
+
+export type ApiV1DevicesRetrieveErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type ApiV1DevicesRetrieveError = ApiV1DevicesRetrieveErrors[keyof ApiV1DevicesRetrieveErrors];
+
+export type ApiV1DevicesRetrieveResponses = {
+    200: DeviceListEnvelope;
+};
+
+export type ApiV1DevicesRetrieveResponse = ApiV1DevicesRetrieveResponses[keyof ApiV1DevicesRetrieveResponses];
+
 export type ApiV1DevicesCreateData = {
     body: DeviceRegisterRequest;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original 201 outcome — the same device id and token material — instead of registering a second device; reuse with a different request is an open point (headers.md) and executes normally.
+         */
+        'Idempotency-Key'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/v1/devices';
@@ -819,6 +1278,74 @@ export type ApiV1DevicesDestroyResponses = {
 };
 
 export type ApiV1DevicesDestroyResponse = ApiV1DevicesDestroyResponses[keyof ApiV1DevicesDestroyResponses];
+
+export type ApiV1EventsRetrieveData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Opaque cursor from the previous page's next_cursor.
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults).
+         */
+        page_size?: number;
+        /**
+         * Only events for this project id (PID + five digits, Section 7.3).
+         */
+        project?: string;
+        /**
+         * Only events for this task id ({PID}-T{index}, Section 7.3).
+         */
+        task?: string;
+    };
+    url: '/api/v1/events';
+};
+
+export type ApiV1EventsRetrieveErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type ApiV1EventsRetrieveError = ApiV1EventsRetrieveErrors[keyof ApiV1EventsRetrieveErrors];
+
+export type ApiV1EventsRetrieveResponses = {
+    200: EventListEnvelope;
+};
+
+export type ApiV1EventsRetrieveResponse = ApiV1EventsRetrieveResponses[keyof ApiV1EventsRetrieveResponses];
+
+export type ApiV1EventsStreamRetrieveData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Only events for this project id (PID + five digits, Section 7.3).
+         */
+        project?: string;
+        /**
+         * Only events for this task id ({PID}-T{index}, Section 7.3).
+         */
+        task?: string;
+    };
+    url: '/api/v1/events/stream';
+};
+
+export type ApiV1EventsStreamRetrieveErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type ApiV1EventsStreamRetrieveError = ApiV1EventsStreamRetrieveErrors[keyof ApiV1EventsStreamRetrieveErrors];
+
+export type ApiV1EventsStreamRetrieveResponses = {
+    200: Blob | File;
+};
+
+export type ApiV1EventsStreamRetrieveResponse = ApiV1EventsStreamRetrieveResponses[keyof ApiV1EventsStreamRetrieveResponses];
 
 export type ListProjectsData = {
     body?: never;
@@ -1066,6 +1593,55 @@ export type CreateTaskResponses = {
 
 export type CreateTaskResponse = CreateTaskResponses[keyof CreateTaskResponses];
 
+export type ListWorkData = {
+    body?: never;
+    path: {
+        pid: string;
+    };
+    query?: {
+        /**
+         * Opaque cursor from the previous next_cursor; valid only with the same role/priority (pagination.md rule 1).
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above are clamped).
+         */
+        page_size?: number;
+        /**
+         * FR-TSK-05 priority filter (single value).
+         *
+         * * `urgent` - urgent
+         * * `high` - high
+         * * `medium` - medium
+         * * `low` - low
+         */
+        priority?: 'urgent' | 'high' | 'medium' | 'low';
+        /**
+         * Which offer list to read: coder → pending (default); auditor → to_be_audited (the audit claim itself is WP-3.3's T11).
+         *
+         * * `coder` - coder
+         * * `auditor` - auditor
+         */
+        role?: 'coder' | 'auditor';
+    };
+    url: '/api/v1/projects/{pid}/work';
+};
+
+export type ListWorkErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type ListWorkError = ListWorkErrors[keyof ListWorkErrors];
+
+export type ListWorkResponses = {
+    200: TaskListEnvelope;
+};
+
+export type ListWorkResponse = ListWorkResponses[keyof ListWorkResponses];
+
 export type RetrieveTaskData = {
     body?: never;
     path: {
@@ -1120,6 +1696,135 @@ export type PartialUpdateTaskResponses = {
 };
 
 export type PartialUpdateTaskResponse = PartialUpdateTaskResponses[keyof PartialUpdateTaskResponses];
+
+export type ListCheckpointsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        /**
+         * Opaque cursor from the previous page's next_cursor; valid only for this task's listing (pagination.md rule 1).
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults, same per-endpoint choice as the other list routes).
+         */
+        page_size?: number;
+    };
+    url: '/api/v1/tasks/{id}/checkpoints';
+};
+
+export type ListCheckpointsErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+};
+
+export type ListCheckpointsError = ListCheckpointsErrors[keyof ListCheckpointsErrors];
+
+export type ListCheckpointsResponses = {
+    200: CheckpointListEnvelope;
+};
+
+export type ListCheckpointsResponse = ListCheckpointsResponses[keyof ListCheckpointsResponses];
+
+export type CreateCheckpointData = {
+    body: CheckpointCreate;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second checkpoint or double-extending the lease.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{id}/checkpoints';
+};
+
+export type CreateCheckpointErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type CreateCheckpointError = CreateCheckpointErrors[keyof CreateCheckpointErrors];
+
+export type CreateCheckpointResponses = {
+    200: CheckpointWriteResponse;
+};
+
+export type CreateCheckpointResponse = CreateCheckpointResponses[keyof CreateCheckpointResponses];
+
+export type ClaimTaskData = {
+    body: ClaimRequest;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of executing the claim/release again.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{id}/claim';
+};
+
+export type ClaimTaskErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type ClaimTaskError = ClaimTaskErrors[keyof ClaimTaskErrors];
+
+export type ClaimTaskResponses = {
+    200: ClaimResponse;
+};
+
+export type ClaimTaskResponse = ClaimTaskResponses[keyof ClaimTaskResponses];
+
+export type ReleaseTaskData = {
+    body?: ReleaseRequest;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of executing the claim/release again.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{id}/release';
+};
+
+export type ReleaseTaskErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type ReleaseTaskError = ReleaseTaskErrors[keyof ReleaseTaskErrors];
+
+export type ReleaseTaskResponses = {
+    200: Task;
+};
+
+export type ReleaseTaskResponse = ReleaseTaskResponses[keyof ReleaseTaskResponses];
 
 export type ApiV1TokensRetrieveData = {
     body?: never;

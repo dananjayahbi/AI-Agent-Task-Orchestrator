@@ -21,6 +21,11 @@ file" vs "unsupported version" vs "no token"):
   regenerate an ancient manifest).
 * :class:`TokenError` — no usable token in the two legitimate sources; configure
   it (env var or ``orchestrator init``).
+* :class:`SessionOpenError` — the backend refused to open the agent session
+  (Section 10.3 step 4; MT-2.2-04); the canonical code is named in the message.
+* :class:`ProjectMismatchError` — the token's project does not match the
+  manifest's ``project_id`` (Section 10.3 binding rule; MT-2.2-05); the
+  remedy-bearing abort.
 * :class:`ApiVersionError` — the backend advertises an incompatible API version
   header (Section 10.11); upgrade the bridge or the backend.
 
@@ -78,3 +83,26 @@ class ApiVersionError(BindingError):
     all is *not* a mismatch (unverified — see the transport module), so this
     error always means "upgrade the bridge or the backend".
     """
+
+
+class SessionOpenError(BindingError):
+    """``POST /agent-sessions`` failed at startup (Section 10.3 step 4; MT-2.2-04).
+
+    The bridge serves only bound sessions (FR-MCP-02): when the backend refuses
+    to open one — after the bounded retry policy of Section 10.10 has run — the
+    startup aborts with the canonical error code named in the message. The
+    mismatch case has its own class (see :class:`ProjectMismatchError`).
+    """
+
+
+class ProjectMismatchError(SessionOpenError):
+    """The token's project does not match the manifest's (Section 10.3; MT-2.2-05).
+
+    The *authoritative* detection is server-side (FR-SEC-01): the backend
+    answers ``AUTH_FORBIDDEN_PROJECT`` to the session open, and the bridge maps
+    that rejection to this unambiguous, remedy-bearing startup abort. The
+    canonical code is a class constant so the entry-point log, the stderr line
+    and the tests share one spelling; no token bytes ever ride along.
+    """
+
+    canonical_code = "AUTH_FORBIDDEN_PROJECT"

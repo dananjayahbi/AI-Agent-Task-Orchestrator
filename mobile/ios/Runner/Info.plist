@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Biometric gate (MT-5.5-04, Section 14.2): Face ID prompts require
+	     this usage description; Touch ID and passcode fallback need none. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Unlock the Orchestrator with Face ID to release your device credential.</string>
 </dict>
 </plist>

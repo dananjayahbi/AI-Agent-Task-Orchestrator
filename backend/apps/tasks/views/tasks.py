@@ -2,9 +2,12 @@
 
 ``POST /projects/{pid}/tasks``, ``GET /tasks/{id}`` and
 ``PATCH /tasks/{id}``; the list half of the first route joins with
-MT-1.4-04. Caller **Owner** (Section 9.2's Tasks row caller column — the
-``/projects/{pid}/tasks`` POST is also the "Create draft tasks" matrix
-row).
+MT-1.4-04. Callers per route: **Owner** on create/list/PATCH (Section
+9.2's Tasks row caller column — the ``/projects/{pid}/tasks`` POST is
+also the "Create draft tasks" matrix row), and **Owner or the bound
+project's agent token** on ``GET /tasks/{id}`` (the §9.2/§10.5 read cell
+the bridge's ``get_task_details`` serves — activated WP-2.x; devices
+stay denied).
 
 Recorded readings (MT-1.4-03 risk note, WP changelog):
 
@@ -22,7 +25,8 @@ Recorded readings (MT-1.4-03 risk note, WP changelog):
   project-addressed route, ``HasTaskProjectScope`` first on
   ``/tasks/{id}`` (the PID rides inside the id) — an agent token aimed
   at another project answers ``AUTH_FORBIDDEN_PROJECT`` before any role
-  error; then ``IsOwnerSession``.
+  error; then the method's role class (``IsOwnerSession`` on writes,
+  ``CanReadTaskDetail`` on the detail read).
 * **Idempotency** (Section 9.2 rule; ADR-012; headers.md): both mutating
   endpoints honor the canonical ``Idempotency-Key`` header through
   ``apps.core.idempotency`` — same key + same request replays the stored
@@ -54,7 +58,7 @@ from apps.core.pagination import parse_page_size
 from apps.core.serializers import ErrorEnvelopeSerializer
 from apps.projects.services.projects import get_project_or_404
 
-from ..permissions import HasTaskProjectScope
+from ..permissions import CanReadTaskDetail, HasTaskProjectScope
 from ..serializers import (
     TaskCreateSerializer,
     TaskListEnvelopeSerializer,
@@ -249,18 +253,30 @@ class TaskDetailView(APIView):
     """``GET``/``PATCH /tasks/{id}`` — read everything, edit FR-TSK-02 only."""
 
     # The PID rides inside the task id (Section 7.3) — scope parsed from
-    # it, then the Section 9.2 Owner caller column.
+    # it, then the caller cell per method: GET admits Owner + the bound
+    # project's agent token (Section 9.2/10.5 — the bridge's
+    # get_task_details; FR-MCP-03), PATCH stays Owner-only.
     permission_classes: list[Any] = [HasTaskProjectScope, IsOwnerSession]
+
+    def get_permissions(self) -> list[Any]:
+        """GET answers to the read cell; PATCH to the Owner-only cell."""
+        if self.request is not None and self.request.method == "GET":
+            return [HasTaskProjectScope(), CanReadTaskDetail()]
+        return [HasTaskProjectScope(), IsOwnerSession()]
 
     @extend_schema(
         operation_id="retrieve_task",
         responses={status.HTTP_200_OK: TaskSerializer, **_READ_ERRORS},
         description=(
-            "Read one task by id (Section 9.2; caller: Owner only). Every "
-            "Section 7.2 field is returned. A malformed id answers "
-            "VALIDATION_ERROR (400) — the boundary check of Section 7.3; an "
-            "unknown but well-formed id answers TASK_NOT_FOUND (404). "
-            "Archived and completed tasks remain readable (MT-1.4-06)."
+            "Read one task by id (Section 9.2). Caller: Owner or an agent "
+            "token scoped to the task's project — the row the bridge's "
+            "`get_task_details` tool serves (Section 10.5); foreign agent "
+            "tokens answer AUTH_FORBIDDEN_PROJECT (403) and devices "
+            "ROLE_NOT_PERMITTED. Every Section 7.2 field is returned. A "
+            "malformed id answers VALIDATION_ERROR (400) — the boundary "
+            "check of Section 7.3; an unknown but well-formed id answers "
+            "TASK_NOT_FOUND (404). Archived and completed tasks remain "
+            "readable (MT-1.4-06)."
         ),
     )
     def get(self, request: Request, id: str, *args: Any, **kwargs: Any) -> Response:

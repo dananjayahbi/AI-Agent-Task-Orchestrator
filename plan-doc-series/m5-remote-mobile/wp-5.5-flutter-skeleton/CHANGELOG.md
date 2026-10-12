@@ -95,12 +95,112 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   (`dart run tool/openapi_client.dart check` from `mobile/`); adding it as a
   workflow step belongs to the CI pipeline owner — `.github/workflows/*` is
   outside this WP executor's file ownership, so no workflow file was touched.
-- **MT-5.5-04 — deferred:** dependencies not yet met (WP-5.3 device
-  registration/device-bound token backend; consumes MT-5.5-03's client) —
-  deferred until WP-5.3 lands, per roadmap.md §4a (recorded 2026-10-12).
-- **MT-5.5-05 — deferred:** dependency WP-1.10 (SSE realtime gateway) not yet
-  met — deferred until WP-1.10 lands, per roadmap.md §4a (recorded
-  2026-10-12).
-- **MT-5.5-06 — deferred:** depends on MT-5.5-04 (secure storage/gate) and
-  MT-5.5-05 (SSE) plus WP-5.3 backend flows — all outstanding; deferred per
-  roadmap.md §4a (recorded 2026-10-12).
+- **MT-5.5-04 — complete** (deps met: WP-5.3 landed). Secure token storage +
+  biometric gate (ADR-006 layer 3; Sections 12.2/14.2; release contract
+  `docs/mobile/device-auth-release-contract.md`). `SecureTokenStore` seam
+  over `flutter_secure_storage` (Keychain/Keystore); the device token is
+  written there by exactly one call site —
+  `AuthGateNotifier.storeToken` — and never appears in logs, widget state,
+  or `AuthGateState`. `AuthGateNotifier` (Riverpod): cold-start probe lands
+  LOCKED when a credential exists, `noCredential` when not, `storageError`
+  honestly when the store is unreadable (retry affordance, never a silent
+  bypass); `unlock()` runs `local_auth` 3.x with OS-passcode fallback and
+  returns true only on real success; `releaseToken()` returns the token to
+  the request layer **only while unlocked** (a locked app sends no
+  Authorization header at all — Section 14.2); inactivity re-lock with a
+  documented default of **5 minutes** (`lockTimeoutProvider` — plan leaves
+  the value unspecified, so 9.10 discipline records the default; overridable
+  per environment later). `AuthTokenInterceptor` injects the token only
+  when released, and a 401 on an injected request fires `discardCredential`
+  (delete + `noCredential` + onboarding re-entry per the release contract's
+  "Rejection and recovery"). `LockGate` replaces the whole navigator while
+  locked (`LockedView`: unlock, honest enrollment guidance, honest
+  unsupported-device limitation, storage-retry). Platform wiring:
+  Android `USE_BIOMETRIC` + `FlutterFragmentActivity` (local_auth
+  requirement), iOS `NSFaceIDUsageDescription`. 18 security tests green.
+  **Device-matrix decision (recorded per MT-04):** both-platform manual
+  verification (real Keychain/Keystore, real biometric prompt) is pending a
+  physical device run — the Windows host cannot execute it; automated tests
+  cover the gate logic with scripted store/authenticator seams. Recorded as
+  the remaining WP-5.5 device-matrix item alongside MT-02's iOS build.
+- **MT-5.5-05 — complete** (dependency WP-1.10 landed — `/events/stream`
+  exists; implemented fully against it). SSE resume client
+  (`lib/core/realtime/`). `OrchestratorEvent`: the typed 7-key envelope
+  (Section 9.6) with tolerant `tryParse` (malformed frames are skipped with
+  a warning, never crash the stream). `SseParser`: incremental
+  UTF-8+LineSplitter framing (`id:`/`data:`/comment heartbeats; chunk- and
+  multi-byte-split safe — tested). `SseClient`: start/pause/resume/dispose
+  over a `SseTransport` seam; **resume** sends the last processed id as
+  `Last-Event-ID` (header per WP-1.10's dual contract), "processed" =
+  emitted-then-persisted so a kill between emit and persist replays the
+  event (at-least-once to the app, exactly-once per subscriber via the
+  broadcast stream); exponential backoff + jitter with a cap; a heartbeat
+  **watchdog timer** (not `Stream.timeout` — verified experimentally that
+  `timeout()` does not fire over an `async*` generator) closes a silent
+  connection and reconnects; on stream failures it falls back to polling
+  `GET /events` with a base64url `cursorForId` (re-encoding the id exactly
+  like the server's `encode_cursor`; round-trip tested against the server
+  algorithm) and probes the stream back before returning to it; 401 stops
+  the client (the gate's discard rule takes over) instead of storming.
+  `SseLifecycleBinder` ties start/pause to gate-unlocked + app-resumed
+  (Section 14.2 foreground-only streaming). `main()` persists the resume
+  id via SharedPreferences (not a secret — Section 9.6). **NFR-11 note:**
+  the events endpoints are not in the `schemas/openapi.yaml` snapshot yet
+  (WP-1.10 lag), so the SSE transport and history cursor are hand-written
+  against the documented wire contract — consistent with NFR-11's "typed
+  where the contract exists" and noted as a schema follow-up below. 28
+  realtime tests green.
+- **MT-5.5-06 — complete** (deps met: MT-01..05 + WP-5.3). Onboarding flow
+  (`lib/features/onboarding/`) with the four Section 14.1 screens in order,
+  driven by `OnboardingFlowNotifier` (single flow-state source, Section
+  14.3) and resumable: step + confirmed URL + completion persist in plain
+  preferences (`OnboardingProgressStore` — no token material ever); resume
+  is honest about what still needs an API call (URL step → itself;
+  login/registration → login since the owner session was in-memory;
+  enrollment → straight there because the device token is already stored).
+  (1) URL entry pre-fills from flavor config, accepts the tunnel hostname,
+  validates against the server's `GET /health/live` (the documented ops
+  endpoint — root-level per `backend/config/urls.py`, Section 9.2; no OQ
+  needed) before proceeding; a confirmed URL overrides the flavor default
+  for every consumer (`main()` seed — MT-02 precedence decision honored),
+  with a cheap startup re-validation so a corrupted preference falls back
+  to the flavor default. (2) Login via `POST /auth/login` through the
+  generated client; failures map Section 9.2 catalog codes to friendly
+  copy at one point (`onboarding_messages.dart`) — no credential echo, no
+  raw server text (Section 12.4; tested including password-absence and
+  raw-message-absence assertions). (3) Device registration `POST /devices`
+  (owner-session bearer, `Idempotency-Key` stable per logical attempt and
+  rotated on fresh login — NFR-12) whose response token is handed
+  directly to `gate.storeToken` in one statement chain — it never enters
+  app state, widgets, or logs (MT risk note reviewed line-by-line; the
+  flow test asserts `state.toString()` contains neither token). (4)
+  Biometric enrollment guides arming the MT-04 gate with the real
+  `local_auth` prompt; skip is honest — `finish()` claims nothing, the
+  app stays locked until a real unlock (Section 14.2; tested both paths
+  incl. cancelled-prompt-leaves-unfinished). Completion hands off through
+  the gate's own state (unlock → shell, skip → lock view). App-level
+  routing: `onboardingRequiredProvider` (seeded by `main()` from
+  persisted progress; also set by `discardCredential` for post-revocation
+  re-entry) makes `LockGate` render onboarding instead of shell/lock-view
+  while it needs screen time. `GeneratedOnboardingApi` rebuilds a bare
+  (gate-free, ADR-006 pre-auth) client per URL — the only production
+  call site — with an adapter seam for the mocked-backend integration
+  test. Verified: 32 onboarding tests (flow unit, widget per screen,
+  full-flow mocked-backend integration asserting exactly the three
+  documented calls and token placement), `flutter analyze` clean, `dart
+  format --set-exit-if-changed mobile/` exit 0, all 108 `flutter test`
+  green, OpenAPI drift gate in sync (client regenerated after the
+  concurrent events-schema land). **Both-platform manual verification**
+  (login → register → enroll on real iOS/Android) shares the MT-04
+  device-matrix pending item.
+- **WP-5.5 follow-ups (reported, not worked around):** (a) the events
+  endpoints (`GET /events/stream`, `GET /events`) are absent from the
+  `schemas/openapi.yaml` snapshot — the hand-written MT-05 transport
+  should be folded into the generated client once the schema owner adds
+  them (schema diff review, Section 20.4 item 4); (b) device registration
+  sends `push_token: "pending-wp-5.4"` (required non-blank backend field,
+  stored sensitive-at-rest and never returned) until WP-5.4 registers
+  APNs/FCM; (c) tunnel request/response buffering for the SSE stream is
+  a WP-5.1 (infra) verification item; (d) both-platform manual device
+  matrix (real Keychain/Keystore + biometric prompt, iOS build) pending
+  a physical device/macOS run.

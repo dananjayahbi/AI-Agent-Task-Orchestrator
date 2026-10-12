@@ -457,16 +457,19 @@ def test_anonymous_callers_get_auth_required(client: APIClient, project: Project
 
 
 @pytest.mark.parametrize("role", ["coder", "decomposer", "merge_executor"])
-def test_non_owner_agent_tokens_get_role_not_permitted(
+def test_agent_tokens_are_refused_creates_but_read_detail(
     owner_client: APIClient, project: Project, role: str
 ) -> None:
-    """Owner-only enforcement: agents are refused on their OWN project.
+    """Owner-only create; §9.2/§10.5's agent read cell on the detail GET.
 
     The Decomposer/Device cells of Section 12.2's "Create draft tasks"
     row are deferred to WP-2.x/M5 (MT-1.4-03 risk note) — recorded
     explicitly in the authorization-matrix suite, asserted here on the
-    real route.
+    real route. The detail read is the activated WP-2.x read cell: a
+    token scoped to the task's project reads the row (the bridge's
+    `get_task_details`), while the write half stays Owner-only.
     """
+    Task.objects.create(id="PID00001-T001", project=project, title="Detail read")
     token = _issue_agent_token(owner_client, "PID00001", role=role)
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -475,8 +478,17 @@ def test_non_owner_agent_tokens_get_role_not_permitted(
     assert _envelope(create)["code"] == "ROLE_NOT_PERMITTED"
 
     detail = APIClient().get("/api/v1/tasks/PID00001-T001", headers=headers)
-    assert detail.status_code == 403
-    assert _envelope(detail)["code"] == "ROLE_NOT_PERMITTED"
+    assert detail.status_code == 200
+    assert detail.json()["id"] == "PID00001-T001"
+
+    patched = APIClient().patch(
+        "/api/v1/tasks/PID00001-T001",
+        {"title": "Nope", "version": 1},
+        headers=headers,
+        format="json",
+    )
+    assert patched.status_code == 403
+    assert _envelope(patched)["code"] == "ROLE_NOT_PERMITTED"
 
 
 def test_device_tokens_get_role_not_permitted(owner_client: APIClient, project: Project) -> None:
@@ -493,6 +505,7 @@ def test_pid00001_agent_token_is_forbidden_on_pid00002_tasks(
     owner_client: APIClient, project: Project
 ) -> None:
     """WP-1.2 acceptance on the real task routes (ADR-004 zero-bleed)."""
+    Task.objects.create(id="PID00001-T001", project=project, title="Own project task")
     Project.objects.create(
         id="PID00002",
         name="Other project",
@@ -514,7 +527,8 @@ def test_pid00001_agent_token_is_forbidden_on_pid00002_tasks(
     assert detail_other.status_code == 403
     assert _envelope(detail_other)["code"] == "AUTH_FORBIDDEN_PROJECT"
 
-    # ...while the own-project task id passes scope and hits Owner-only.
+    # ...while the own-project task id passes scope and hits the §9.2
+    # agent read cell (the activated WP-2.x read — 200).
     detail_own = api.get("/api/v1/tasks/PID00001-T001", headers=headers)
-    assert detail_own.status_code == 403
-    assert _envelope(detail_own)["code"] == "ROLE_NOT_PERMITTED"
+    assert detail_own.status_code == 200
+    assert detail_own.json()["id"] == "PID00001-T001"

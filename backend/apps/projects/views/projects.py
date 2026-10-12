@@ -11,10 +11,14 @@ Recorded readings (MT-1.3-03, WP changelog):
 * **PATCH, not DELETE** — projects are never deleted; pause/archive are
   ``active_status`` transitions (mirrors Section 7.3's task-id continuity
   intent; no ``DELETE /projects/{pid}`` exists in Section 9.2 either).
-* **Agent read-only access stays reserved** — Section 9.2's caller column
-  ("agents read-only for own project") activates in WP-2.x; until then the
-  endpoints answer ``ROLE_NOT_PERMITTED`` for every agent credential (the
-  OpenAPI description says so, so no client expects otherwise).
+* **Agent read-only access is active** — Section 9.2's caller cell
+  ("agents read-only for own project") is wired on ``GET /projects/{pid}``
+  (and ``GET /projects/{pid}/policy``) as the WP-2.x activation the views
+  recorded: agent tokens read their own project behind the scope guard,
+  every other caller shape (list, create, patch) stays Owner-only, and
+  ``GET /projects`` — the *Manage projects/policy* matrix row — remains
+  Owner-only because it spans every project. Devices stay denied on the
+  detail read (not in the caller cell).
 * Unknown ``{pid}`` → ``VALIDATION_ERROR``/400 via the documented
   generic-NotFound mapping (the catalog has no ``PROJECT_NOT_FOUND`` —
   asymmetry with ``TASK_NOT_FOUND`` recorded in the changelog).
@@ -42,6 +46,7 @@ from apps.core.serializers import ErrorEnvelopeSerializer
 from apps.events.services import write_event
 
 from ..models import Project
+from ..permissions import CanReadProject
 from ..serializers.projects import (
     ProjectCreateSerializer,
     ProjectListEnvelopeSerializer,
@@ -105,8 +110,9 @@ class ProjectListCreateView(APIView):
             "ids make lexicographic order deterministic; pagination.md rule "
             "2). Pagination: cursor-based — pass `cursor` from the previous "
             "`next_cursor`; `page_size` defaults to 25, clamped to 100. "
-            "Caller: Owner only — agent read-only access for a token's own "
-            "project activates in WP-2.x and is denied until then."
+            "Caller: Owner only — the list spans every project, so agent "
+            "tokens are refused here (ROLE_NOT_PERMITTED); an agent reads "
+            "its own project through `GET /projects/{pid}` instead."
         ),
     )
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -166,18 +172,28 @@ class ProjectDetailView(APIView):
     """GET and PATCH one project addressed by its ``{pid}``."""
 
     # Scope guard first: a PID00001 agent token on /projects/PID00002 must
-    # answer AUTH_FORBIDDEN_PROJECT before the Owner-only role error
-    # (ADR-004; WP-1.2 acceptance extended to the real routes here).
+    # answer AUTH_FORBIDDEN_PROJECT before the role error (ADR-004;
+    # WP-1.2 acceptance extended to the real routes here). The GET cell is
+    # §9.2's "agents read-only for own project"; PATCH keeps the §12.2
+    # Manage-projects Owner cell.
     permission_classes: list[Any] = [HasProjectScope, CanManageProjects]
+
+    def get_permissions(self) -> list[Any]:
+        """GET answers to the read cell; PATCH to the Owner-only cell."""
+        if self.request is not None and self.request.method == "GET":
+            return [HasProjectScope(), CanReadProject()]
+        return [HasProjectScope(), CanManageProjects()]
 
     @extend_schema(
         operation_id="retrieve_project",
         responses={status.HTTP_200_OK: ProjectSerializer, **_READ_ERRORS},
         description=(
-            "Read one project. Caller: Owner only — agent read-only access "
-            "for a token's own project activates in WP-2.x and is denied "
-            "until then. A malformed or unknown pid answers "
-            "VALIDATION_ERROR (400): the catalog has no PROJECT_NOT_FOUND."
+            "Read one project. Caller: Owner or an agent token scoped to "
+            "this project (Section 9.2: agents read-only for own project); "
+            "other agent tokens answer AUTH_FORBIDDEN_PROJECT (403) and "
+            "devices ROLE_NOT_PERMITTED. A malformed or unknown pid "
+            "answers VALIDATION_ERROR (400): the catalog has no "
+            "PROJECT_NOT_FOUND."
         ),
     )
     def get(self, request: Request, pid: str, *args: Any, **kwargs: Any) -> Response:

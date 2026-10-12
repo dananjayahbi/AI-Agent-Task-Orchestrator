@@ -215,8 +215,11 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
     _Route("/api/v1/projects/PID00001/work", AgentEndpointThrottle, "MT-1.6-07", True),
     _Route("/api/v1/tasks/1/claim", AgentEndpointThrottle, "MT-1.6-07", True),
     _Route("/api/v1/tasks/1/release", AgentEndpointThrottle, "MT-1.6-07", True),
-    # --- Progress row (Agent / Owner): WP-1.6
-    _Route("/api/v1/tasks/1/checkpoints", AgentEndpointThrottle, "WP-1.6", False),
+    # --- Progress row (Agent / Owner): landed with MT-1.8-03 (WP-1.8) ---
+    # The shared GET+POST route carries AgentEndpointThrottle on the view
+    # class (the write half is the agent-authenticated cell); an owner
+    # GET rides the same class budget — recorded in the WP-1.8 changelog.
+    _Route("/api/v1/tasks/1/checkpoints", AgentEndpointThrottle, "MT-1.8-03", True),
     # --- Submission row (Agent / Owner): WP-1.6
     _Route("/api/v1/tasks/1/resolution", AgentEndpointThrottle, "WP-1.6", False),
     # --- Audit row (Auditor / Owner): WP-1.6

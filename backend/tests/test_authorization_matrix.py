@@ -55,7 +55,6 @@ from apps.accounts.models import User
 from apps.accounts.permissions import (
     CanOperateMergeQueue,
     CanPublishTasks,
-    CanReadEvents,
     CanReadMergeQueue,
     CanReviewDecisions,
     CanSubmitAuditVerdict,
@@ -145,7 +144,8 @@ urlpatterns = [
     path("probe/review", _probe_view(CanReviewDecisions).as_view()),
     path("probe/merge-queue", _probe_view(CanReadMergeQueue).as_view()),
     path("probe/merge-queue/start", _probe_view(CanOperateMergeQueue).as_view()),
-    path("probe/events", _probe_view(CanReadEvents).as_view()),
+    # WP-1.10 (MT-1.10-05) removed the *Read events* probe: the row now
+    # runs on the real /api/v1/events + /api/v1/events/stream routes.
     # The real WP-1.2 surface keeps resolving while probes are active: tests
     # revoke tokens/devices through the actual endpoints inside this URLConf.
     path("api/v1/", include("apps.accounts.urls")),
@@ -159,6 +159,9 @@ urlpatterns = [
     # two Claim rows and the landed-route cases below resolve here.
     path("api/v1/", include("apps.leases.urls")),
     path("api/v1/", include("apps.agents.urls")),
+    # WP-1.10's real SSE gateway routes (MT-1.10-05) — the *Read events*
+    # row runs on them above.
+    path("api/v1/", include("apps.events.urls")),
 ]
 
 
@@ -237,7 +240,11 @@ PROBES: tuple[_Probe, ...] = (
         _cells(merge_executor=True),
     ),
     # Section 9.6: agents never read events — no agent cell exists to grant.
-    _Probe("Read events", "/probe/events", "GET", _cells(owner=True, device=True)),
+    # WP-1.10 (MT-1.10-05): the row runs on the real routes — the history
+    # endpoint and the SSE stream (an allowed caller gets 200 on both; the
+    # stream response is streaming, and the matrix walk never iterates it).
+    _Probe("Read events", "/api/v1/events", "GET", _cells(owner=True, device=True)),
+    _Probe("Read events", "/api/v1/events/stream", "GET", _cells(owner=True, device=True)),
 )
 
 
@@ -425,13 +432,15 @@ def test_cross_project_guard_on_the_real_projects_registry(matrix: _Authz) -> No
 
     The same acceptance as the probe case above, now where the endpoint
     actually exists (MT-1.2-07: "switch to API-created projects when the
-    registry lands"): scope match falls through to the Owner-only role
-    check, scope mismatch answers AUTH_FORBIDDEN_PROJECT *before* any role
-    logic, and the owner reads the row.
+    registry lands"): scope mismatch answers AUTH_FORBIDDEN_PROJECT
+    before any role logic, the own-project read falls through to §9.2's
+    agent read cell (the WP-2.x activation — the role check now admits
+    the scoped agent token instead of refusing it), and the owner reads
+    the row.
     """
     own_project = matrix.call("decomposer", "GET", f"/api/v1/projects/{PID_ONE}")
-    assert own_project.status_code == 403
-    assert _code(own_project) == ROLE_NOT_PERMITTED
+    assert own_project.status_code == 200, own_project.content
+    assert own_project.json()["id"] == PID_ONE  # §9.2: agents read own project
 
     other_project = matrix.call("decomposer", "GET", f"/api/v1/projects/{PID_TWO}")
     assert other_project.status_code == 403
@@ -507,12 +516,14 @@ def test_revoked_device_token_fails_on_its_very_next_request(
     matrix: _Authz, owner_client: APIClient
 ) -> None:
     """Lost phone: one DELETE revokes device + token; the next call dies."""
-    assert matrix.call("device", "GET", "/probe/events").status_code == 200
+    # Real *Read events* route since WP-1.10 (MT-1.10-05) — the history
+    # endpoint answers JSON, safe to assert before and after revocation.
+    assert matrix.call("device", "GET", "/api/v1/events").status_code == 200
 
     revoke = owner_client.delete(f"/api/v1/devices/{matrix.device['id']}")
     assert revoke.status_code == 200
 
-    after = matrix.call("device", "GET", "/probe/events")
+    after = matrix.call("device", "GET", "/api/v1/events")
     assert after.status_code == 401
     assert _code(after) == AUTH_REQUIRED
 
@@ -611,6 +622,123 @@ def test_wp16_landed_routes_enforce_their_callers(matrix: _Authz) -> None:
     assert ended.status_code == 200
 
 
+# --- WP-1.8 landing: the Progress row's real callers (deferred retired) -----
+
+
+def test_wp18_landed_checkpoint_routes_enforce_their_callers(matrix: _Authz) -> None:
+    """Real-route cases for the checkpoint endpoints (removed deferred).
+
+    POST's caller cell is **Agent only** (Section 9.2 Progress row read
+    side split by method): anonymous 401, owner 403, device 403 — none
+    reach the service. GET's cell is **Agent / Owner**: anonymous 401,
+    device 403, owner 200, agent 200. The agent's allowed POST goes
+    through the real fencing gate — claim T001 first, then checkpoint
+    with the live generation (the services' own catalogs live in
+    tests/test_checkpoint_endpoint.py).
+    """
+    task = f"/api/v1/tasks/{PID_ONE}-T001"
+    checkpoints = f"{task}/checkpoints"
+
+    # POST (Agent only): the denied shapes die at the permission gate.
+    anon_post = matrix.call("anonymous", "POST", checkpoints)
+    assert anon_post.status_code == 401
+    assert _code(anon_post) == AUTH_REQUIRED
+
+    owner_post = matrix.post("owner", checkpoints, {"session_id": "sess-matrix-cp"})
+    assert owner_post.status_code == 403
+    assert _code(owner_post) == ROLE_NOT_PERMITTED
+
+    device_post = matrix.post("device", checkpoints, {"session_id": "sess-matrix-cp"})
+    assert device_post.status_code == 403
+    assert _code(device_post) == ROLE_NOT_PERMITTED
+
+    # GET (Agent / Owner): device excluded, both admitted callers read.
+    anon_get = matrix.call("anonymous", "GET", checkpoints)
+    assert anon_get.status_code == 401
+    assert _code(anon_get) == AUTH_REQUIRED
+
+    device_get = matrix.call("device", "GET", checkpoints)
+    assert device_get.status_code == 403
+    assert _code(device_get) == ROLE_NOT_PERMITTED
+
+    owner_get = matrix.call("owner", "GET", checkpoints)
+    assert owner_get.status_code == 200
+
+    agent_get = matrix.call("coder", "GET", checkpoints)
+    assert agent_get.status_code == 200
+
+    # The agent's own POST: claim (Section 9.3) then checkpoint with the
+    # fencing pair — 200 with the stored row and the extended expiry.
+    claim = matrix.post(
+        "coder",
+        f"{task}/claim",
+        {"session_id": "sess-matrix-cp", "worker_agent_id": "matrix-coder"},
+    )
+    assert claim.status_code == 200, claim.content
+
+    agent_post = matrix.post(
+        "coder",
+        checkpoints,
+        {"session_id": "sess-matrix-cp", "lease_generation": 1, "message": "matrix"},
+    )
+    assert agent_post.status_code == 200
+    assert agent_post.json()["lease_extended"] is True
+
+
+# --- WP-2.x activation: §9.2 agent read-only cells on their real routes -----
+
+
+def test_wp2x_agent_read_routes_enforce_their_callers(matrix: _Authz) -> None:
+    """The activated read cells: project, policy and task detail.
+
+    Section 9.2's caller cells as the API enforces them after the WP-2.x
+    activation: ``GET /projects/{pid}``, ``GET /projects/{pid}/policy``
+    and ``GET /tasks/{id}`` admit the owner **and** an agent token
+    scoped to the addressed project (the bridge's session context and
+    ``get_task_details`` reads); devices answer ROLE_NOT_PERMITTED (not
+    in the caller cell), anonymous AUTH_REQUIRED, and the *owner-only*
+    shapes — the project list (the Manage-projects matrix row above) and
+    every write — stay refused to agents.
+    """
+    reads = (
+        f"/api/v1/projects/{PID_ONE}",
+        f"/api/v1/projects/{PID_ONE}/policy",
+        f"/api/v1/tasks/{PID_ONE}-T001",
+    )
+
+    # Owner and any project-scoped agent role read all three routes.
+    for actor in ("owner", "coder", "auditor", "decomposer", "merge_executor"):
+        for route in reads:
+            response = matrix.call(actor, "GET", route)
+            assert response.status_code == 200, (actor, route, response.content)
+
+    # Devices are excluded from the read cells.
+    for route in reads:
+        response = matrix.call("device", "GET", route)
+        assert response.status_code == 403, route
+        assert _code(response) == ROLE_NOT_PERMITTED, route
+
+    # Anonymous → AUTH_REQUIRED on every read.
+    for route in reads:
+        response = matrix.call("anonymous", "GET", route)
+        assert response.status_code == 401, route
+        assert _code(response) == AUTH_REQUIRED, route
+
+    # The project list spans every project: the Manage-projects row keeps
+    # it Owner-only for agents (§12.2 cells; DEFERRED_MATRIX_CELLS still
+    # governs the create row below), and the POST-shaped write on the
+    # addressed rows stays Owner-only too — no write rides the read cell.
+    # (PATCH denials for agents are asserted on the real routes in
+    # test_project_api / test_project_policy_api / test_task_api.)
+    listed = matrix.call("coder", "GET", "/api/v1/projects")
+    assert listed.status_code == 403
+    assert _code(listed) == ROLE_NOT_PERMITTED
+
+    create = matrix.post("coder", f"/api/v1/projects/{PID_ONE}/tasks", {"title": "Nope"})
+    assert create.status_code == 403
+    assert _code(create) == ROLE_NOT_PERMITTED
+
+
 # --- FR-SEC-05 case inside the matrix suite (MT-1.2-06) ---------------------
 
 
@@ -660,7 +788,10 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     # as real-route probes above; test_wp16_landed_routes_enforce_their_
     # callers below covers work + release), and the agent-sessions pair
     # moved to the real MT-1.6-09 routes there too.
-    "/api/v1/tasks/1/checkpoints",  # WP-1.6
+    # WP-1.8 removed /api/v1/tasks/1/checkpoints as it landed the route:
+    # test_wp18_landed_checkpoint_routes_enforce_their_callers below
+    # carries its real POST/GET cases (reporting-only: WP-1.8 recorded
+    # the hand-off, the matrix owner landed it at convergence).
     "/api/v1/tasks/1/resolution",  # Submit resolution (WP-1.6)
     "/api/v1/tasks/1/resolutions",  # WP-1.6
     "/api/v1/resolutions/1/patch",  # WP-1.6
@@ -673,8 +804,11 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     "/api/v1/tasks/1/attachments",  # WP-1.11
     "/api/v1/attachments/1",  # WP-1.11
     "/api/v1/attachments/1/content",  # WP-1.11
-    "/api/v1/events",  # Read events — Owner only (WP-1.8)
-    "/api/v1/events/stream",  # Read events — Owner only (WP-1.8)
+    # WP-1.10 (MT-1.10-05) removed its entries as it landed them: the
+    # *Read events* row now runs on the real /api/v1/events and
+    # /api/v1/events/stream routes (probes above), and
+    # tests/events/test_event_authorization.py carries the full per-event
+    # filtering catalog.
     "/api/v1/dashboard/summary",  # Owner (WP-1.8)
 )
 

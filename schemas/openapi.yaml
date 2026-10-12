@@ -375,6 +375,125 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/events:
+    get:
+      operationId: api_v1_events_retrieve
+      description: 'Event history (Section 9.6 envelope per item). Sort: id ascending
+        (chronological — the monotonic SSE id order). Pagination: cursor-based — pass
+        `cursor` from the previous `next_cursor`; `page_size` defaults to 25 and is
+        clamped to 100. Filters: `project`, `task` (Section 9.6 names).'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults).
+      - in: query
+        name: project
+        schema:
+          type: string
+          pattern: ^PID[0-9]{5}$
+          minLength: 1
+        description: Only events for this project id (PID + five digits, Section 7.3).
+      - in: query
+        name: task
+        schema:
+          type: string
+          pattern: ^PID[0-9]{5}-T[0-9]{3,}$
+          minLength: 1
+        description: Only events for this task id ({PID}-T{index}, Section 7.3).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/events/stream:
+    get:
+      operationId: api_v1_events_stream_retrieve
+      description: 'Server-Sent Events feed of Section 9.6 envelopes (`id:` carries
+        the monotonic event id; `data:` carries the envelope JSON; comment lines are
+        heartbeats and carry no id). Filters: `project`, `task`, fixed at connect.
+        Resume: send the last received id as the `Last-Event-ID` header (or `last_event_id`
+        query parameter) to replay missed events before switching to live. Authentication:
+        owner session or device bearer token — agents never subscribe (Section 12.2).'
+      parameters:
+      - in: query
+        name: project
+        schema:
+          type: string
+          pattern: ^PID[0-9]{5}$
+          minLength: 1
+        description: Only events for this project id (PID + five digits, Section 7.3).
+      - in: query
+        name: task
+        schema:
+          type: string
+          pattern: ^PID[0-9]{5}-T[0-9]{3,}$
+          minLength: 1
+        description: Only events for this task id ({PID}-T{index}, Section 7.3).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/projects:
     get:
       operationId: list_projects
@@ -382,8 +501,9 @@ paths:
         order, i.e. creation order (zero-padded Section 7.3 ids make lexicographic
         order deterministic; pagination.md rule 2). Pagination: cursor-based — pass
         `cursor` from the previous `next_cursor`; `page_size` defaults to 25, clamped
-        to 100. Caller: Owner only — agent read-only access for a token''s own project
-        activates in WP-2.x and is denied until then.'
+        to 100. Caller: Owner only — the list spans every project, so agent tokens
+        are refused here (ROLE_NOT_PERMITTED); an agent reads its own project through
+        `GET /projects/{pid}` instead.'
       parameters:
       - in: query
         name: cursor
@@ -485,10 +605,10 @@ paths:
   /api/v1/projects/{pid}:
     get:
       operationId: retrieve_project
-      description: 'Read one project. Caller: Owner only — agent read-only access
-        for a token''s own project activates in WP-2.x and is denied until then. A
-        malformed or unknown pid answers VALIDATION_ERROR (400): the catalog has no
-        PROJECT_NOT_FOUND.'
+      description: 'Read one project. Caller: Owner or an agent token scoped to this
+        project (Section 9.2: agents read-only for own project); other agent tokens
+        answer AUTH_FORBIDDEN_PROJECT (403) and devices ROLE_NOT_PERMITTED. A malformed
+        or unknown pid answers VALIDATION_ERROR (400): the catalog has no PROJECT_NOT_FOUND.'
       parameters:
       - in: path
         name: pid
@@ -631,9 +751,10 @@ paths:
     get:
       operationId: retrieve_project_policy
       description: 'Read the project''s full policy with current values (Section 7.2
-        field names and documented defaults). Caller: Owner only — agent access activates
-        in WP-2.x and is denied until then. A malformed or unknown pid answers VALIDATION_ERROR
-        (400).'
+        field names and documented defaults). Caller: Owner or an agent token scoped
+        to this project (Section 9.2: agents read-only for own project); foreign agent
+        tokens answer AUTH_FORBIDDEN_PROJECT and devices ROLE_NOT_PERMITTED. A malformed
+        or unknown pid answers VALIDATION_ERROR (400).'
       parameters:
       - in: path
         name: pid
@@ -1005,10 +1126,13 @@ paths:
   /api/v1/tasks/{id}:
     get:
       operationId: retrieve_task
-      description: 'Read one task by id (Section 9.2; caller: Owner only). Every Section
-        7.2 field is returned. A malformed id answers VALIDATION_ERROR (400) — the
-        boundary check of Section 7.3; an unknown but well-formed id answers TASK_NOT_FOUND
-        (404). Archived and completed tasks remain readable (MT-1.4-06).'
+      description: 'Read one task by id (Section 9.2). Caller: Owner or an agent token
+        scoped to the task''s project — the row the bridge''s `get_task_details` tool
+        serves (Section 10.5); foreign agent tokens answer AUTH_FORBIDDEN_PROJECT
+        (403) and devices ROLE_NOT_PERMITTED. Every Section 7.2 field is returned.
+        A malformed id answers VALIDATION_ERROR (400) — the boundary check of Section
+        7.3; an unknown but well-formed id answers TASK_NOT_FOUND (404). Archived
+        and completed tasks remain readable (MT-1.4-06).'
       parameters:
       - in: path
         name: id
@@ -1124,6 +1248,160 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
         '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tasks/{id}/checkpoints:
+    get:
+      operationId: list_checkpoints
+      description: 'One task''s checkpoint history, newest first (Section 9.2 Progress
+        row; caller: Agent / Owner). Cursor pagination per WP-0.5-04: `page_size`
+        (default 25, maximum 100), the opaque `cursor` from the previous page''s `next_cursor`,
+        stable (timestamp, id) ordering so inserts during paging never shift or duplicate
+        rows. Empty tasks return an empty page, not an error. Cross-project agent
+        tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown tasks TASK_NOT_FOUND (404).
+        History/backfill only — live updates are the WP-1.10 `task.checkpoint` event
+        stream.'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor; valid only
+          for this task's listing (pagination.md rule 1).
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults, same per-endpoint choice
+          as the other list routes).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckpointListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    post:
+      operationId: create_checkpoint
+      description: 'Store one agent checkpoint and extend the lease (Section 9.2 Progress
+        row; caller: Agent lease holder; Section 6.5 Flow B). One transaction verifies
+        the fencing pair (`session_id` + `lease_generation`) against the locked row
+        — a stale generation or dead lease answers LEASE_EXPIRED (409, stop and re-claim
+        per Section 10.5), a foreign session LEASE_NOT_OWNED (403) — then stores the
+        row (server timestamp; `attempt_number` copied at write time), applies Section
+        8.6''s min(now + duration, acquired + cap) extension, emits `task.checkpoint`
+        in-transaction, and returns the new `lease_expires_at` (plus `capped`, so
+        the bridge can surface submit-or-release guidance). `kind` gates extension
+        (OQ-04 recorded reading): progress/system always, liveness only under the
+        project''s checkpoint_and_liveness mode. `Idempotency-Key` replays a retried
+        checkpoint without a duplicate row or a double extension (NFR-12).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of storing
+          a second checkpoint or double-extending the lease.
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckpointCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CheckpointCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CheckpointCreate'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckpointWriteResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
           content:
             application/json:
               schema:
@@ -1613,7 +1891,7 @@ components:
         id:
           type: integer
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/KindE0dEnum'
         project_id:
           type: string
           nullable: true
@@ -1644,6 +1922,142 @@ components:
         * `vision` - vision
         * `text_only` - text_only
         * `unknown` - unknown
+    Checkpoint:
+      type: object
+      description: One stored checkpoint — the Section 7.2 field list, as returned.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Server-generated row identity (7.2).
+        task_id:
+          type: string
+          description: The addressed task (Section 7.2).
+        attempt_number:
+          type: integer
+          description: The coder claim attempt at write time (copied, never joined
+            — MT-1.8-01 risk note).
+        session_id:
+          type: string
+          description: Bridge-issued session id of the reporting agent (G-18).
+        timestamp:
+          type: string
+          format: date-time
+          description: Server clock at insertion (P7) — the feed's 'when'.
+        message:
+          type: string
+        percent:
+          type: integer
+          nullable: true
+          description: 0-100 hint, or null when the caller omitted it (7.2).
+        token_usage:
+          description: Free JSON token accounting blob (Section 7.2).
+        kind:
+          type: string
+          description: progress | liveness | system (7.2).
+      required:
+      - attempt_number
+      - id
+      - kind
+      - message
+      - percent
+      - session_id
+      - task_id
+      - timestamp
+      - token_usage
+    CheckpointCreate:
+      type: object
+      description: '``POST /tasks/{id}/checkpoints`` input (Section 10.5 tool contract).'
+      properties:
+        session_id:
+          type: string
+          description: Lease-holding session id (G-18) — the fencing pair's identity
+            half.
+          maxLength: 255
+        lease_generation:
+          type: integer
+          minimum: 0
+          description: Fencing generation from the claim response (Section 8.6; ADR-012);
+            a stale value answers LEASE_EXPIRED.
+        message:
+          type: string
+          default: ''
+          description: The agent's progress report text (Section 10.5 tool input).
+        percent:
+          type: integer
+          maximum: 100
+          minimum: 0
+          nullable: true
+          description: Optional 0-100 completion hint (Section 7.2 bounds; out-of-range
+            answers VALIDATION_ERROR).
+        token_usage:
+          description: Free JSON token accounting blob (Section 7.2) — no fixed schema
+            is invented here (MT-1.8-01 risk note; an OQ would freeze one).
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/CheckpointCreateKindEnum'
+          default: progress
+          description: |-
+            progress | liveness | system (Section 7.2); default progress — the extension-carrying kind (OQ-04 recorded reading).
+
+            * `progress` - progress
+            * `liveness` - liveness
+            * `system` - system
+      required:
+      - lease_generation
+      - session_id
+    CheckpointCreateKindEnum:
+      enum:
+      - progress
+      - liveness
+      - system
+      type: string
+      description: |-
+        * `progress` - progress
+        * `liveness` - liveness
+        * `system` - system
+    CheckpointListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Checkpoint'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
+    CheckpointWriteResponse:
+      type: object
+      description: MT-1.8-03's frozen response — Section 10.5 "Returns new expiry".
+      properties:
+        checkpoint:
+          allOf:
+          - $ref: '#/components/schemas/Checkpoint'
+          description: The stored row's identity and Section 7.2 fields.
+        lease_extended:
+          type: boolean
+          description: False for a kind that does not extend under the project's lease_extension_mode
+            (OQ-04 recorded reading).
+        lease_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: The Section 8.6 deadline after this call — the new expiry the
+            bridge turns into its next_checkpoint_due hint.
+        capped:
+          type: boolean
+          description: True when the hard cap clamped the extension — the owner must
+            submit or release (MT-1.6-03's flag, consumed here).
+      required:
+      - capped
+      - checkpoint
+      - lease_expires_at
+      - lease_extended
     ClaimRequest:
       type: object
       description: '``POST /tasks/{id}/claim`` input (Section 10.5 claim_task minus
@@ -1852,6 +2266,150 @@ components:
       - correlation_id
       - message
       - retryable
+    EventActor:
+      type: object
+      description: Envelope ``actor`` — the structured Section 9.6 object, never flattened.
+      properties:
+        type:
+          $ref: '#/components/schemas/EventActorTypeEnum'
+        ref:
+          type: string
+      required:
+      - ref
+      - type
+    EventActorTypeEnum:
+      enum:
+      - owner
+      - agent
+      - system
+      type: string
+      description: |-
+        * `owner` - owner
+        * `agent` - agent
+        * `system` - system
+    EventEnvelope:
+      type: object
+      description: The Section 9.6 event envelope — exactly the seven documented keys.
+      properties:
+        id:
+          type: integer
+          description: Monotonic event id — the SSE event id (Section 9.6).
+        type:
+          allOf:
+          - $ref: '#/components/schemas/EventEnvelopeTypeEnum'
+          description: |-
+            One of the Section 9.6 catalog types (closed set).
+
+            * `project.created` - project.created
+            * `project.updated` - project.updated
+            * `task.created` - task.created
+            * `task.updated` - task.updated
+            * `task.transitioned` - task.transitioned
+            * `task.claimed` - task.claimed
+            * `task.released` - task.released
+            * `task.checkpoint` - task.checkpoint
+            * `task.lease_expiring` - task.lease_expiring
+            * `task.lease_expired` - task.lease_expired
+            * `attachment.processing` - attachment.processing
+            * `attachment.ready` - attachment.ready
+            * `attachment.failed` - attachment.failed
+            * `audit.claimed` - audit.claimed
+            * `audit.passed` - audit.passed
+            * `audit.escalated` - audit.escalated
+            * `review.requested` - review.requested
+            * `review.decided` - review.decided
+            * `merge.started` - merge.started
+            * `merge.succeeded` - merge.succeeded
+            * `merge.failed` - merge.failed
+            * `agent.session_started` - agent.session_started
+            * `agent.session_ended` - agent.session_ended
+            * `system.alert` - system.alert
+        project_id:
+          type: string
+        task_id:
+          type: string
+          nullable: true
+        occurred_at:
+          type: string
+          description: UTC instant rendered as YYYY-MM-DDTHH:MM:SSZ (Section 9.6).
+        actor:
+          $ref: '#/components/schemas/EventActor'
+        data: {}
+      required:
+      - actor
+      - data
+      - id
+      - occurred_at
+      - project_id
+      - task_id
+      - type
+    EventEnvelopeTypeEnum:
+      enum:
+      - project.created
+      - project.updated
+      - task.created
+      - task.updated
+      - task.transitioned
+      - task.claimed
+      - task.released
+      - task.checkpoint
+      - task.lease_expiring
+      - task.lease_expired
+      - attachment.processing
+      - attachment.ready
+      - attachment.failed
+      - audit.claimed
+      - audit.passed
+      - audit.escalated
+      - review.requested
+      - review.decided
+      - merge.started
+      - merge.succeeded
+      - merge.failed
+      - agent.session_started
+      - agent.session_ended
+      - system.alert
+      type: string
+      description: |-
+        * `project.created` - project.created
+        * `project.updated` - project.updated
+        * `task.created` - task.created
+        * `task.updated` - task.updated
+        * `task.transitioned` - task.transitioned
+        * `task.claimed` - task.claimed
+        * `task.released` - task.released
+        * `task.checkpoint` - task.checkpoint
+        * `task.lease_expiring` - task.lease_expiring
+        * `task.lease_expired` - task.lease_expired
+        * `attachment.processing` - attachment.processing
+        * `attachment.ready` - attachment.ready
+        * `attachment.failed` - attachment.failed
+        * `audit.claimed` - audit.claimed
+        * `audit.passed` - audit.passed
+        * `audit.escalated` - audit.escalated
+        * `review.requested` - review.requested
+        * `review.decided` - review.decided
+        * `merge.started` - merge.started
+        * `merge.succeeded` - merge.succeeded
+        * `merge.failed` - merge.failed
+        * `agent.session_started` - agent.session_started
+        * `agent.session_ended` - agent.session_ended
+        * `system.alert` - system.alert
+    EventListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventEnvelope'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
     HealthLive:
       type: object
       description: Response body of GET /health/live.
@@ -1873,7 +2431,7 @@ components:
       required:
       - checks
       - status
-    KindEnum:
+    KindE0dEnum:
       enum:
       - owner_session
       - agent
@@ -2672,7 +3230,7 @@ components:
         id:
           type: integer
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/KindE0dEnum'
         project_id:
           type: string
           nullable: true

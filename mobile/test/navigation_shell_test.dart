@@ -5,13 +5,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orchestrator_mobile/app/app.dart';
 import 'package:orchestrator_mobile/app/nav_shell.dart';
 import 'package:orchestrator_mobile/app/routes.dart';
+import 'package:orchestrator_mobile/core/security/biometric_authenticator.dart';
+import 'package:orchestrator_mobile/core/security/secure_token_store.dart';
+
+import 'security/security_test_support.dart';
 
 /// Navigation shell integrity (MT-5.5-01): every Section 14.1 area is
 /// reachable — the four tab areas through the shell, the flow and modal
 /// areas through their routes. Placeholders must be honest empty states.
 void main() {
   Future<void> pumpApp(WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: OrchestratorApp()));
+    // No stored credential → the MT-5.5-04 gate passes the shell through
+    // (onboarding runs inside the app), so the shell is what these
+    // navigation checks exercise.
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          secureTokenStoreProvider
+              .overrideWithValue(InMemorySecureTokenStore()),
+          biometricAuthProvider.overrideWithValue(FakeBiometricAuthenticator()),
+        ],
+        child: const OrchestratorApp(),
+      ),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -75,8 +91,9 @@ void main() {
       final NavigatorState navigator =
           tester.state<NavigatorState>(find.byType(Navigator));
 
+      // Onboarding is fully implemented (MT-5.5-06), so it is excluded
+      // from the placeholder list and checked below.
       const List<AppArea> pushedAreas = <AppArea>[
-        AppArea.onboarding,
         AppArea.taskDetail,
         AppArea.review,
         AppArea.auditLog,
@@ -89,6 +106,25 @@ void main() {
         navigator.pop();
         await tester.pumpAndSettle();
       }
+    });
+
+    testWidgets(
+        'the onboarding route renders the real flow, not a '
+        'placeholder', (tester) async {
+      await pumpApp(tester);
+      final NavigatorState navigator =
+          tester.state<NavigatorState>(find.byType(Navigator));
+
+      navigator.pushNamed(AppArea.onboarding.path);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Onboarding'), findsOneWidget);
+      expect(find.textContaining('Not implemented yet'), findsNothing);
+      // MT-5.5-06: the URL entry step is the flow's first screen.
+      expect(find.byKey(const ValueKey<String>('onboarding-server-url-field')),
+          findsOneWidget);
+      navigator.pop();
+      await tester.pumpAndSettle();
     });
 
     testWidgets('all eight Section 14.1 areas render from the route table',

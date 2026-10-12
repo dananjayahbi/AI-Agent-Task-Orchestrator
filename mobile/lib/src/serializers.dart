@@ -16,16 +16,35 @@ import 'package:orchestrator_mobile/src/model/date.dart';
 
 import 'package:orchestrator_mobile/src/model/active_status_enum.dart';
 import 'package:orchestrator_mobile/src/model/agent_hints.dart';
+import 'package:orchestrator_mobile/src/model/agent_session.dart';
+import 'package:orchestrator_mobile/src/model/agent_session_create.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_request.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_response.dart';
+import 'package:orchestrator_mobile/src/model/capability_enum.dart';
+import 'package:orchestrator_mobile/src/model/checkpoint.dart';
+import 'package:orchestrator_mobile/src/model/checkpoint_create.dart';
+import 'package:orchestrator_mobile/src/model/checkpoint_create_kind_enum.dart';
+import 'package:orchestrator_mobile/src/model/checkpoint_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/checkpoint_write_response.dart';
+import 'package:orchestrator_mobile/src/model/claim_request.dart';
+import 'package:orchestrator_mobile/src/model/claim_response.dart';
 import 'package:orchestrator_mobile/src/model/code_enum.dart';
+import 'package:orchestrator_mobile/src/model/device_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/device_register_request.dart';
 import 'package:orchestrator_mobile/src/model/device_register_response.dart';
+import 'package:orchestrator_mobile/src/model/device_summary.dart';
 import 'package:orchestrator_mobile/src/model/error_envelope.dart';
+import 'package:orchestrator_mobile/src/model/error_envelope_body.dart';
+import 'package:orchestrator_mobile/src/model/event_actor.dart';
+import 'package:orchestrator_mobile/src/model/event_actor_type_enum.dart';
+import 'package:orchestrator_mobile/src/model/event_envelope.dart';
+import 'package:orchestrator_mobile/src/model/event_envelope_type_enum.dart';
+import 'package:orchestrator_mobile/src/model/event_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/health_live.dart';
 import 'package:orchestrator_mobile/src/model/health_ready.dart';
-import 'package:orchestrator_mobile/src/model/kind_enum.dart';
+import 'package:orchestrator_mobile/src/model/kind_e0d_enum.dart';
 import 'package:orchestrator_mobile/src/model/lease_extension_mode_enum.dart';
+import 'package:orchestrator_mobile/src/model/lease_record.dart';
 import 'package:orchestrator_mobile/src/model/login_request.dart';
 import 'package:orchestrator_mobile/src/model/merge_strategy_enum.dart';
 import 'package:orchestrator_mobile/src/model/orchestrator_manifest.dart';
@@ -40,13 +59,16 @@ import 'package:orchestrator_mobile/src/model/project_create.dart';
 import 'package:orchestrator_mobile/src/model/project_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/project_policy.dart';
 import 'package:orchestrator_mobile/src/model/refreshed.dart';
+import 'package:orchestrator_mobile/src/model/release_request.dart';
 import 'package:orchestrator_mobile/src/model/revoked.dart';
+import 'package:orchestrator_mobile/src/model/rules_block.dart';
 import 'package:orchestrator_mobile/src/model/state_enum.dart';
 import 'package:orchestrator_mobile/src/model/task.dart';
 import 'package:orchestrator_mobile/src/model/task_create.dart';
 import 'package:orchestrator_mobile/src/model/task_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/token_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/token_summary.dart';
+import 'package:orchestrator_mobile/src/model/transport_enum.dart';
 import 'package:orchestrator_mobile/src/model/user_summary.dart';
 
 part 'serializers.g.dart';
@@ -54,16 +76,35 @@ part 'serializers.g.dart';
 @SerializersFor([
   ActiveStatusEnum,
   AgentHints,
+  AgentSession,
+  AgentSessionCreate,
   AgentTokenIssueRequest,
   AgentTokenIssueResponse,
+  CapabilityEnum,
+  Checkpoint,
+  CheckpointCreate,
+  CheckpointCreateKindEnum,
+  CheckpointListEnvelope,
+  CheckpointWriteResponse,
+  ClaimRequest,
+  ClaimResponse,
   CodeEnum,
+  DeviceListEnvelope,
   DeviceRegisterRequest,
   DeviceRegisterResponse,
+  DeviceSummary,
   ErrorEnvelope,
+  ErrorEnvelopeBody,
+  EventActor,
+  EventActorTypeEnum,
+  EventEnvelope,
+  EventEnvelopeTypeEnum,
+  EventListEnvelope,
   HealthLive,
   HealthReady,
-  KindEnum,
+  KindE0dEnum,
   LeaseExtensionModeEnum,
+  LeaseRecord,
   LoginRequest,
   MergeStrategyEnum,
   OrchestratorManifest,
@@ -78,13 +119,16 @@ part 'serializers.g.dart';
   ProjectListEnvelope,
   ProjectPolicy,
   Refreshed,
+  ReleaseRequest,
   Revoked,
+  RulesBlock,
   StateEnum,
   Task,
   TaskCreate,
   TaskListEnvelope,
   TokenListEnvelope,
   TokenSummary,
+  TransportEnum,
   UserSummary,
 ])
 Serializers serializers = (_$serializers.toBuilder()
@@ -93,8 +137,16 @@ Serializers serializers = (_$serializers.toBuilder()
         () => MapBuilder<String, String>(),
       )
       ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(EventEnvelope)]),
+        () => ListBuilder<EventEnvelope>(),
+      )
+      ..addBuilderFactory(
         const FullType(BuiltList, [FullType(TokenSummary)]),
         () => ListBuilder<TokenSummary>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Checkpoint)]),
+        () => ListBuilder<Checkpoint>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Project)]),
@@ -112,6 +164,10 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(String)]),
         () => ListBuilder<String>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(DeviceSummary)]),
+        () => ListBuilder<DeviceSummary>(),
       )
       ..add(const OneOfSerializer())
       ..add(const AnyOfSerializer())

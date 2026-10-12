@@ -1,16 +1,16 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'kind_enum.dart';
+part of 'kind_e0d_enum.dart';
 
 // **************************************************************************
 // BuiltValueGenerator
 // **************************************************************************
 
-const KindEnum _$ownerSession = const KindEnum._('ownerSession');
-const KindEnum _$agent = const KindEnum._('agent');
-const KindEnum _$device = const KindEnum._('device');
+const KindE0dEnum _$ownerSession = const KindE0dEnum._('ownerSession');
+const KindE0dEnum _$agent = const KindE0dEnum._('agent');
+const KindE0dEnum _$device = const KindE0dEnum._('device');
 
-KindEnum _$valueOf(String name) {
+KindE0dEnum _$valueOf(String name) {
   switch (name) {
     case 'ownerSession':
       return _$ownerSession;
@@ -23,29 +23,30 @@ KindEnum _$valueOf(String name) {
   }
 }
 
-final BuiltSet<KindEnum> _$values = BuiltSet<KindEnum>(const <KindEnum>[
+final BuiltSet<KindE0dEnum> _$values =
+    BuiltSet<KindE0dEnum>(const <KindE0dEnum>[
   _$ownerSession,
   _$agent,
   _$device,
 ]);
 
-class _$KindEnumMeta {
-  const _$KindEnumMeta();
-  KindEnum get ownerSession => _$ownerSession;
-  KindEnum get agent => _$agent;
-  KindEnum get device => _$device;
-  KindEnum valueOf(String name) => _$valueOf(name);
-  BuiltSet<KindEnum> get values => _$values;
+class _$KindE0dEnumMeta {
+  const _$KindE0dEnumMeta();
+  KindE0dEnum get ownerSession => _$ownerSession;
+  KindE0dEnum get agent => _$agent;
+  KindE0dEnum get device => _$device;
+  KindE0dEnum valueOf(String name) => _$valueOf(name);
+  BuiltSet<KindE0dEnum> get values => _$values;
 }
 
-mixin _$KindEnumMixin {
+mixin _$KindE0dEnumMixin {
   // ignore: non_constant_identifier_names
-  _$KindEnumMeta get KindEnum => const _$KindEnumMeta();
+  _$KindE0dEnumMeta get KindE0dEnum => const _$KindE0dEnumMeta();
 }
 
-Serializer<KindEnum> _$kindEnumSerializer = _$KindEnumSerializer();
+Serializer<KindE0dEnum> _$kindE0dEnumSerializer = _$KindE0dEnumSerializer();
 
-class _$KindEnumSerializer implements PrimitiveSerializer<KindEnum> {
+class _$KindE0dEnumSerializer implements PrimitiveSerializer<KindE0dEnum> {
   static const Map<String, Object> _toWire = const <String, Object>{
     'ownerSession': 'owner_session',
     'agent': 'agent',
@@ -58,19 +59,19 @@ class _$KindEnumSerializer implements PrimitiveSerializer<KindEnum> {
   };
 
   @override
-  final Iterable<Type> types = const <Type>[KindEnum];
+  final Iterable<Type> types = const <Type>[KindE0dEnum];
   @override
-  final String wireName = 'KindEnum';
+  final String wireName = 'KindE0dEnum';
 
   @override
-  Object serialize(Serializers serializers, KindEnum object,
+  Object serialize(Serializers serializers, KindE0dEnum object,
           {FullType specifiedType = FullType.unspecified}) =>
       _toWire[object.name] ?? object.name;
 
   @override
-  KindEnum deserialize(Serializers serializers, Object serialized,
+  KindE0dEnum deserialize(Serializers serializers, Object serialized,
           {FullType specifiedType = FullType.unspecified}) =>
-      KindEnum.valueOf(
+      KindE0dEnum.valueOf(
           _fromWire[serialized] ?? (serialized is String ? serialized : ''));
 }
 

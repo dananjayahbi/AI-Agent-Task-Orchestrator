@@ -19,6 +19,8 @@ class _$TaskCreate extends TaskCreate {
   final String? testCommand;
   @override
   final PriorityEnum? priority;
+  @override
+  final BuiltList<String>? dependsOn;
 
   factory _$TaskCreate([void Function(TaskCreateBuilder)? updates]) =>
       (TaskCreateBuilder()..update(updates))._build();
@@ -29,7 +31,8 @@ class _$TaskCreate extends TaskCreate {
       this.acceptanceCriteria,
       this.targetScope,
       this.testCommand,
-      this.priority})
+      this.priority,
+      this.dependsOn})
       : super._();
   @override
   TaskCreate rebuild(void Function(TaskCreateBuilder) updates) =>
@@ -47,7 +50,8 @@ class _$TaskCreate extends TaskCreate {
         acceptanceCriteria == other.acceptanceCriteria &&
         targetScope == other.targetScope &&
         testCommand == other.testCommand &&
-        priority == other.priority;
+        priority == other.priority &&
+        dependsOn == other.dependsOn;
   }
 
   @override
@@ -59,6 +63,7 @@ class _$TaskCreate extends TaskCreate {
     _$hash = $jc(_$hash, targetScope.hashCode);
     _$hash = $jc(_$hash, testCommand.hashCode);
     _$hash = $jc(_$hash, priority.hashCode);
+    _$hash = $jc(_$hash, dependsOn.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -71,7 +76,8 @@ class _$TaskCreate extends TaskCreate {
           ..add('acceptanceCriteria', acceptanceCriteria)
           ..add('targetScope', targetScope)
           ..add('testCommand', testCommand)
-          ..add('priority', priority))
+          ..add('priority', priority)
+          ..add('dependsOn', dependsOn))
         .toString();
   }
 }
@@ -107,6 +113,12 @@ class TaskCreateBuilder implements Builder<TaskCreate, TaskCreateBuilder> {
   PriorityEnum? get priority => _$this._priority;
   set priority(PriorityEnum? priority) => _$this._priority = priority;
 
+  ListBuilder<String>? _dependsOn;
+  ListBuilder<String> get dependsOn =>
+      _$this._dependsOn ??= ListBuilder<String>();
+  set dependsOn(ListBuilder<String>? dependsOn) =>
+      _$this._dependsOn = dependsOn;
+
   TaskCreateBuilder() {
     TaskCreate._defaults(this);
   }
@@ -120,6 +132,7 @@ class TaskCreateBuilder implements Builder<TaskCreate, TaskCreateBuilder> {
       _targetScope = $v.targetScope?.toBuilder();
       _testCommand = $v.testCommand;
       _priority = $v.priority;
+      _dependsOn = $v.dependsOn?.toBuilder();
       _$v = null;
     }
     return this;
@@ -150,6 +163,7 @@ class TaskCreateBuilder implements Builder<TaskCreate, TaskCreateBuilder> {
             targetScope: _targetScope?.build(),
             testCommand: testCommand,
             priority: priority,
+            dependsOn: _dependsOn?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -158,6 +172,9 @@ class TaskCreateBuilder implements Builder<TaskCreate, TaskCreateBuilder> {
         _acceptanceCriteria?.build();
         _$failedField = 'targetScope';
         _targetScope?.build();
+
+        _$failedField = 'dependsOn';
+        _dependsOn?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
             r'TaskCreate', _$failedField, e.toString());

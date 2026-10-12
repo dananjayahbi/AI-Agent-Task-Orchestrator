@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orchestrator_mobile/orchestrator_mobile.dart';
 
 import '../config/app_config.dart';
+import '../security/auth_gate.dart';
+import 'auth_token_interceptor.dart';
 import 'correlation_id_interceptor.dart';
 import 'error_mapping_interceptor.dart';
 
@@ -27,7 +29,16 @@ class OrchestratorClient {
 
   /// Builds the client for [config]'s resolved origin
   /// (`scheme://host[:port]` — operation paths already carry `/api/v1`).
-  factory OrchestratorClient.fromConfig(AppConfig config) {
+  ///
+  /// [releaseToken] / [discardCredential] wire MT-5.5-04's biometric gate:
+  /// the device token is attached to outbound requests only while the gate
+  /// is unlocked (Section 12.2/14.2). Both are optional so tests and
+  /// pre-auth flows (onboarding) can construct a bare client.
+  factory OrchestratorClient.fromConfig(
+    AppConfig config, {
+    String? Function()? releaseToken,
+    Future<void> Function()? discardCredential,
+  }) {
     final OrchestratorMobile generated = OrchestratorMobile(
       basePathOverride: config.apiOrigin.toString(),
     );
@@ -35,6 +46,14 @@ class OrchestratorClient {
       ErrorMappingInterceptor(generated.serializers),
     );
     generated.dio.interceptors.add(CorrelationIdInterceptor());
+    if (releaseToken != null && discardCredential != null) {
+      generated.dio.interceptors.add(
+        AuthTokenInterceptor(
+          releaseToken: releaseToken,
+          discardCredential: discardCredential,
+        ),
+      );
+    }
     return OrchestratorClient._(generated);
   }
 
@@ -50,8 +69,17 @@ class OrchestratorClient {
 }
 
 /// Single source of the API client for every consumer, constructed from the
-/// resolved flavor configuration (MT-5.5-02/03).
+/// resolved flavor configuration (MT-5.5-02/03) and wired to the biometric
+/// gate (MT-5.5-04): while the gate is locked the client sends no
+/// `Authorization` header (Section 14.2).
 final Provider<OrchestratorClient> apiClientProvider =
     Provider<OrchestratorClient>(
-  (ref) => OrchestratorClient.fromConfig(ref.watch(appConfigProvider)),
+  (ref) {
+    final AuthGateNotifier gate = ref.read(authGateProvider.notifier);
+    return OrchestratorClient.fromConfig(
+      ref.watch(appConfigProvider),
+      releaseToken: gate.releaseToken,
+      discardCredential: gate.discardCredential,
+    );
+  },
 );

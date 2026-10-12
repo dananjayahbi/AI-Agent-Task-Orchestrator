@@ -54,3 +54,51 @@ class HasTaskProjectScope(BasePermission):
         if token.project_id is None or token.project_id != pid:
             raise AuthForbiddenProject(f"Token is scoped to {token.project_id!r}, not {pid!r}.")
         return True
+
+
+class CanReadTaskDetail(BasePermission):
+    """Section 9.2/10.5 task-detail read caller: Owner session **or** agent token.
+
+    ``GET /tasks/{id}`` feeds the owner's UI and the bridge's
+    ``get_task_details`` (Section 10.5; FR-MCP-03) — the caller cell this
+    adapter expresses admits owner sessions and live agent tokens, with
+    ``HasTaskProjectScope`` listed first so a foreign-project agent token
+    still answers ``AUTH_FORBIDDEN_PROJECT`` before any role logic
+    (ADR-004 zero-bleed). Devices are not in the cell and answer
+    ``ROLE_NOT_PERMITTED``; anonymous callers fail DRF's authentication
+    step with ``AUTH_REQUIRED``. The write half of the route (PATCH)
+    stays behind ``IsOwnerSession``.
+    """
+
+    message = "Task detail is readable by the owner or an agent token."
+
+    def has_permission(self, request: Request, view: Any) -> bool:
+        """Owner session, or any live agent token; other kinds denied."""
+        token = request.auth
+        if not isinstance(token, ApiToken):
+            return False  # anonymous → AUTH_REQUIRED via DRF
+        return token.kind in (TokenKind.OWNER_SESSION, TokenKind.AGENT)
+
+
+class CanReadCheckpoints(BasePermission):
+    """Section 9.2 Progress-row read caller: Owner session **or** agent token.
+
+    ``GET /tasks/{id}/checkpoints``'s caller cell ("Agent / Owner") as an
+    endpoint-shape adapter — the same composition pattern as the leases
+    app's ``CanReleaseTask`` (capability rows stay in
+    ``apps.accounts.permissions``; this class only expresses which token
+    kinds the §9.2 row admits). Devices are **not** in the caller column
+    and answer ``ROLE_NOT_PERMITTED``; the web/mobile feeds read through
+    an owner session (FR-WEB-04 / FR-MOB-03) or the project-scoped agent
+    token. Cross-project agent tokens are already refused by
+    ``HasTaskProjectScope`` when listed first (Zero-Bleed, ADR-004).
+    """
+
+    message = "Checkpoints are readable by the owner or an agent token."
+
+    def has_permission(self, request: Request, view: Any) -> bool:
+        """Owner session, or any live agent token; other kinds denied."""
+        token = request.auth
+        if not isinstance(token, ApiToken):
+            return False  # anonymous → AUTH_REQUIRED via DRF
+        return token.kind in (TokenKind.OWNER_SESSION, TokenKind.AGENT)

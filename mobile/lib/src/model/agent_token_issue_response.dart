@@ -3,7 +3,7 @@
 //
 
 // ignore_for_file: constant_identifier_names, no_leading_underscores_for_local_identifiers, unnecessary_brace_in_string_interps, unnecessary_this, unused_element, unused_import, use_function_type_syntax_for_parameters, use_super_parameters
-import 'package:orchestrator_mobile/src/model/kind_enum.dart';
+import 'package:orchestrator_mobile/src/model/kind_e0d_enum.dart';
 import 'package:built_value/json_object.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -26,7 +26,7 @@ abstract class AgentTokenIssueResponse
   int get id;
 
   @BuiltValueField(wireName: r'kind')
-  KindEnum get kind;
+  KindE0dEnum get kind;
   // enum kindEnum {  owner_session,  agent,  device,  };
 
   @BuiltValueField(wireName: r'project_id')
@@ -80,7 +80,7 @@ class _$AgentTokenIssueResponseSerializer
     yield r'kind';
     yield serializers.serialize(
       object.kind,
-      specifiedType: const FullType(KindEnum),
+      specifiedType: const FullType(KindE0dEnum),
     );
     yield r'project_id';
     yield object.projectId == null
@@ -143,8 +143,8 @@ class _$AgentTokenIssueResponseSerializer
         case r'kind':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(KindEnum),
-          ) as KindEnum;
+            specifiedType: const FullType(KindE0dEnum),
+          ) as KindE0dEnum;
           result.kind = valueDes;
           break;
         case r'project_id':

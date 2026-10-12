@@ -12,6 +12,7 @@ from pathlib import Path
 
 import orchestrator_bridge
 from orchestrator_bridge.tools import TOOLS
+from orchestrator_bridge.tools.schemas import CORE_TOOL_NAMES
 
 PACKAGE_ROOT = Path(orchestrator_bridge.__file__).resolve().parent
 TESTS_ROOT = Path(__file__).resolve().parent
@@ -39,9 +40,20 @@ def test_all_seams_import() -> None:
         assert module.__doc__, f"{name} must carry a plan-section docstring"
 
 
-def test_tools_registry_is_empty() -> None:
-    """WP-2.1 acceptance: the tool set starts empty (Section 19.1)."""
-    assert TOOLS == {}
+def test_tools_registry_lists_the_five_core_tools() -> None:
+    """WP-2.4/MT-2.4-01: the registry is exactly Section 10.5's core five.
+
+    (The WP-2.1 "empty tool set" contract survives as ``create_server``
+    without a bound runtime — asserted in ``test_entrypoints.py``.)
+    """
+    assert tuple(TOOLS) == CORE_TOOL_NAMES
+    assert set(TOOLS) == {
+        "get_available_tasks",
+        "get_task_details",
+        "claim_task",
+        "release_task",
+        "get_project_context",
+    }
 
 
 def test_no_backend_or_web_imports() -> None:

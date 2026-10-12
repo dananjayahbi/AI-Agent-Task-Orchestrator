@@ -134,25 +134,30 @@ services:
     image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:dev}
     build:
       context: ../../backend
-    # Placeholder idle loop until WP-1.7 swaps in `celery worker` (MT-1.1-05:
-    # worker/beat behaviour is out of scope — only the shared image wiring).
+    # WP-1.7 (MT-1.7-01): a real Celery worker consuming the Section 9.9 jobs
+    # (broker from ORCHESTRATOR_CACHE_BROKER_URL; app in config/celery.py).
     command:
-      - python
-      - -c
-      - |
-        import time
-        while True:
-            time.sleep(60)
+      - celery
+      - -A
+      - config.celery
+      - worker
+      - --loglevel=INFO
     environment: *backend-env
     volumes:
       - backend_media:/media
     networks: [internal]
-    healthcheck: # Section 16.1: worker liveness (WP-1.7 swaps in `celery inspect ping`)
-      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+    healthcheck: # Section 16.1: worker liveness via worker-ping (WP-1.7)
+      # `inspect ping` is answered by the worker itself through the broker;
+      # grep -q pong turns a silent/no-reply exit into an unhealthy state.
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A config.celery inspect ping -d celery@$$HOSTNAME --timeout 5 | grep -q pong",
+        ]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 5s
+      start_period: 10s
     depends_on:
       postgres:
         condition: service_healthy
@@ -164,17 +169,19 @@ services:
     image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:dev}
     build:
       context: ../../backend
-    # Placeholder idle loop until WP-1.7 swaps in `celery beat`.
+    # WP-1.7 (MT-1.7-01): the beat scheduler for the two Section 9.9 60-second
+    # jobs (lease-sweeper, lease-expiring-notifier; names fixed in
+    # config/celery.py). Runs one beat instance (idempotent jobs tolerate
+    # accidental doubles — see README).
     command:
-      - python
-      - -c
-      - |
-        import time
-        while True:
-            time.sleep(60)
+      - celery
+      - -A
+      - config.celery
+      - beat
+      - --loglevel=INFO
     environment: *backend-env
     networks: [internal]
-    healthcheck: # Section 16.1: process check (WP-1.7: beat schedule runner)
+    healthcheck: # Section 16.1: process check — beat is pid 1 in this container
       test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
       interval: 10s
       timeout: 5s

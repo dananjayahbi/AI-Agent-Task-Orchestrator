@@ -40,6 +40,7 @@ part 'task.g.dart';
 /// * [createdBy]
 /// * [createdAt]
 /// * [updatedAt]
+/// * [dependsOn] - Section 7.1 N:N relation (FR-TSK-07): the task ids this task waits on, ordered by id. Server-managed — written through the `depends_on` field of POST/PATCH (replace-the-set), read here.
 @BuiltValue()
 abstract class Task implements Built<Task, TaskBuilder> {
   /// {PID}-T{index} (Section 7.3); server-assigned, immutable.
@@ -134,6 +135,10 @@ abstract class Task implements Built<Task, TaskBuilder> {
 
   @BuiltValueField(wireName: r'updated_at')
   DateTime get updatedAt;
+
+  /// Section 7.1 N:N relation (FR-TSK-07): the task ids this task waits on, ordered by id. Server-managed — written through the `depends_on` field of POST/PATCH (replace-the-set), read here.
+  @BuiltValueField(wireName: r'depends_on')
+  BuiltList<String> get dependsOn;
 
   Task._();
 
@@ -305,6 +310,11 @@ class _$TaskSerializer implements PrimitiveSerializer<Task> {
     yield serializers.serialize(
       object.updatedAt,
       specifiedType: const FullType(DateTime),
+    );
+    yield r'depends_on';
+    yield serializers.serialize(
+      object.dependsOn,
+      specifiedType: const FullType(BuiltList, [FullType(String)]),
     );
   }
 
@@ -521,6 +531,13 @@ class _$TaskSerializer implements PrimitiveSerializer<Task> {
             specifiedType: const FullType(DateTime),
           ) as DateTime;
           result.updatedAt = valueDes;
+          break;
+        case r'depends_on':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(String)]),
+          ) as BuiltList<String>;
+          result.dependsOn.replace(valueDes);
           break;
         default:
           unhandled.add(key);

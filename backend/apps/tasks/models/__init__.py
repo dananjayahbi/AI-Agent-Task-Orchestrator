@@ -8,6 +8,7 @@ concern (MT-1.4-01: ``models/task.py``; MT-1.4-05 adds
 
 from __future__ import annotations
 
+from .checkpoints import CheckpointImmutable, CheckpointKind, TaskCheckpoint
 from .dependencies import TaskDependency
 from .task import (
     ClaimedRole,
@@ -22,9 +23,12 @@ from .transitions import ActorType, TaskTransition, TransitionReason
 __all__ = [
     "ActorType",
     "ClaimedRole",
+    "CheckpointImmutable",
+    "CheckpointKind",
     "MergeStatus",
     "ReviewReason",
     "Task",
+    "TaskCheckpoint",
     "TaskDependency",
     "TaskPriority",
     "TaskState",

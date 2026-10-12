@@ -1,9 +1,12 @@
 """``GET/PATCH /projects/{pid}/policy`` — Section 9.2 Projects row (MT-1.3-04).
 
-Caller **Owner** (Section 12.2 "Manage projects/policy"), with the ADR-004
-scope guard first — the same answer set as the project routes: agent token
-aimed elsewhere → ``AUTH_FORBIDDEN_PROJECT``, agent token aimed here →
-``ROLE_NOT_PERMITTED``, no credential → ``AUTH_REQUIRED``.
+Caller **Owner or the project's own agent token on GET** (Section 9.2:
+"agents read-only for own project" — the WP-2.x activation recorded when
+this route landed), with the ADR-004 scope guard first — the same answer
+set as the project routes: agent token aimed elsewhere →
+``AUTH_FORBIDDEN_PROJECT``, device or other non-caller →
+``ROLE_NOT_PERMITTED``, no credential → ``AUTH_REQUIRED``. PATCH stays
+Owner-only (Section 12.2 "Manage projects/policy").
 
 Recorded notes (MT-1.3-04, WP changelog):
 
@@ -35,6 +38,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import CanManageProjects, HasProjectScope
 from apps.events.services import write_event
 
+from ..permissions import CanReadProject
 from ..serializers.policy import ProjectPolicySerializer
 from ..services.projects import get_project_or_404
 from .projects import _READ_ERRORS, _actor_ref
@@ -43,15 +47,25 @@ from .projects import _READ_ERRORS, _actor_ref
 class ProjectPolicyDetailView(APIView):
     """Read and partially update one project's Section 7.2 policy."""
 
+    # §9.2's read cell on GET (agents, own project behind the scope
+    # guard); §12.2's Manage-projects Owner cell on PATCH.
     permission_classes: list[Any] = [HasProjectScope, CanManageProjects]
+
+    def get_permissions(self) -> list[Any]:
+        """GET answers to the read cell; PATCH to the Owner-only cell."""
+        if self.request is not None and self.request.method == "GET":
+            return [HasProjectScope(), CanReadProject()]
+        return [HasProjectScope(), CanManageProjects()]
 
     @extend_schema(
         operation_id="retrieve_project_policy",
         responses={status.HTTP_200_OK: ProjectPolicySerializer, **_READ_ERRORS},
         description=(
             "Read the project's full policy with current values (Section 7.2 "
-            "field names and documented defaults). Caller: Owner only — "
-            "agent access activates in WP-2.x and is denied until then. A "
+            "field names and documented defaults). Caller: Owner or an "
+            "agent token scoped to this project (Section 9.2: agents "
+            "read-only for own project); foreign agent tokens answer "
+            "AUTH_FORBIDDEN_PROJECT and devices ROLE_NOT_PERMITTED. A "
             "malformed or unknown pid answers VALIDATION_ERROR (400)."
         ),
     )

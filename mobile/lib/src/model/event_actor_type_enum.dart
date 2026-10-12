@@ -7,23 +7,24 @@ import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
-part 'kind_enum.g.dart';
+part 'event_actor_type_enum.g.dart';
 
-/// * `owner_session` - owner session * `agent` - agent * `device` - device
-class KindEnum extends EnumClass {
-  @BuiltValueEnumConst(wireName: r'owner_session')
-  static const KindEnum ownerSession = _$ownerSession;
+/// * `owner` - owner * `agent` - agent * `system` - system
+class EventActorTypeEnum extends EnumClass {
+  @BuiltValueEnumConst(wireName: r'owner')
+  static const EventActorTypeEnum owner = _$owner;
   @BuiltValueEnumConst(wireName: r'agent')
-  static const KindEnum agent = _$agent;
-  @BuiltValueEnumConst(wireName: r'device')
-  static const KindEnum device = _$device;
+  static const EventActorTypeEnum agent = _$agent;
+  @BuiltValueEnumConst(wireName: r'system')
+  static const EventActorTypeEnum system = _$system;
 
-  static Serializer<KindEnum> get serializer => _$kindEnumSerializer;
+  static Serializer<EventActorTypeEnum> get serializer =>
+      _$eventActorTypeEnumSerializer;
 
-  const KindEnum._(String name) : super(name);
+  const EventActorTypeEnum._(String name) : super(name);
 
-  static BuiltSet<KindEnum> get values => _$values;
-  static KindEnum valueOf(String name) => _$valueOf(name);
+  static BuiltSet<EventActorTypeEnum> get values => _$values;
+  static EventActorTypeEnum valueOf(String name) => _$valueOf(name);
 }
 
 /// Optionally, enum_class can generate a mixin to go with your enum for use
@@ -32,4 +33,4 @@ class KindEnum extends EnumClass {
 /// corresponding Angular template.
 ///
 /// Trigger mixin generation by writing a line like this one next to your enum.
-abstract class KindEnumMixin = Object with _$KindEnumMixin;
+abstract class EventActorTypeEnumMixin = Object with _$EventActorTypeEnumMixin;

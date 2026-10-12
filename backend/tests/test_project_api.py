@@ -260,7 +260,7 @@ def test_malformed_and_unknown_pid_answer_catalog_codes(owner_client: APIClient)
 def test_non_owner_credentials_receive_catalog_authorization_codes(
     owner_client: APIClient, client: APIClient
 ) -> None:
-    """Owner-only: ROLE_NOT_PERMITTED for wrong roles, AUTH_REQUIRED for none."""
+    """Owner-only surfaces stay so; the §9.2 agent read cell returns 200."""
     created = _create(owner_client)
     pid = created["id"]
     agent_token = _issue_agent_token(owner_client, pid)
@@ -268,11 +268,21 @@ def test_non_owner_credentials_receive_catalog_authorization_codes(
     agent = {"Authorization": f"Bearer {agent_token}"}
     device = {"Authorization": f"Bearer {device_token}"}
 
-    # Scope matches (the token's own project) → role check decides.
-    for path in ("/api/v1/projects", f"/api/v1/projects/{pid}"):
-        denied = client.get(path, headers=agent)
-        assert denied.status_code == status.HTTP_403_FORBIDDEN, path
-        assert _envelope(denied)["code"] == "ROLE_NOT_PERMITTED", path
+    # The list spans every project → Owner-only for agents (the §12.2
+    # Manage-projects row); the addressed detail read is §9.2's agent
+    # read cell (the WP-2.x activation) → 200 on the token's own project.
+    listed = client.get("/api/v1/projects", headers=agent)
+    assert listed.status_code == status.HTTP_403_FORBIDDEN
+    assert _envelope(listed)["code"] == "ROLE_NOT_PERMITTED"
+
+    detail = client.get(f"/api/v1/projects/{pid}", headers=agent)
+    assert detail.status_code == status.HTTP_200_OK
+    assert detail.json()["id"] == pid
+
+    # The read cell never widens: PATCH stays behind the Manage row.
+    patched = client.patch(f"/api/v1/projects/{pid}", {"name": "Nope"}, headers=agent)
+    assert patched.status_code == status.HTTP_403_FORBIDDEN
+    assert _envelope(patched)["code"] == "ROLE_NOT_PERMITTED"
 
     device_denied = client.get(f"/api/v1/projects/{pid}", headers=device)
     assert device_denied.status_code == status.HTTP_403_FORBIDDEN
@@ -290,15 +300,19 @@ def test_non_owner_credentials_receive_catalog_authorization_codes(
 def test_agent_token_for_one_project_is_forbidden_on_another(
     owner_client: APIClient, client: APIClient
 ) -> None:
-    """ADR-004 zero-bleed on the real registry: PID-A token vs PID-B row."""
+    """ADR-004 zero-bleed on the real registry: PID-A token vs PID-B row.
+
+    The own-project read passes (§9.2 agent read cell); the foreign read
+    dies on the scope guard before any role logic.
+    """
     project_a = _create(owner_client, name="Project A")
     project_b = _create(owner_client, name="Project B")
     agent_token = _issue_agent_token(owner_client, project_a["id"])
     agent = {"Authorization": f"Bearer {agent_token}"}
 
     own = client.get(f"/api/v1/projects/{project_a['id']}", headers=agent)
-    assert own.status_code == status.HTTP_403_FORBIDDEN
-    assert _envelope(own)["code"] == "ROLE_NOT_PERMITTED"
+    assert own.status_code == status.HTTP_200_OK  # §9.2: agents read own project
+    assert own.json()["id"] == project_a["id"]
 
     other = client.get(f"/api/v1/projects/{project_b['id']}", headers=agent)
     assert other.status_code == status.HTTP_403_FORBIDDEN

@@ -208,7 +208,7 @@ def test_patch_requires_non_empty_prefix_and_glob_lists(owner_client: APIClient)
 def test_policy_endpoint_is_owner_only_with_catalog_codes(
     owner_client: APIClient, client: APIClient
 ) -> None:
-    """ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT / AUTH_REQUIRED only."""
+    """GET admits §9.2's agent read cell; PATCH stays Owner-only."""
     project_a = _create(owner_client, name="Policy A")
     project_b = _create(owner_client, name="Policy B")
     url_a = f"/api/v1/projects/{project_a['id']}/policy"
@@ -218,10 +218,13 @@ def test_policy_endpoint_is_owner_only_with_catalog_codes(
     agent = {"Authorization": f"Bearer {agent_token}"}
     device = {"Authorization": f"Bearer {_register_device(owner_client)}"}
 
-    # Scope matches → the Owner-only role check decides (GET and PATCH).
-    role_denied = client.get(url_a, headers=agent)
-    assert role_denied.status_code == status.HTTP_403_FORBIDDEN
-    assert _envelope(role_denied)["code"] == "ROLE_NOT_PERMITTED"
+    # Scope matches → the caller cell decides: the agent reads its own
+    # project's policy (§9.2 "agents read-only for own project"), while
+    # every write still hits the Manage-projects Owner cell.
+    read = client.get(url_a, headers=agent)
+    assert read.status_code == status.HTTP_200_OK
+    assert read.json()["branch_prefix"]  # the real Section 7.2 payload
+
     patch_denied = client.patch(url_a, {"max_retries": 9}, headers=agent, format="json")
     assert patch_denied.status_code == status.HTTP_403_FORBIDDEN
     assert _envelope(patch_denied)["code"] == "ROLE_NOT_PERMITTED"
@@ -231,6 +234,7 @@ def test_policy_endpoint_is_owner_only_with_catalog_codes(
     assert cross.status_code == status.HTTP_403_FORBIDDEN
     assert _envelope(cross)["code"] == "AUTH_FORBIDDEN_PROJECT"
 
+    # Devices are not in the read cell.
     device_denied = client.get(url_a, headers=device)
     assert device_denied.status_code == status.HTTP_403_FORBIDDEN
     assert _envelope(device_denied)["code"] == "ROLE_NOT_PERMITTED"

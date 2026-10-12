@@ -44,7 +44,11 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: apps.core.settings.dev
 
-  # Placeholder idle loops until WP-1.7 — settings override for coherence.
+  # WP-1.7 (MT-1.7-01): real celery commands now come from the base file
+  # (`celery -A config.celery worker` / `beat`); the overlay only selects the
+  # dev settings module. Note: worker/beat have no source bind mount (the dev
+  # hot-reload mount belongs to `backend` alone), so code changes reach them
+  # through an image rebuild — see README "Verifying worker and beat".
   worker:
     environment:
       DJANGO_SETTINGS_MODULE: apps.core.settings.dev

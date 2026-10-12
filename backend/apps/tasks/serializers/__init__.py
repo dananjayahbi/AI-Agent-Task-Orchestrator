@@ -1,11 +1,20 @@
 """Serializer surface of the tasks app (Section 9.2).
 
 One module per contract family (MT-1.4-03: task CRUD shapes; MT-1.4-04
-adds the list envelope/query shapes alongside).
+adds the list envelope/query shapes alongside; MT-1.8-03/04 add the
+Progress-row checkpoint shapes).
 """
 
 from __future__ import annotations
 
+from .checkpoints import (
+    CheckpointCreateSerializer,
+    CheckpointListEnvelopeSerializer,
+    CheckpointListQuerySerializer,
+    CheckpointSerializer,
+    CheckpointWriteResponseSerializer,
+    checkpoint_payload,
+)
 from .tasks import (
     EDITABLE_FIELDS,
     TaskCreateSerializer,
@@ -17,9 +26,15 @@ from .tasks import (
 
 __all__ = [
     "EDITABLE_FIELDS",
+    "CheckpointCreateSerializer",
+    "CheckpointListEnvelopeSerializer",
+    "CheckpointListQuerySerializer",
+    "CheckpointSerializer",
+    "CheckpointWriteResponseSerializer",
     "TaskCreateSerializer",
     "TaskListEnvelopeSerializer",
     "TaskListQuerySerializer",
     "TaskSerializer",
     "TaskUpdateSerializer",
+    "checkpoint_payload",
 ]

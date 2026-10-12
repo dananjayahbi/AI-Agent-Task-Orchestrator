@@ -20,6 +20,7 @@ part 'patched_task_update.g.dart';
 /// * [targetScope]
 /// * [testCommand]
 /// * [priority]
+/// * [dependsOn] - Replace-the-set dependency write (MT-1.4-05): the payload becomes the full set — omit to leave it untouched, `[]` clears it. Validated under the version check, same transaction.
 @BuiltValue()
 abstract class PatchedTaskUpdate
     implements Built<PatchedTaskUpdate, PatchedTaskUpdateBuilder> {
@@ -45,6 +46,10 @@ abstract class PatchedTaskUpdate
   @BuiltValueField(wireName: r'priority')
   PriorityEnum? get priority;
   // enum priorityEnum {  urgent,  high,  medium,  low,  };
+
+  /// Replace-the-set dependency write (MT-1.4-05): the payload becomes the full set — omit to leave it untouched, `[]` clears it. Validated under the version check, same transaction.
+  @BuiltValueField(wireName: r'depends_on')
+  BuiltList<String>? get dependsOn;
 
   PatchedTaskUpdate._();
 
@@ -119,6 +124,13 @@ class _$PatchedTaskUpdateSerializer
       yield serializers.serialize(
         object.priority,
         specifiedType: const FullType(PriorityEnum),
+      );
+    }
+    if (object.dependsOn != null) {
+      yield r'depends_on';
+      yield serializers.serialize(
+        object.dependsOn,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
   }
@@ -203,6 +215,15 @@ class _$PatchedTaskUpdateSerializer
           ) as PriorityEnum?;
           if (valueDes == null) continue;
           result.priority = valueDes;
+          break;
+        case r'depends_on':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType:
+                const FullType.nullable(BuiltList, [FullType(String)]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.dependsOn.replace(valueDes);
           break;
         default:
           unhandled.add(key);

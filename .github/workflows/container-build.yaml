@@ -44,6 +44,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Cheap configuration gate (MT-0.3-03 wording, WP-1.7's compose
+      # surface): render the full dev stack (base + dev overlay) through
+      # `docker compose config` so broken YAML, a bad interpolation
+      # reference or an invalid service definition in infra/compose fails
+      # the job without building or starting anything.
+      - name: "compose: validate the stack (docker compose config)"
+        run: |
+          docker compose --env-file infra/compose/.env.example \
+            -f infra/compose/compose.yaml \
+            -f infra/compose/compose.dev.yaml \
+            --profile dev config --quiet
+
       # Buildx driver required for the `type=gha` cache exporter (the default
       # docker-driver builder cannot export it).
       - uses: docker/setup-buildx-action@v3

@@ -85,6 +85,33 @@ CACHES = {
 # pointed elsewhere only through its canonical env name.
 EVENTS_CHANNEL = get_str("ORCHESTRATOR_EVENTS_CHANNEL", "orchestrator:events")
 EVENTS_REDIS_URL = get_str("ORCHESTRATOR_EVENTS_REDIS_URL", _CACHE_URL)
+# SSE heartbeat cadence (Section 9.6: "Heartbeat comments every 15 s keep
+# Cloudflare and mobile connections alive"; MT-1.10-04). The default is the
+# plan's 15 s; the interval is configurable for tests and for downward
+# review only — raising it toward proxy idle timeouts (Cloudflare ~100 s
+# class) re-opens RISK-05 and belongs to WP-5.1's verification, not an
+# ops tweak (configuration.md row).
+EVENTS_HEARTBEAT_SECONDS = get_int("ORCHESTRATOR_EVENTS_HEARTBEAT_SECONDS", 15)
+
+# --- Section 9.10 group: Celery broker (WP-1.7; ADR-003) --------------------
+# Worker/beat (Section 16.1 services, Section 9.9 jobs) take broker and result
+# backend from the documented `CACHE_` name in configuration.md. The URL falls
+# back to the cache Redis so the Compose stack needs no additional wiring
+# (same pattern as EVENTS_REDIS_URL above); the scheme is validated at
+# startup (Section 16.2 fail-fast posture — configuration.md already pins
+# redis://; rediss:// is accepted as the same family over TLS).
+CELERY_BROKER_URL = get_str("ORCHESTRATOR_CACHE_BROKER_URL", _CACHE_URL)
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+_parsed_broker_url = urlparse(CELERY_BROKER_URL)
+if _parsed_broker_url.scheme not in ("redis", "rediss"):
+    raise ImproperlyConfigured(
+        "ORCHESTRATOR_CACHE_BROKER_URL must use the redis:// scheme "
+        f"(got scheme {_parsed_broker_url.scheme!r})."
+    )
+# Server-side clock is UTC everywhere (P7): workers and beat compute job
+# schedules and lease timestamps against the same clock the API uses.
+CELERY_TIMEZONE = "UTC"
+CELERY_ENABLE_UTC = True
 
 # --- Section 9.10 group: allowed hosts and CORS/CSRF origins ----------------
 # Dev/test fallback includes loopback plus `testserver` so a fresh clone and

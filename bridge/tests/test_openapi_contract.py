@@ -199,6 +199,23 @@ RESPONSE_SAMPLES: dict[str, Any] = {
         "created_at": "2026-10-01T09:00:00Z",
         "updated_at": "2026-10-11T18:30:00Z",
     },
+    "project_policy": {
+        "lease_duration_minutes": 45,
+        "lease_max_total_minutes": 240,
+        "lease_extension_mode": "checkpoint_only",
+        "max_retries": 3,
+        "max_concurrent_tasks": 1,
+        "autonomous_diff_threshold_lines": 250,
+        "auditor_min_confidence": 4,
+        "critical_path_globs": [".github/**"],
+        "migration_path_globs": ["**/migrations/**"],
+        "sensitive_config_globs": ["**/.env*"],
+        "auto_complete_enabled": True,
+        "merge_strategy": "squash",
+        "branch_prefix": "feat/PID00007-",
+        "audit_required_default": True,
+        "stalled_after_minutes": 20,
+    },
     "task_details": {
         "id": "PID00007-T004",
         "project_id": "PID00007",
@@ -248,6 +265,13 @@ REQUEST_SAMPLES: dict[str, Any] = {
         "worker_agent_id": "worker-1",
     },
     "release": {"session_id": "sess-bridge-0001", "lease_generation": 1},
+    "checkpoint_create": {
+        "session_id": "sess-bridge-0001",
+        "lease_generation": 1,
+        "message": "Halfway there",
+        "percent": 50,
+        "kind": "progress",
+    },
 }
 
 #: Non-2xx samples (AC 2): three catalog codes against the wire envelope.

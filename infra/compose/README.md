@@ -225,10 +225,41 @@ Health checks exactly per Section 16.1:
 | `redis` | `redis-cli ping` |
 | `migrate` | exit code of `manage.py migrate --noinput` (gates `backend` via `service_completed_successfully`) |
 | `backend` | `GET /health/ready` — the real endpoint (WP-1.1, MT-1.1-03), probed with stdlib `urllib` (the slim image ships no `wget`) |
-| `worker` | process liveness placeholder (`celery inspect ping` from WP-1.7) |
-| `beat` | process liveness placeholder (beat schedule runner from WP-1.7) |
+| `worker` | worker-ping: `celery -A config.celery inspect ping -d celery@$HOSTNAME` piped through `grep -q pong` (the worker answers through the broker; a silent/no-reply exit is unhealthy) |
+| `beat` | process check — beat is pid 1 in its container (`os.kill(1, 0)`) |
 | `web` | HTTP check on `:3000` |
 | `cloudflared` | `cloudflared tunnel ready` (tunnel status; `prod`/`tunnel` profiles only — WP-5.1) |
+
+## Verifying worker and beat (WP-1.7, MT-1.7-01)
+
+Both services run the backend image's Celery entry points (`celery -A
+config.celery worker` / `beat`; the schedule lives in `backend/config/celery.py`
+— the two Section 9.9 jobs `lease-sweeper` and `lease-expiring-notifier`, each
+every 60 s). No ports are published; the broker is the stack's Redis via
+`ORCHESTRATOR_CACHE_BROKER_URL`. From the repo root, with the stack healthy:
+
+```bash
+# Worker: startup banner plus the ready line; the health check pings it.
+docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml --profile dev logs -f worker
+
+# Direct worker-ping (same probe the health check runs):
+docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml --profile dev exec worker \
+  celery -A config.celery inspect ping -d celery@$HOSTNAME   # expect: pong from celery@<id>
+
+# Beat: logs show "Scheduler: Sending due task lease-sweeper (...)" every 60 s.
+docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml --profile dev logs -f beat
+
+# Beat schedule listing (the registered jobs and intervals):
+docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml --profile dev exec beat \
+  python -c "from config.celery import app; [print(name, entry['schedule'], entry['task']) for name, entry in app.conf.beat_schedule.items()]"
+```
+
+Running beat twice (two schedulers) is tolerated: both jobs are idempotent
+(exactly-once reclaims via `FOR UPDATE SKIP LOCKED` + the state machine guards,
+one lease-expiring event per generation-window — WP-1.7 MTs). In the dev
+overlay, worker/beat have **no** source bind mount (that belongs to `backend`
+alone), so code changes reach them via `docker compose build worker beat` or a
+`--build` up.
 
 ## Restart procedure and data-survival check (WP-0.2 acceptance)
 

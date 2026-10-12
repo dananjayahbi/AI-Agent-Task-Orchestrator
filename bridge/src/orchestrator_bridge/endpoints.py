@@ -27,7 +27,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-__all__ = ["BRIDGE_ENDPOINTS", "Endpoint", "MUTATING_METHODS", "PENDING_BACKEND"]
+__all__ = [
+    "BRIDGE_ENDPOINTS",
+    "Endpoint",
+    "MUTATING_METHODS",
+    "PENDING_BACKEND",
+    "endpoint",
+]
 
 #: headers.md: all POST/PATCH/PUT/DELETE calls are mutating; reads never are.
 MUTATING_METHODS: Final[frozenset[str]] = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -63,16 +69,32 @@ BRIDGE_ENDPOINTS: Final[tuple[Endpoint, ...]] = (
     Endpoint("release", "POST", "/api/v1/tasks/{id}/release"),
     Endpoint("task_details", "GET", "/api/v1/tasks/{id}"),
     Endpoint("project_context", "GET", "/api/v1/projects/{pid}"),
+    Endpoint("project_policy", "GET", "/api/v1/projects/{pid}/policy"),
     Endpoint("manifest_read", "GET", "/api/v1/projects/{pid}/manifest"),
     Endpoint("task_create_draft", "POST", "/api/v1/projects/{pid}/tasks"),
     Endpoint("health_live", "GET", "/health/live"),
 )
 
+
+def endpoint(endpoint_id: str) -> Endpoint:
+    """Look up one catalog entry by id — the single source of path truth.
+
+    Handlers and the session layer resolve their paths through this function
+    (never by re-typing a path literal), so a backend path change surfaces as
+    one catalog edit plus the MT-2.3-05 contract test.
+    """
+    for entry in BRIDGE_ENDPOINTS:
+        if entry.id == endpoint_id:
+            return entry
+    raise KeyError(f"unknown bridge endpoint id: {endpoint_id!r}")
+
+
 #: Endpoint id -> the backend work package that will put it in the document.
 #: Only these may be absent from ``schemas/openapi.yaml``; absence anywhere
-#: else fails the contract test with the endpoint named.
+#: else fails the contract test with the endpoint named. (WP-1.8's
+#: ``checkpoint_create`` entry retired at convergence: the checkpoint
+#: route is in the document and the contract test validates its sample.)
 PENDING_BACKEND: Final[dict[str, str]] = {
-    "checkpoint_create": "WP-1.8 (MT-1.8-03, checkpoint endpoint)",
     "resolution_submit": "WP-3.2 (backend submission endpoints)",
     "attachment_list": "WP-1.11 (attachment storage and upload API)",
     "attachment_get": "WP-1.11 (attachment storage and upload API)",

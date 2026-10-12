@@ -3,40 +3,21 @@
 //
 
 // ignore_for_file: constant_identifier_names, no_leading_underscores_for_local_identifiers, unnecessary_brace_in_string_interps, unnecessary_this, unused_element, unused_import, use_function_type_syntax_for_parameters, use_super_parameters
-import 'package:built_collection/built_collection.dart';
-import 'package:orchestrator_mobile/src/model/code_enum.dart';
-import 'package:built_value/json_object.dart';
+import 'package:orchestrator_mobile/src/model/error_envelope_body.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
 part 'error_envelope.g.dart';
 
-/// The Section 9.2 error envelope — exactly the five documented fields.
+/// The Section 9.2 wire envelope — five fields nested under ``error``.  ``apps.core.errors.build_error_envelope`` emits the wrapper on the wire; the document must model that nesting, not a flat top-level body (the flat schema was a contract bug, fixed at the Wave 2 end-of-wave gate).
 ///
 /// Properties:
-/// * [code]
-/// * [message]
-/// * [retryable]
-/// * [details]
-/// * [correlationId]
+/// * [error]
 @BuiltValue()
 abstract class ErrorEnvelope
     implements Built<ErrorEnvelope, ErrorEnvelopeBuilder> {
-  @BuiltValueField(wireName: r'code')
-  CodeEnum get code;
-  // enum codeEnum {  AUTH_REQUIRED,  AUTH_FORBIDDEN_PROJECT,  VALIDATION_ERROR,  TASK_NOT_FOUND,  TASK_STATE_CONFLICT,  TASK_ALREADY_CLAIMED,  LEASE_EXPIRED,  LEASE_NOT_OWNED,  DEPENDENCY_UNMET,  CONCURRENCY_LIMIT_REACHED,  SCOPE_VIOLATION,  ROLE_NOT_PERMITTED,  AUDITOR_SAME_AS_CODER,  ATTACHMENT_NOT_READY,  ATTACHMENT_UNSUPPORTED_FORMAT,  POLICY_VIOLATION,  RATE_LIMITED,  VERSION_CONFLICT,  SERVER_ERROR,  };
-
-  @BuiltValueField(wireName: r'message')
-  String get message;
-
-  @BuiltValueField(wireName: r'retryable')
-  bool get retryable;
-
-  @BuiltValueField(wireName: r'details')
-  BuiltMap<String, JsonObject?>? get details;
-
-  @BuiltValueField(wireName: r'correlation_id')
-  String get correlationId;
+  @BuiltValueField(wireName: r'error')
+  ErrorEnvelopeBody get error;
 
   ErrorEnvelope._();
 
@@ -63,33 +44,10 @@ class _$ErrorEnvelopeSerializer implements PrimitiveSerializer<ErrorEnvelope> {
     ErrorEnvelope object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'code';
+    yield r'error';
     yield serializers.serialize(
-      object.code,
-      specifiedType: const FullType(CodeEnum),
-    );
-    yield r'message';
-    yield serializers.serialize(
-      object.message,
-      specifiedType: const FullType(String),
-    );
-    yield r'retryable';
-    yield serializers.serialize(
-      object.retryable,
-      specifiedType: const FullType(bool),
-    );
-    if (object.details != null) {
-      yield r'details';
-      yield serializers.serialize(
-        object.details,
-        specifiedType: const FullType.nullable(
-            BuiltMap, [FullType(String), FullType.nullable(JsonObject)]),
-      );
-    }
-    yield r'correlation_id';
-    yield serializers.serialize(
-      object.correlationId,
-      specifiedType: const FullType(String),
+      object.error,
+      specifiedType: const FullType(ErrorEnvelopeBody),
     );
   }
 
@@ -116,42 +74,12 @@ class _$ErrorEnvelopeSerializer implements PrimitiveSerializer<ErrorEnvelope> {
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'code':
+        case r'error':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(CodeEnum),
-          ) as CodeEnum;
-          result.code = valueDes;
-          break;
-        case r'message':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(String),
-          ) as String;
-          result.message = valueDes;
-          break;
-        case r'retryable':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(bool),
-          ) as bool;
-          result.retryable = valueDes;
-          break;
-        case r'details':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType.nullable(
-                BuiltMap, [FullType(String), FullType.nullable(JsonObject)]),
-          ) as BuiltMap<String, JsonObject?>?;
-          if (valueDes == null) continue;
-          result.details.replace(valueDes);
-          break;
-        case r'correlation_id':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(String),
-          ) as String;
-          result.correlationId = valueDes;
+            specifiedType: const FullType(ErrorEnvelopeBody),
+          ) as ErrorEnvelopeBody;
+          result.error.replace(valueDes);
           break;
         default:
           unhandled.add(key);

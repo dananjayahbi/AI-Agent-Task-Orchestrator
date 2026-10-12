@@ -189,4 +189,8 @@ jobs:
         run: uv run --directory backend pytest tests/integration --ds apps.core.settings.dev
       - name: "bridge: integration suite (pytest, against Postgres + Redis)"
         if: steps.suites.outputs.bridge == 'true'
-        run: uv run --directory bridge pytest bridge/tests/integration
+        # Path is relative to --directory's cwd (bridge/) — the same rule
+        # as the backend step above; `bridge/tests/integration` would
+        # resolve to bridge/bridge/tests/integration and exit 4 (WP-2.4
+        # recorded follow-up, fixed at convergence).
+        run: uv run --directory bridge pytest tests/integration

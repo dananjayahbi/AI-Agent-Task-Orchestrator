@@ -11,9 +11,10 @@ import 'api_exception.dart';
 /// catalog codes from (Section 13.3's mobile equivalent).
 ///
 /// Both documented renderings are accepted at this one point: the canonical
-/// nested body `{"error": {...}}` (Section 9.2 — what the OpenAPI
-/// `ErrorEnvelope` schema declares since the Wave 2 gate) and a top-level
-/// five-field body (legacy rendering, tolerated defensively).
+/// nested body `{"error": {…}}` (Section 9.2 — what the OpenAPI
+/// `ErrorEnvelope` schema declares since the schema owner reconciled the
+/// shape) and a top-level five-field body (legacy rendering, tolerated
+/// defensively by wrapping it before deserialization).
 class ErrorMappingInterceptor extends Interceptor {
   ErrorMappingInterceptor(this._serializers);
 
@@ -29,15 +30,15 @@ class ErrorMappingInterceptor extends Interceptor {
     final int? statusCode = err.response?.statusCode;
     final Object? body = err.response?.data;
 
-    Map<String, dynamic>? raw;
     if (body is Map) {
-      final Object? nested = body['error'];
-      raw = Map<String, dynamic>.from(nested is Map ? nested : body);
-    }
-    if (raw != null) {
+      // Canonical rendering already nests under `error`; anything else is
+      // wrapped so one deserializer handles both shapes.
+      final Map<String, dynamic> wire = body['error'] is Map
+          ? Map<String, dynamic>.from(body)
+          : <String, dynamic>{'error': Map<String, dynamic>.from(body)};
       try {
         final Object? decoded = _serializers.deserialize(
-          raw,
+          wire,
           specifiedType: const FullType(ErrorEnvelope),
         );
         if (decoded is ErrorEnvelope) {

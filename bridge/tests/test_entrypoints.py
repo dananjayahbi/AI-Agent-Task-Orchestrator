@@ -4,10 +4,16 @@ Acceptance source: plan-doc-series/m2-mcp-bridge/wp-2.1-bridge-skeleton/
 MT-2.1-04-entry-point-stubs.md (parent plan Sections 10.2, 10.11, 19.1;
 FR-MCP-01; Section 6.6 MCP SDK).
 
-WP-2.2 note: ``stdio.run`` now binds first (Section 10.3 steps 1–3), so every
-startup test supplies a minimal temp manifest + token — the WP-2.1 handshake
-contract (empty tool set, clean shutdown) is unchanged, and a missing manifest
-fails fast per MT-2.2-01 (asserted below).
+WP-2.2 note: ``stdio.run`` binds first (Section 10.3 steps 1–5 — manifest and
+token, then the backend session + context cache), so every startup test
+supplies a minimal temp manifest + token **and a stub backend** for the
+session open; a missing manifest still fails fast per MT-2.2-01 (asserted
+below), and a mismatched token aborts per MT-2.2-05 (``test_project_mismatch``).
+
+WP-2.4 note: with a bound session the server advertises the five core tools,
+so the handshake test asserts the exact WP-2.4 tool set instead of the
+WP-2.1 empty one (the WP-2.1 contract is preserved for ``create_server``
+without a runtime — asserted above).
 """
 
 from __future__ import annotations
@@ -19,7 +25,6 @@ import os
 import subprocess
 import sys
 import threading
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -38,10 +43,11 @@ from orchestrator_bridge.entrypoints import http as http_module
 from orchestrator_bridge.entrypoints import stdio as stdio_module
 from orchestrator_bridge.logging import configure_logging
 from orchestrator_bridge.server import create_server
+from orchestrator_bridge.tools.schemas import CORE_TOOL_NAMES, TOOL_SPECS
+from tests.conftest import StubHttpBackend
 
 BRIDGE_ROOT = Path(__file__).resolve().parent.parent
 _ABSENT_CONFIG = Path("no-such-bridge-config.toml")
-_FIXTURE_TOKEN = "fixture-token-not-a-real-secret"
 
 
 @pytest.fixture(autouse=True)
@@ -54,21 +60,9 @@ def _settings(env: dict[str, str] | None = None) -> Settings:
     return load_settings(env=env or {}, config_path=_ABSENT_CONFIG)
 
 
-def _bound_settings(
-    tmp_path: Path, write_manifest: Callable[..., Path], env: dict[str, str] | None = None
-) -> Settings:
-    """Settings that satisfy Section 10.3 steps 1–3 (WP-2.2 startup binding).
-
-    The manifest lives in *tmp_path* and is reached through the MT-2.1-02
-    test-only override — no repo state and no real user config involved.
-    """
-    manifest = write_manifest(tmp_path / "bound-repo")
-    bound_env = {
-        "ORCHESTRATOR_BRIDGE_MANIFEST_PATH": str(manifest),
-        "ORCHESTRATOR_AGENT_TOKEN": _FIXTURE_TOKEN,
-        **(env or {}),
-    }
-    return load_settings(env=bound_env, config_path=_ABSENT_CONFIG)
+def _env_settings(env: dict[str, str]) -> Settings:
+    """Settings from an explicit environment (manifest + token provided)."""
+    return load_settings(env=env, config_path=_ABSENT_CONFIG)
 
 
 def _stream_records(stream: io.StringIO) -> list[dict[str, object]]:
@@ -207,28 +201,41 @@ def test_config_error_fails_fast_with_clear_message(
 
 
 def test_stdio_run_emits_startup_and_shutdown_events(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, write_manifest: Callable[..., Path]
+    monkeypatch: pytest.MonkeyPatch,
+    stub_manifest_env: dict[str, str],
+    stub_http_backend: StubHttpBackend,
 ) -> None:
     stream = io.StringIO()
-    settings = _bound_settings(tmp_path, write_manifest)  # WP-2.2: bind before serving
+    settings = _env_settings(stub_manifest_env)  # WP-2.2: bind + open before serving
     configure_logging(settings, stream=stream)
     fake = _FakeServer()
-    monkeypatch.setattr(stdio_module, "create_server", lambda _settings_arg: fake)
+    monkeypatch.setattr(stdio_module, "create_server", lambda _settings_arg, **_kwargs: fake)
     assert stdio_module.run(settings) == EXIT_OK
     assert fake.transport == "stdio"
     events = _stream_records(stream)
-    assert [record["event"] for record in events] == ["startup", "shutdown"]
-    assert all(record["component"] == "bridge.stdio" for record in events)
-    assert events[0]["project_id"] == "PID00007"  # bound context reaches the startup log
+    stdio_events = [
+        record["event"] for record in events if record.get("component") == "bridge.stdio"
+    ]
+    assert stdio_events == ["startup", "shutdown"]
+    startup = [record for record in events if record.get("event") == "startup"]
+    assert startup and startup[0]["project_id"] == "PID00007"  # bound context logged
+    assert startup[0]["agent_session_id"]  # MT-2.2-04: the open session id is logged
+    # the session lifecycle crossed the wire: open before serve, end after stop.
+    methods_paths = [(call.method, call.path) for call in stub_http_backend.requests]
+    assert ("POST", "/api/v1/agent-sessions") in methods_paths
+    assert any(path.endswith("/end") for _method, path in methods_paths)
 
 
 def test_stdio_run_respects_configured_log_level(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, write_manifest: Callable[..., Path]
+    monkeypatch: pytest.MonkeyPatch, stub_manifest_env: dict[str, str]
 ) -> None:
     stream = io.StringIO()
-    settings = _bound_settings(tmp_path, write_manifest, env={"ORCHESTRATOR_LOG_LEVEL": "ERROR"})
+    env = {**stub_manifest_env, "ORCHESTRATOR_LOG_LEVEL": "ERROR"}
+    settings = _env_settings(env)
     configure_logging(settings, stream=stream)
-    monkeypatch.setattr(stdio_module, "create_server", lambda _settings_arg: _FakeServer())
+    monkeypatch.setattr(
+        stdio_module, "create_server", lambda _settings_arg, **_kwargs: _FakeServer()
+    )
     assert stdio_module.run(settings) == EXIT_OK
     assert stream.getvalue() == ""  # INFO startup suppressed by config, not inline
 
@@ -264,23 +271,23 @@ def test_stdio_run_fails_fast_without_manifest(
     assert captured.out == ""  # nothing can corrupt the JSON-RPC stream
 
 
-# --- WP-2.1 acceptance: stdio handshake with an empty tool set -------------------
+# --- WP-2.4 acceptance: stdio handshake lists the five core tools ----------------
 
 
-def test_stdio_process_handshake_lists_empty_tools(
-    tmp_path: Path, write_manifest: Callable[..., Path]
+def test_stdio_process_handshake_lists_core_tools(
+    stub_manifest_env: dict[str, str], stub_http_backend: StubHttpBackend
 ) -> None:
     """JSON-RPC handshake over a real stdio process — the inspector-equivalent proof.
 
     Every stdout line must parse as a JSON-RPC message (framing intact) and the
     bridge's own diagnostics must appear as JSON lines on stderr only. Startup
-    binds through a temp manifest + token first (WP-2.2 Section 10.3); the
-    WP-2.1 contract — empty tool set, clean shutdown — is unchanged.
+    binds through a temp manifest + token **and the stub backend** (WP-2.2
+    Section 10.3 steps 1–5 — the session opens before serving and ends on the
+    clean shutdown); the WP-2.4 contract is the exact core tool set on
+    ``tools/list``.
     """
-    manifest = write_manifest(tmp_path / "bound-repo")
     env = {key: value for key, value in os.environ.items() if not key.startswith("ORCHESTRATOR_")}
-    env["ORCHESTRATOR_BRIDGE_MANIFEST_PATH"] = str(manifest)
-    env["ORCHESTRATOR_AGENT_TOKEN"] = _FIXTURE_TOKEN
+    env.update(stub_manifest_env)
     messages = "\n".join(
         [
             json.dumps(
@@ -291,7 +298,7 @@ def test_stdio_process_handshake_lists_empty_tools(
                     "params": {
                         "protocolVersion": "2025-06-18",
                         "capabilities": {},
-                        "clientInfo": {"name": "wp-2-1-test", "version": "1.0"},
+                        "clientInfo": {"name": "wp-2-4-test", "version": "1.0"},
                     },
                 }
             ),
@@ -318,7 +325,7 @@ def test_stdio_process_handshake_lists_empty_tools(
     # cancellable (observed ~1-in-5 full-file flake). Keep stdin open until the
     # response is observed, then EOF to exercise the clean-shutdown path; the
     # watchdog keeps a hung server from hanging the test.
-    watchdog = threading.Timer(45.0, proc.kill)
+    watchdog = threading.Timer(60.0, proc.kill)
     watchdog.start()
     try:
         stdin.write(messages + "\n")
@@ -360,7 +367,12 @@ def test_stdio_process_handshake_lists_empty_tools(
     assert init_response["result"]["serverInfo"]["name"] == "orchestrator-bridge"
 
     tools_response = next(message for message in rpc_messages if message.get("id") == 2)
-    assert tools_response["result"]["tools"] == []
+    advertised = [tool["name"] for tool in tools_response["result"]["tools"]]
+    assert advertised == list(CORE_TOOL_NAMES)  # WP-2.4: the five core tools, no more
+    # the advertised schemas are the MT-2.4-01 declared contracts, verbatim.
+    by_name = {tool["name"]: tool for tool in tools_response["result"]["tools"]}
+    for spec in TOOL_SPECS:
+        assert by_name[spec.name]["inputSchema"] == dict(spec.input_schema)
 
     diagnostics = [
         json.loads(line)
@@ -369,6 +381,11 @@ def test_stdio_process_handshake_lists_empty_tools(
     ]
     startup = [record for record in diagnostics if record.get("event") == "startup"]
     assert startup and startup[0]["component"] == "bridge.stdio"
+
+    # MT-2.2-04 lifecycle over the real socket: open before serving, end on exit.
+    methods_paths = [(call.method, call.path) for call in stub_http_backend.requests]
+    assert ("POST", "/api/v1/agent-sessions") in methods_paths
+    assert any(path.endswith("/end") for _method, path in methods_paths)
 
 
 def test_stdio_process_fails_fast_without_manifest(tmp_path: Path) -> None:

@@ -59,6 +59,8 @@ class _$Task extends Task {
   final DateTime createdAt;
   @override
   final DateTime updatedAt;
+  @override
+  final BuiltList<String> dependsOn;
 
   factory _$Task([void Function(TaskBuilder)? updates]) =>
       (TaskBuilder()..update(updates))._build();
@@ -89,7 +91,8 @@ class _$Task extends Task {
       this.archivedAt,
       this.createdBy,
       required this.createdAt,
-      required this.updatedAt})
+      required this.updatedAt,
+      required this.dependsOn})
       : super._();
   @override
   Task rebuild(void Function(TaskBuilder) updates) =>
@@ -127,7 +130,8 @@ class _$Task extends Task {
         archivedAt == other.archivedAt &&
         createdBy == other.createdBy &&
         createdAt == other.createdAt &&
-        updatedAt == other.updatedAt;
+        updatedAt == other.updatedAt &&
+        dependsOn == other.dependsOn;
   }
 
   @override
@@ -159,6 +163,7 @@ class _$Task extends Task {
     _$hash = $jc(_$hash, createdBy.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
+    _$hash = $jc(_$hash, dependsOn.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -191,7 +196,8 @@ class _$Task extends Task {
           ..add('archivedAt', archivedAt)
           ..add('createdBy', createdBy)
           ..add('createdAt', createdAt)
-          ..add('updatedAt', updatedAt))
+          ..add('updatedAt', updatedAt)
+          ..add('dependsOn', dependsOn))
         .toString();
   }
 }
@@ -316,6 +322,12 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
   DateTime? get updatedAt => _$this._updatedAt;
   set updatedAt(DateTime? updatedAt) => _$this._updatedAt = updatedAt;
 
+  ListBuilder<String>? _dependsOn;
+  ListBuilder<String> get dependsOn =>
+      _$this._dependsOn ??= ListBuilder<String>();
+  set dependsOn(ListBuilder<String>? dependsOn) =>
+      _$this._dependsOn = dependsOn;
+
   TaskBuilder() {
     Task._defaults(this);
   }
@@ -349,6 +361,7 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
       _createdBy = $v.createdBy;
       _createdAt = $v.createdAt;
       _updatedAt = $v.updatedAt;
+      _dependsOn = $v.dependsOn.toBuilder();
       _$v = null;
     }
     return this;
@@ -412,6 +425,7 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
                 createdAt, r'Task', 'createdAt'),
             updatedAt: BuiltValueNullFieldError.checkNotNull(
                 updatedAt, r'Task', 'updatedAt'),
+            dependsOn: dependsOn.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -420,6 +434,9 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
         acceptanceCriteria.build();
         _$failedField = 'targetScope';
         targetScope.build();
+
+        _$failedField = 'dependsOn';
+        dependsOn.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(r'Task', _$failedField, e.toString());
       }
