@@ -20,6 +20,7 @@ dependencies = [
     # (MT-2.2-02) — already present transitively via mcp; declared directly
     # because the bridge imports it (schema-driven validation, one shared schema).
     "jsonschema>=4.23",
+        "types-jsonschema",
 ]
 
 [dependency-groups]

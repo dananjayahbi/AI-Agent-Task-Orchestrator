@@ -135,9 +135,7 @@ describe('EditProjectForm', () => {
     fireEvent.change(nameInput, { target: { value: 'Edited by me' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
-    await waitFor(() =>
-      expect(screen.getByText(VERSION_CONFLICT_COPY)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(VERSION_CONFLICT_COPY)).toBeTruthy());
     // Server truth wins: the invalidated refetch flows back into the form.
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Server Wins'),

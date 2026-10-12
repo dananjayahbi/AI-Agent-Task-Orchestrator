@@ -167,7 +167,8 @@ describe('callApi error handling (Section 13.2 behaviour)', () => {
       ),
     );
 
-    await expect(loginRequest({ username: 'owner', password: 'bad' })).rejects.toMatchObject({
+    const badCreds = { username: 'owner', password: 'bad' }; // pragma: allowlist secret
+    await expect(loginRequest(badCreds)).rejects.toMatchObject({
       code: 'AUTH_REQUIRED',
     });
 

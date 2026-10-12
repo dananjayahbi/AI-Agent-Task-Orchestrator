@@ -24,7 +24,7 @@ acceptance; Section 17 no-secrets rule).
 
 from __future__ import annotations
 
-from .config import Settings, _ENV_KEYS, default_user_config_path
+from .config import _ENV_KEYS, Settings, default_user_config_path
 from .errors import INIT_COMMAND, TokenError
 
 __all__ = ["require_agent_token"]
