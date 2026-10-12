@@ -10,10 +10,13 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "generate:api": "node scripts/generate-api.mjs",
+    "check:api": "node scripts/check-api-drift.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.4.0",
@@ -26,6 +29,7 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",

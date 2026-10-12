@@ -12,9 +12,10 @@ the run mode, dispatch. **Mode selection precedence** (documented in
    key of the user config file (MT-2.1-02 layering);
 3. default ``stdio``.
 
-Exit codes: ``0`` success, ``1`` configuration error (fail fast, NFR-10),
-``2`` mode not yet implemented (a stub must never look healthy — MT-2.1-04
-risk note).
+Exit codes: ``0`` success, ``1`` startup/configuration error (fail fast,
+NFR-10 — layered-config problems and, from WP-2.2, manifest/token binding
+failures of Section 10.3 steps 1–3), ``2`` mode not yet implemented (a stub
+must never look healthy — MT-2.1-04 risk note).
 """
 
 from __future__ import annotations

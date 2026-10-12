@@ -6,3 +6,6 @@ coverage
 package-lock.json
 next-env.d.ts
 tsconfig.tsbuildinfo
+# Generated API client (MT-4.1-03) — regeneration owns its formatting; the
+# drift gate, not prettier, decides whether it is fresh.
+lib/api/generated

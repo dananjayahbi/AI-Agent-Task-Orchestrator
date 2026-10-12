@@ -16,6 +16,10 @@ description = "MCP bridge and Merge Executor for the AI Agent Task Orchestrator"
 requires-python = ">=3.12"
 dependencies = [
     "mcp>=2.3.0",
+    # Section 10.3 step 2 validates the manifest against the published schema
+    # (MT-2.2-02) — already present transitively via mcp; declared directly
+    # because the bridge imports it (schema-driven validation, one shared schema).
+    "jsonschema>=4.23",
 ]
 
 [dependency-groups]
@@ -29,6 +33,13 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/orchestrator_bridge"]
+
+# Ship the *canonical* schemas/manifest.v1.json inside the wheel (MT-2.2-02:
+# the published schema travels with the bridge). One source file in git — no
+# second copy: the validator reads the repo file from a checkout and this
+# build-time copy when installed standalone (identity enforced by the build).
+[tool.hatch.build.targets.wheel.force-include]
+"../schemas/manifest.v1.json" = "orchestrator_bridge/schemas/manifest.v1.json"
 
 # --- Console scripts: one-line launchers for the Section 10.2 run modes ------
 # Generic entry honours --mode; the three mode scripts are the explicit

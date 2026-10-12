@@ -11,7 +11,7 @@ const TOTAL_DOCS = 328;
 
 const waves = [
   { id: 1, name: "Foundations",            total: 22, done: 22, status: "done" },
-  { id: 2, name: "Backend foundation",     total: 23, done: 17, status: "active" },
+  { id: 2, name: "Backend foundation",     total: 23, done: 23, status: "done" },
   { id: 3, name: "State machine & leases", total: 27, done: 3,  status: "active" },
   { id: 4, name: "Events, attachments",    total: 32, done: 0,  status: "pending" },
   { id: 5, name: "Bridge skeleton & web",  total: 32, done: 7,  status: "active" },
@@ -41,13 +41,23 @@ const timeline = [
   },
   {
     date: "2026-10-12",
-    status: "active",
-    event: "Wave 2 in progress + parallel dispatch started (52/328)",
+    status: "done",
+    event: "Wave 2 complete — Backend foundation (23/23) · committed 4efc49c",
     detail:
-      "WP-1.1, WP-1.2, WP-1.3 done (17/23 of Wave 2). Scheduling switched to dependency-based " +
-      "(roadmap 4a): parallel agents landed wp-5.1 tunnel (3/4), wp-2.1 bridge skeleton (4/4), " +
-      "wp-4.1 web skeleton (3/4), wp-5.5 Flutter scaffold (3/6). WP-1.4 task CRUD running; " +
-      "deferred MTs await WP-1.9/1.10 (events/SSE) and WP-5.3 (device auth).",
+      "Full gate: 377 backend tests + web 53 + bridge 55 + flutter 27, all lint/type/format green; " +
+      "all five exit criteria live-proven under Compose (AUTH_FORBIDDEN_PROJECT, manifest schema " +
+      "validation, 100 unique concurrent ids, VERSION_CONFLICT, health + OpenAPI served). " +
+      "ErrorEnvelope contract reconciled to nested 9.2 wire shape.",
+  },
+  {
+    date: "2026-10-12",
+    status: "active",
+    event: "Max-parallel dispatch — 4 concurrent agents (58/328)",
+    detail:
+      "Owner directive recorded in roadmap 4a: maximize dependency-safe parallelism. Running: " +
+      "wp-1.5 state machine (backend), wp-4.2 project UI + MT-4.1-03 (web), wp-5.3 device auth " +
+      "(backend/accounts territory), wp-2.2 manifest binding MT-01..03 (bridge). " +
+      "Deferred MTs tracked in WP changelogs (await WP-1.9/1.10, agent-sessions endpoint).",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

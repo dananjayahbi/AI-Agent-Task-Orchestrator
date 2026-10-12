@@ -1,18 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loginRequest, logoutRequest } from '@/lib/api/auth';
-import { apiFetch, ApiError, setUnauthorizedHandler } from '@/lib/api/client';
+import { ApiError, callApi, setUnauthorizedHandler } from '@/lib/api/client';
+import { listProjects } from '@/lib/api/generated/sdk.gen';
 import { performSessionExpired, performSignOut } from '@/lib/session/flows';
 import { readSessionUser, saveSessionUser } from '@/lib/session/store';
 
 const fetchMock = vi.fn();
 
-function jsonResponse(payload: unknown, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
     status,
-    json: async () => payload,
-  };
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function calledRequest(index = 0): Request {
+  return fetchMock.mock.calls[index]?.[0] as Request;
 }
 
 const OWNER_SESSION = {
@@ -40,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('loginRequest', () => {
-  it('posts credentials through the same-origin API seam and returns only the identity', async () => {
+  it('posts credentials through the generated client and returns only the identity', async () => {
     fetchMock.mockResolvedValue(jsonResponse(OWNER_SESSION));
 
     const user = await loginRequest({ username: 'owner', password: 'pw' }); // pragma: allowlist secret
@@ -48,12 +52,12 @@ describe('loginRequest', () => {
     expect(user).toEqual({ id: 7, username: 'owner' });
     expect(user).not.toHaveProperty('token');
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/v1/auth/login');
-    expect(init.method).toBe('POST');
-    expect(init.credentials).toBe('include');
-    expect(init.body).toBe(JSON.stringify({ username: 'owner', password: 'pw' })); // pragma: allowlist secret
-    expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
+    const request = calledRequest();
+    expect(new URL(request.url).pathname).toBe('/api/v1/auth/login');
+    expect(request.method).toBe('POST');
+    expect(request.credentials).toBe('include');
+    expect(await request.clone().json()).toEqual({ username: 'owner', password: 'pw' }); // pragma: allowlist secret
+    expect(request.headers.get('Content-Type')).toBe('application/json');
   });
 
   it('never persists the bearer binding — only the non-secret identity crosses client state', async () => {
@@ -75,11 +79,11 @@ describe('logoutRequest', () => {
 
     await logoutRequest();
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/v1/auth/logout');
-    expect(init.method).toBe('POST');
-    expect(new Headers(init.headers).get('X-CSRFToken')).toBe('csrf-123');
-    expect(init.credentials).toBe('include');
+    const request = calledRequest();
+    expect(new URL(request.url).pathname).toBe('/api/v1/auth/logout');
+    expect(request.method).toBe('POST');
+    expect(request.headers.get('X-CSRFToken')).toBe('csrf-123');
+    expect(request.credentials).toBe('include');
   });
 });
 
@@ -121,11 +125,11 @@ describe('performSessionExpired (mid-session AUTH_REQUIRED)', () => {
   });
 });
 
-describe('apiFetch error handling (Section 13.2 behaviour)', () => {
+describe('callApi error handling (Section 13.2 behaviour)', () => {
   it('parses the nested Section 9.2 envelope into ApiError fields', async () => {
     fetchMock.mockResolvedValue(jsonResponse(AUTH_REQUIRED_NESTED, 401));
 
-    const error = await apiFetch('/projects').catch((caught: unknown) => caught);
+    const error = await callApi(listProjects()).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ApiError);
     const apiError = error as ApiError;
@@ -140,7 +144,7 @@ describe('apiFetch error handling (Section 13.2 behaviour)', () => {
     setUnauthorizedHandler(handler);
     fetchMock.mockResolvedValue(jsonResponse(AUTH_REQUIRED_NESTED, 401));
 
-    await expect(apiFetch('/projects')).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
+    await expect(callApi(listProjects())).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
 
     expect(handler).toHaveBeenCalledTimes(1);
   });
@@ -163,7 +167,7 @@ describe('apiFetch error handling (Section 13.2 behaviour)', () => {
       ),
     );
 
-    await expect(apiFetch('/auth/login', { method: 'POST', body: '{}' })).rejects.toMatchObject({
+    await expect(loginRequest({ username: 'owner', password: 'bad' })).rejects.toMatchObject({
       code: 'AUTH_REQUIRED',
     });
 
@@ -184,22 +188,16 @@ describe('apiFetch error handling (Section 13.2 behaviour)', () => {
       ),
     );
 
-    await expect(apiFetch('/projects', { method: 'POST', body: '{}' })).rejects.toMatchObject({
+    await expect(callApi(listProjects())).rejects.toMatchObject({
       code: 'VALIDATION_ERROR',
       correlationId: 'corr-flat',
     });
   });
 
   it('degrades a non-JSON failure to the canonical SERVER_ERROR code', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 502,
-      json: async () => {
-        throw new Error('not json');
-      },
-    });
+    fetchMock.mockResolvedValue(new Response('bad gateway', { status: 502 }));
 
-    await expect(apiFetch('/projects')).rejects.toMatchObject({
+    await expect(callApi(listProjects())).rejects.toMatchObject({
       code: 'SERVER_ERROR',
       status: 502,
       retryable: true,

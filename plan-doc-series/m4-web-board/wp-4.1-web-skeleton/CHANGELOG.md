@@ -136,12 +136,84 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   `AUTH_FORBIDDEN_PROJECT` denial renders without leaking `details`, raw
   non-API error messages never render). Full suite: 5 files / 53 tests.
 
-- **MT-4.1-03** — DEFERRED (roadmap 4a rule 1): its dependency
-  (schema-versioning conventions, cited as MT-1.4-01) has not landed — no
-  schema-versioning convention exists under `docs/plan/conventions/` or
-  `schemas/` as of 2026-10-12, and `MT-1.4-01` in the series is the task
-  model doc — so the generated-client + drift-gate slice runs when those
-  conventions publish.
+- **MT-4.1-03** — Typed API client generated in CI with a schema-drift gate
+  (Sections 6.6, 13.1/13.3, 19.6; NFR-11, FR-WEB-01; ADR-006; Section 20.4
+  items 2/3/4/7). **Generator (recorded per the risk note):** `@hey-api/
+  openapi-ts` **pinned exact `0.99.0`** as a devDependency (no caret — CI
+  and local runs agree; upgrading is an explicit diff-reviewed change). It
+  emits `client.gen.ts` + `sdk.gen.ts` + `types.gen.ts` + a self-contained
+  fetch runtime (the separate `@hey-api/client-fetch` package is deprecated
+  since generator v0.73 — the runtime is bundled, so **no new runtime
+  dependency** ships with the client). Output is deterministic (verified by
+  test: two runs → identical SHA-256 per file; no timestamps, no absolute
+  paths). Mobile WP-5.x reuses this script rather than re-choosing. **One
+  document, two consumers:** `scripts/generate-api.mjs` reads
+  `schemas/openapi.yaml` (read-only — the exact artifact MT-1.1-04's backend
+  gate regenerates), parses it with the existing `yaml` devDependency and
+  hands the generator a normalized JSON intermediate under
+  `node_modules/.cache/` (removed on exit) — needed because openapi-ts
+  0.99's CLI silently emits **zero files** for `.yaml` input (verified;
+  tool quirk recorded here so nobody "simplifies" the pipeline back). Paths
+  are passed as forward-slash relative strings because the generator bakes
+  the input path into the output (Windows `\` would otherwise diverge from
+  Linux CI — cross-host determinism, RISK-15 flavor). **Scripts:**
+  `npm --prefix web run generate:api` (regenerates `web/lib/api/generated/`,
+  committed) and `npm --prefix web run check:api` (regenerate → `git diff
+  --exit-code` + `git status --porcelain` over that directory → exit 1 with
+  a remedy message naming the exact local command and the Section 20.4 item
+  4 schema-review reminder — mirror of MT-1.1-04's gate UX, both halves read
+  the same). **CI:** a step in `.github/workflows/lint-type.yaml` (lint job,
+  beside the `migration-schema-diff` OpenAPI gate) runs
+  `npm --prefix web run check:api` — verbatim CONTRIBUTING row, added to
+  the Web "Tooling commands" table first per that workflow's convention,
+  plus an "OpenAPI snapshot" paragraph sentence documenting the second
+  consumer (files outside `web/` touched only as the MT's target paths and
+  the workflow's documented command-parity rule prescribe). **Wholesale
+  replacement of the temporary wrapper:** `apiFetch` is gone (enforced by
+  test); `lib/api/client.ts` is now transport glue only — runtime
+  `setConfig` (base = page origin, same-origin through the MT-4.1-01
+  proxy; `credentials: 'include'`), the CSRFCookie→`X-CSRFToken`
+  interceptor, and `callApi()` normalizing generated results into the
+  same `ApiError` shape (`code`/`status`/`retryable`/`correlationId`) with
+  the silent `AUTH_REQUIRED` hook preserved (login endpoint excluded via
+  the request's URL); `lib/api/auth.ts` types login/logout from generated
+  `LoginRequest`/`OwnerSession`; the `@/lib/api` barrel re-exports the
+  generated sdk + types, which is the only place endpoint paths and payload
+  types come from (NFR-11). **Import boundary (Section 19.6):**
+  `tests/api/import-boundary.test.ts` scans `app/`, `components/`, `lib/`
+  (comments stripped, generated dir allowlisted) and fails on any
+  `fetch(` call, `'/api/v1` endpoint literal or resurrected `apiFetch`,
+  and asserts the barrel points at the generated surface; the generated
+  directory is ignored by ESLint and Prettier (machine-owned output — the
+  drift gate, not local tooling, decides whether it is fresh).
+  **Contract-bug note closed:** the Wave 2 gate nested the wire envelope
+  (`ErrorEnvelope.error`) exactly as Section 9.2 shows, so the generated
+  error types match the wire and generation proceeded — the parser still
+  accepts flat bodies defensively. **Deviation (dependency citation,
+  resolved interpretation):** the cited dependency "MT-1.4-01
+  schema-versioning conventions" does not exist — MT-1.4-01 in the series
+  is task-model constraints, and no schema-versioning convention document
+  exists under `docs/plan/conventions/` or `schemas/`. The
+  schema-versioning discipline this gate relies on **is** the documented
+  regen + CI diff gate (CONTRIBUTING "Regenerate OpenAPI snapshot" row /
+  MT-1.1-04), which is what was implemented and mirrored; recorded here as
+  the MT's open-question resolution rather than inventing a new document.
+  **Tests:** `tests/api/generate-client.test.ts` (determinism two-run
+  equality; a mutated *copy* of the canonical document generates a
+  different client → the committed-vs-fresh diff turns red — the copy
+  lives in scratch space, `schemas/` is never written; a hand-edited
+  generated file is overwritten by regeneration → committed hand edits
+  fail the gate) and `tests/api/import-boundary.test.ts` (5 rules) —
+  `npm --prefix web run test -- tests/api` → 2 files / 8 tests green;
+  existing auth suites reworked to real `Request`/`Response` objects
+  through the generated transport (same assertions). Full suite: 11 files
+  / 96 tests. **Gate evidence (both directions):** on this tree
+  `check:api` regenerates and reports the *untracked* client directory
+  (exit 1 — correct: the client must be committed; the green direction is
+  the CI run on the clean tree after commit, mirroring MT-1.1-04's gate),
+  and the simulated schema change flips the comparison red as proven by
+  the mutation test. Verification (2026-10-12): `lint`, `typecheck`,
+  `format:check`, `test`, `build` all green.
 
 ## WP notes, deviations and open questions
 
@@ -149,11 +221,14 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   here):** the wire error body is nested (`{"error": {code, message,
   retryable, details, correlation_id}}` — parent plan Section 9.2 example,
   `backend/apps/core/errors.py::build_error_envelope`), but the
-  `ErrorEnvelope` component in `schemas/openapi.yaml` declares the five
+  `ErrorEnvelope` component in `schemas/openapi.yaml` declared the five
   fields *flat*. The web parser accepts both (nested first — plan
-  authoritative); **MT-4.1-03 must not generate from the document until the
-  schema serializer and the wire agree**, or generated types will misparse
-  every error. Flagged for the backend/schema owner.
+  authoritative). **Resolved before MT-4.1-03 ran:** the Wave 2 end-of-wave
+  gate nested the document's `ErrorEnvelope` (`ErrorEnvelope.error`), so
+  serializer, wire and generated types now agree; MT-4.1-03 generated from
+  that fixed document, and the parser keeps its flat fallback for cached or
+  older responses. Flagged originally for the backend/schema owner —
+  closed.
 - **Open question (configuration):** the proxy upstream reuses the
   documented `ORCHESTRATOR_API_BASE_URL` (manifest-binding semantics; both
   are the same backend origin in dev). If production wants an *internal*
@@ -176,9 +251,11 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   the pre-existing 5 high braces/micromatch advisories via
   `eslint-config-next` — documented in CONTRIBUTING as unfixable-without-
   downgrade and gated at `critical`, so intentionally untouched.
-- **Verification (2026-10-12, all green):** `npm --prefix web run lint`,
-  `npm --prefix web run typecheck`, `npm --prefix web run format:check`,
-  `npm --prefix web run test` (5 files / 53 tests), `npm --prefix web run
-  test -- auth` (41) and `-- errors` (12), `npm --prefix web run build`
-  (all routes + `ƒ Proxy`), plus the live route-gate smoke above. Nothing
-  was committed (no `git add`/`git commit` by this WP).
+- **Verification (2026-10-12, all green — final state after MT-4.1-03):**
+  `npm --prefix web run lint`, `npm --prefix web run typecheck`,
+  `npm --prefix web run format:check`, `npm --prefix web run test`
+  (11 files / 96 tests incl. `-- tests/api` → 8), `npm --prefix web run
+  build` (all routes + `ƒ Proxy`). Earlier wave evidence (MT-4.1-01/02/04):
+  `-- auth` (41) and `-- errors` (12) suites, plus the live route-gate
+  smoke above. Nothing was committed (no `git add`/`git commit` by this
+  WP).

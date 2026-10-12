@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // Generated API client (MT-4.1-03): machine-owned output from
+    // schemas/openapi.yaml — linting it locally would fight the drift gate
+    // (the import-boundary test in tests/api/ guards how it is consumed).
+    'lib/api/generated/**',
   ]),
 ]);
 

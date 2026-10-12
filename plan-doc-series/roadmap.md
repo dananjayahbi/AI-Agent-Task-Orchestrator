@@ -206,6 +206,10 @@ criteria. Rules:
    tests still run at WP completion and wave exit as before.
 4. Wave exit criteria still gate the *wave summary* in §3; a wave is reported complete when
    all its WPs are done regardless of when each started.
+5. **Owner directive (2026-10-12): maximize parallel dispatch** — the AI token budget is
+   effectively unlimited; the orchestrator must keep the maximum number of *dependency-safe,
+   file-disjoint* agents running at all times, and proactively scan for newly unblocked WPs
+   after every WP completion rather than waiting for wave boundaries.
 
 ---
 

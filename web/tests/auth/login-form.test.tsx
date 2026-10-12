@@ -12,12 +12,11 @@ vi.mock('next/navigation', () => ({
 
 const fetchMock = vi.fn();
 
-function jsonResponse(payload: unknown, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
     status,
-    json: async () => payload,
-  };
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 function fillAndSubmit() {
@@ -52,7 +51,10 @@ describe('LoginForm', () => {
     expect(window.localStorage.getItem('orchestrator.web.session.user')).not.toContain(
       'PLAINTEXT-BINDING-NEVER-STORED',
     );
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/auth/login');
+    expect(fetchMock.mock.calls[0]?.[0]).toBeInstanceOf(Request);
+    expect(new URL((fetchMock.mock.calls[0]?.[0] as Request).url).pathname).toBe(
+      '/api/v1/auth/login',
+    );
   });
 
   it('renders friendly credential-failure copy, never the raw server message', async () => {
@@ -84,13 +86,7 @@ describe('LoginForm', () => {
   });
 
   it('shows the SERVER_ERROR catalog copy for a non-JSON failure, never the raw body', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 502,
-      json: async () => {
-        throw new Error('bad gateway');
-      },
-    });
+    fetchMock.mockResolvedValue(new Response('bad gateway', { status: 502 }));
 
     render(<LoginForm returnTo="/" />);
     fillAndSubmit();

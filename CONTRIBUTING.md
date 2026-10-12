@@ -104,6 +104,14 @@ document is served by the backend at `/api/v1/schema` (Swagger UI at
 `/api/v1/schema/swagger-ui`) — the path is fixed and recorded in the WP-1.1
 changelog because clients hardcode or discover it.
 
+The same artifact feeds the web client (NFR-11, MT-4.1-03): the typed client
+under `web/lib/api/generated/` is regenerated from it with
+`npm --prefix web run generate:api`, and CI runs
+`npm --prefix web run check:api`, which fails when the committed client and a
+fresh generation differ (stale client, hand edit, or a schema change whose
+regen was not recommitted). After a reviewed OpenAPI change, run the regen
+command above **and** the web generate command, then commit both.
+
 **Settings layout** (WP-1.1, MT-1.1-01 decision — one module per environment, no
 second mechanism): `backend/apps/core/settings/` holds `base.py` (every shared
 setting, read from its canonical `ORCHESTRATOR_*` name with a documented default
@@ -155,6 +163,8 @@ CI and hooks must use npm too). ESLint flat config via `eslint-config-next`
 | Type check | `npm --prefix web run typecheck` |
 | Format | `npm --prefix web run format` |
 | Format check (used by hooks/CI) | `npm --prefix web run format:check` |
+| Regenerate typed API client | `npm --prefix web run generate:api` |
+| Typed client drift check (used by CI) | `npm --prefix web run check:api` |
 
 ### Mobile (Flutter)
 

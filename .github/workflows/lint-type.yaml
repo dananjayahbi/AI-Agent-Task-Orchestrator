@@ -68,6 +68,16 @@ jobs:
         run: npm --prefix web run lint
       - name: "web: format check (prettier --check)"
         run: npm --prefix web run format:check
+      # MT-4.1-03 typed-client gate (NFR-11; WP-4.1 acceptance verbatim:
+      # "client regeneration fails CI when schema drifts") — the web half of
+      # MT-1.1-04's contract gate in the migration-schema-diff job: regenerate
+      # web/lib/api/generated/ from the same canonical schemas/openapi.yaml and
+      # fail on any diff against the committed client. The failure message
+      # tells the developer to run `npm --prefix web run generate:api` and
+      # commit the result; the OpenAPI change itself still needs the Section
+      # 20.4 item 4 schema-diff review (CONTRIBUTING.md "OpenAPI snapshot").
+      - name: "web: typed client drift check (generate + diff)"
+        run: npm --prefix web run check:api
 
       # --- mobile (Flutter/Dart) — format check ---
       # Mobile's lint/analysis command (`flutter analyze`, documented as the mobile
