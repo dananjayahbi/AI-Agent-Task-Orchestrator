@@ -1,19 +1,45 @@
-# Tooling configuration for the MCP bridge + Merge Executor (parent plan Section 6.6).
-# Bridge source code and MCP SDK dependencies arrive with WP-2.1; this file fixes the
-# shared Python tooling baseline (MT-0.1-02).
+# Tooling configuration for the MCP bridge + Merge Executor (parent plan Section 6.6;
+# MT-0.1-02 tooling baseline; WP-2.1 adds the package build and MCP SDK dependency).
+# The bridge is a standalone package — no repo-root workspace exists (MT-2.1-01 risk
+# note), so this file alone drives its tooling. Src layout under src/orchestrator_bridge
+# per Appendix A, buildable so `uv run` resolves imports and the MT-2.1-04 console
+# scripts install as one-line launchers (Section 10.11).
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "orchestrator-bridge"
 version = "0.0.1"
 description = "MCP bridge and Merge Executor for the AI Agent Task Orchestrator"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "mcp>=2.3.0",
+]
 
 [dependency-groups]
 dev = [
     "ruff==0.17.0",
     "mypy==2.4.0",
+    "pytest>=9.1.1",
 ]
+
+# --- Packaging: wheel carries only the bridge package (Appendix A src/ tree) ---
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/orchestrator_bridge"]
+
+# --- Console scripts: one-line launchers for the Section 10.2 run modes ------
+# Generic entry honours --mode; the three mode scripts are the explicit
+# invocation of the MT-2.1-04 precedence chain (explicit > config > stdio).
+# `python -m orchestrator_bridge` is the module invocation of the same path.
+
+[project.scripts]
+orchestrator-bridge = "orchestrator_bridge.entrypoints:cli_entry"
+orchestrator-bridge-stdio = "orchestrator_bridge.entrypoints.stdio:main"
+orchestrator-bridge-http = "orchestrator_bridge.entrypoints.http:main"
+orchestrator-bridge-executor = "orchestrator_bridge.entrypoints.executor:main"
 
 # --- Ruff: formatter + linter (kept identical in backend/ and bridge/) ---
 

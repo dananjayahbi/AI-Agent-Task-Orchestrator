@@ -1,0 +1,26 @@
+# Keep the build context lean and the image free of host state
+# (Section 20.4 item 3: no secrets, caches or host paths in the image).
+
+# Virtualenvs live outside /app in the image; host venvs must never enter.
+.venv/
+venv/
+
+# Python/tool caches and test artifacts — never runtime content.
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Tests run on the host/CI, not inside the image.
+tests/
+
+# Local environment files: real values stay on the host (Section 16.2).
+.env
+.env.*
+*.env
+
+# VCS metadata (context is the backend/ folder, but stay explicit).
+.git/
+.gitignore

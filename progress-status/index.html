@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Agent Task Orchestrator — Implementation Progress</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>AI Agent Task Orchestrator</h1>
+    <p class="subtitle">Implementation progress — 328 micro-documents across 10 waves</p>
+  </header>
+
+  <main>
+    <!-- Overall percentage -->
+    <section class="card" id="overall-card">
+      <h2>Overall progress</h2>
+      <div class="big-percent" id="overall-percent">0%</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="overall-bar"></div>
+      </div>
+      <p class="muted" id="overall-detail">Loading…</p>
+    </section>
+
+    <!-- Per-wave progress bars -->
+    <section class="card" id="waves-card">
+      <h2>Waves</h2>
+      <div id="wave-bars"></div>
+    </section>
+
+    <!-- Timeline -->
+    <section class="card" id="timeline-card">
+      <h2>Timeline</h2>
+      <ul class="timeline" id="timeline"></ul>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <p class="muted">
+      Source of truth:
+      <code>ai_agent_task_orchestrator_architecture_plan.md</code> ·
+      <code>plan-doc-series/overview.md</code> ·
+      <code>plan-doc-series/roadmap.md</code>
+      — if context of the plan is lost, re-read it before interpreting this page.
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -22,6 +22,10 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
+        # Flutter-generated Xcode schemes: contain only Xcode blueprint UUIDs
+        # (flagged as keyword-shaped by conservative patterns); no secret
+        # surface, regenerated wholesale by `flutter create --platforms=ios`.
+        exclude: ^mobile/ios/.*\.xcscheme$
 
   # Per-package format / lint / type checks using the exact documented commands.
   # Each hook only triggers when files in its package change; the command itself runs

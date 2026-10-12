@@ -5,13 +5,17 @@ Runnable skeleton of the parent plan Section 16.1 deployment: eight services —
 `cloudflared` — with the exact dependency edges from the 16.1 table, plus one
 `dev`-profile helper (`mailhog`). Everything is configured only by environment
 variables (NFR-06), so the same files run on Docker Desktop and a Linux VPS.
+Since WP-5.1 the `cloudflared` service is real (token-run named tunnel) and is
+profile-gated: it renders in `prod` and on explicit opt-in via the `tunnel`
+profile, while a plain `dev` run starts the stack without the tunnel (see
+"Tunnel service (WP-5.1)" and "Profiles" below).
 
 | File | Concern |
 |---|---|
 | `compose.yaml` | Base stack: services, dependency edges, volumes (MT-0.2-01); network, port bindings, profiles (MT-0.2-02); health checks (MT-0.2-04) |
 | `compose.dev.yaml` | `dev`-profile concern: hot-reload bind mounts and debug wiring for `backend`/`web` (MT-0.2-02) |
 | `.env.example` | Documented environment template — copy to `.env` and edit (MT-0.2-03) |
-| `stubs/` | Placeholder `backend`/`web` images (replaced by WP-1.1 / WP-4.1; service names and health paths never change) |
+| `stubs/` | Placeholder `web` image (replaced by WP-4.1; the `backend` services build the real image from `backend/` since WP-1.1 / MT-1.1-05 — service names and health paths never change) |
 
 ## Service topology (Section 16.1)
 
@@ -88,8 +92,9 @@ docker compose --env-file infra/compose/.env `
 Validation without starting anything:
 
 ```powershell
-docker compose -f infra/compose/compose.yaml --profile dev config   # renders 8 services + mailhog
+docker compose -f infra/compose/compose.yaml --profile dev config   # renders 7 services + mailhog (no cloudflared)
 docker compose -f infra/compose/compose.yaml --profile prod config  # renders exactly the 16.1 eight
+docker compose -f infra/compose/compose.yaml --profile dev --profile tunnel config  # dev + cloudflared (token required)
 docker compose -f infra/compose/compose.yaml -f infra/compose/compose.dev.yaml --profile dev config  # full dev render incl. hot-reload mounts
 ```
 
@@ -98,15 +103,47 @@ Profile behavior:
 | Concern | `dev` | `prod` |
 |---|---|---|
 | Helper services | `mailhog` (SMTP catcher, no host port) | none |
+| `cloudflared` tunnel (WP-5.1) | **off by default** — run without the tunnel; opt in with an extra `--profile tunnel` (token required) | on — fails fast without `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN` |
 | Hot-reload mounts for `backend`/`web` | yes — `compose.dev.yaml` | none (base file only) |
 | Debug flags | `ORCHESTRATOR_DEBUG=true`, `NODE_ENV=development` (overlay; `NODE_ENV` is the Node image's mandated name, configuration.md rule 7) | debug off (base: `ORCHESTRATOR_DEBUG` default `false` in `.env` prod settings) |
-| Images | env-overridable, stub builds for `backend`/`web` | pinned tags via environment (`.env.example` documents pinning) |
+| Images | env-overridable; `backend` builds the real image from `backend/` (WP-1.1), `web` stays a stub until WP-4.1 | pinned tags via environment (`.env.example` documents pinning) |
 
 Note: Compose cannot change one service's config from the `--profile` flag
 alone, so the dev *profile* gates helper services inside `compose.yaml` while
 the dev *overlay file* carries the hot-reload/debug wiring; the two are always
 used together as shown above (MT-0.2-02 decision recorded in the WP
-changelog).
+changelog). The `cloudflared` service uses the same mechanism in reverse: its
+`profiles: [prod, tunnel]` list is what lets `dev` run stack-without-tunnel
+while `prod` keeps the Section 16.1 eight (MT-5.1-01).
+
+## Tunnel service (WP-5.1)
+
+`cloudflared` runs the official image with a **pinned tag**
+(`ORCHESTRATOR_IMAGE_CLOUDFLARED`, never `latest` in prod; the upgrade path is
+bumping that variable). The named tunnel is started from the environment:
+Compose maps `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN` to cloudflared's
+image-mandated `TUNNEL_TOKEN` (configuration.md rule 7), and the canonical
+ingress rules ([`../cloudflare/ingress.yaml`](../cloudflare/ingress.yaml)) are
+mounted read-only at `/etc/cloudflared/config.yaml`.
+
+* **Bring-up with the tunnel:** set `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN` in
+  `.env` (provisioning and rotation procedure:
+  [`../cloudflare/README.md`](../cloudflare/README.md)), then either run the
+  prod invocation above or add `--profile tunnel` to the dev invocation. The
+  service publishes **no ports** and joins only the internal network
+  (FR-NET-01); readiness is cloudflared's own `tunnel ready` probe (Section
+  16.1), so `--wait` only goes green on a live tunnel.
+* **Fail-fast (Section 16.2):** with the token missing or invalid,
+  cloudflared exits non-zero at startup — a prod `up --wait` can never report
+  healthy without a valid token (verified: empty token and a bad token both
+  exit 255 immediately). In `dev`, running without the tunnel means simply
+  not enabling the `tunnel` profile (default dev bring-up, above).
+* **Hostname:** the tunnel hostname is environment-only —
+  `ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME` in `.env` (OQ-11 convention
+  `orchestrator.<owner-domain>`); no hostname is committed anywhere in this
+  repository (plan 20.4 item 3). Full hostname/DNS/route procedure and the
+  failure-mode documentation:
+  [`../cloudflare/README.md`](../cloudflare/README.md).
 
 ## Environment template and validation notes (Section 16.2, plan 9.10)
 
@@ -120,9 +157,13 @@ provider, FCM, S3 storage). Copy-and-edit bring-up:
 Copy-Item infra\compose\.env.example infra\compose\.env   # git-ignored real values
 # edit infra\compose\.env: ORCHESTRATOR_BIND_ADDR (your LAN IP),
 #   ORCHESTRATOR_DATABASE_PASSWORD, ORCHESTRATOR_SECRET_KEY, ORCHESTRATOR_ALLOWED_HOSTS
+#   + for remote access (WP-5.1): ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN (secret)
+#     and ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME (owner domain; both documented
+#     in ../cloudflare/README.md)
 ```
 
-Rules fixed now (implemented by the backend in WP-1.1):
+Rules fixed now (implemented by `backend/apps/core/settings/prod.py` since
+WP-1.1):
 
 * **Real values never enter Git.** `.env` is ignored (verified with
   `git check-ignore infra/compose/.env`); the committed template holds
@@ -132,7 +173,8 @@ Rules fixed now (implemented by the backend in WP-1.1):
   `ORCHESTRATOR_DATABASE_URL`, `ORCHESTRATOR_SECRET_KEY`,
   `ORCHESTRATOR_ALLOWED_HOSTS`, `ORCHESTRATOR_DEBUG=false`,
   `ORCHESTRATOR_BIND_ADDR`, and `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN` once
-  the named tunnel exists (WP-5.1).
+  the named tunnel exists (WP-5.1) — with `ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME`
+  set to the owner's tunnel hostname when remote access is enabled.
 * **Startup validation (plan 9.10 / 16.2):** in prod the backend must refuse
   to boot when a required value is missing, still equals this template's
   placeholder, or is otherwise weak; missing/weak secrets are a hard failure,
@@ -167,10 +209,13 @@ docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml ps
 ```
 
 **Documented startup window:** first run up to ~3 minutes (image pulls plus
-the stub builds); steady-state restarts green within **60 seconds**
+the `backend` image build); steady-state restarts green within **60 seconds**
 (`--wait-timeout 180` covers the first run). `migrate` finishes first and
 shows `exited (0)` under `ps --all` — that exit code is its health check;
-every other service must report `healthy`.
+every other service must report `healthy`. The dev invocation intentionally
+starts **without** the tunnel (no `cloudflared` container, no token needed —
+WP-5.1); the prod invocation includes it and therefore fails fast until
+`ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN` is set (see "Tunnel service (WP-5.1)").
 
 Health checks exactly per Section 16.1:
 
@@ -178,12 +223,12 @@ Health checks exactly per Section 16.1:
 |---|---|
 | `postgres` | `pg_isready` readiness probe |
 | `redis` | `redis-cli ping` |
-| `migrate` | exit code (gates `backend` via `service_completed_successfully`) |
-| `backend` | `GET /health/ready` (stub answers 200 now; WP-1.1 implements the real endpoint on the same path) |
-| `worker` | worker ping (`:8001/ping` stub; `celery inspect ping` from WP-1.7) |
-| `beat` | process check (beat loop present) |
+| `migrate` | exit code of `manage.py migrate --noinput` (gates `backend` via `service_completed_successfully`) |
+| `backend` | `GET /health/ready` — the real endpoint (WP-1.1, MT-1.1-03), probed with stdlib `urllib` (the slim image ships no `wget`) |
+| `worker` | process liveness placeholder (`celery inspect ping` from WP-1.7) |
+| `beat` | process liveness placeholder (beat schedule runner from WP-1.7) |
 | `web` | HTTP check on `:3000` |
-| `cloudflared` | `cloudflared tunnel ready` (tunnel status) |
+| `cloudflared` | `cloudflared tunnel ready` (tunnel status; `prod`/`tunnel` profiles only — WP-5.1) |
 
 ## Restart procedure and data-survival check (WP-0.2 acceptance)
 

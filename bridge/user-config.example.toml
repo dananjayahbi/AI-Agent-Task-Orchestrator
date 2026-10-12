@@ -1,0 +1,41 @@
+# Example user-level bridge configuration — placeholders only
+# (parent plan Section 20.4 item 3; FR-SEC-04 — never commit a filled-in copy).
+#
+# Default location (anchored to the user profile, never inside a repository —
+# MT-2.1-02):
+#   Windows:  %APPDATA%\orchestrator\bridge.toml
+#   POSIX:    ${XDG_CONFIG_HOME:-~/.config}/orchestrator/bridge.toml
+#
+# Written by `orchestrator init` (WP-2.12 / MT-2.12-02); this package only reads
+# it (MT-2.1-02 read side). Layering: environment variables override this file,
+# which overrides built-in defaults. Empty/absent keys fall through to the next
+# layer.
+
+# Run mode (parent plan Section 10.2): stdio | http | merge-executor.
+# Mode-selection precedence (MT-2.1-04):
+#   1. explicit invocation (console script or --mode on the generic entry)
+#   2. this `mode` key (ORCHESTRATOR_BRIDGE_MODE env overrides it)
+#   3. default stdio
+mode = "stdio"
+
+# Backend base URL (parent plan Section 10.3): must be an http(s):// URL.
+api_base_url = "http://localhost:8000/api/v1"
+
+# Agent token — the dedicated secret key (FR-SEC-04; MT-2.12-02 write side).
+# Prefer ORCHESTRATOR_AGENT_TOKEN in CI/containers; keep this file private.
+# agent_token = "placeholder-token"
+
+# Logging (parent plan Section 17): level one of DEBUG, INFO, WARNING, ERROR,
+# CRITICAL; format json (the Section 17 contract) or text (local debug only).
+log_level = "INFO"
+log_format = "json"
+
+# Backend request timeout in seconds (parent plan Section 10.10): number > 0.
+timeout_seconds = 30
+
+# Manifest path override — test/passthrough hook for WP-2.2 discovery.
+# manifest_path = ""
+
+# Merge Executor mode only (parent plan Section 10.2): repos the executor may
+# operate on. Required when mode = "merge-executor".
+# merge_repo_paths = []

@@ -119,10 +119,11 @@ jobs:
         working-directory: mobile
 
   # Section 18 quality gates list both "migration check (no unapplied model changes)"
-  # and "schema diff check"; WP-0.3's deliverable is the placeholder that passes now
-  # and turns into the real Django check when models arrive (WP-1.1, MT-1.1-01).
-  # Public-contract (OpenAPI) schema diffing is wired by WP-1.1 / MT-1.1-04 and is
-  # deliberately not simulated here.
+  # and "schema diff check". Both are real from WP-1.1 on: model drift via
+  # makemigrations --check, and the public OpenAPI contract snapshot under
+  # schemas/ (MT-1.1-04) — regenerate and fail on unreviewed drift
+  # (Section 20.4 item 4). The job name stays "migration-schema-diff" as the
+  # stable check identifier from WP-0.3.
   migration-schema-diff:
     name: migration-schema-diff
     runs-on: ubuntu-latest
@@ -148,8 +149,22 @@ jobs:
           cache-dependency-glob: "**/uv.lock"
 
       # Real gate from WP-1.1 on: fails when model changes lack migrations
-      # (`--check --dry-run` makes no writes). WP-1.1 supplies the settings module
-      # and any required environment for manage.py in this job at that point.
+      # (`--check --dry-run` makes no writes). The host default settings module
+      # (apps.core.settings.dev) needs no environment in this job.
       - name: "migration check: makemigrations --check --dry-run"
         if: steps.probe.outputs.mode == 'real'
         run: uv run --directory backend python manage.py makemigrations --check --dry-run
+
+      # MT-1.1-04 contract gate (Section 18 contract layer; Section 20.4 item 4):
+      # regenerate the OpenAPI document and fail on any diff against the
+      # committed snapshot — a route/schema change without a reviewed
+      # `manage.py spectacular` regen (CONTRIBUTING.md) cannot merge. The final
+      # line also fails when the snapshot file is missing entirely (git diff
+      # ignores untracked files).
+      - name: "contract check: OpenAPI snapshot drift"
+        if: steps.probe.outputs.mode == 'real'
+        run: |
+          set -euo pipefail
+          uv run --directory backend python manage.py spectacular --file ../schemas/openapi.yaml
+          git diff --exit-code -- schemas/openapi.yaml
+          test -z "$(git status --porcelain -- schemas/openapi.yaml)"

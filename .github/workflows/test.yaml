@@ -181,7 +181,12 @@ jobs:
           cache-dependency-glob: "**/uv.lock"
       - name: "backend: integration suite (pytest, against Postgres + Redis)"
         if: steps.suites.outputs.backend == 'true'
-        run: uv run --directory backend pytest backend/tests/integration
+        # Path is relative to --directory's cwd (backend/). --ds selects the
+        # module that binds DATABASES/CACHES to the CI-provided
+        # ORCHESTRATOR_DATABASE_URL / ORCHESTRATOR_CACHE_URL — without it the
+        # hermetic SQLite unit settings would silently skip the Postgres layer
+        # (MT-1.4-02's Section 18 acceptance; documented in CONTRIBUTING.md).
+        run: uv run --directory backend pytest tests/integration --ds apps.core.settings.dev
       - name: "bridge: integration suite (pytest, against Postgres + Redis)"
         if: steps.suites.outputs.bridge == 'true'
         run: uv run --directory bridge pytest bridge/tests/integration

@@ -1,0 +1,2030 @@
+openapi: 3.0.3
+info:
+  title: AI Agent Task Orchestrator
+  version: 1.0.0
+  description: 'REST API contract for the AI Agent Task Orchestrator. NFR-11: this
+    document is the single source of truth for web and mobile clients. Errors use
+    the Section 9.2 envelope; list endpoints are cursor-paginated (docs/plan/conventions/pagination.md).'
+paths:
+  /api/v1/auth/login:
+    post:
+      operationId: api_v1_auth_login_create
+      description: Verify credentials, start the session, return the binding once.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerSession'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/auth/logout:
+    post:
+      operationId: api_v1_auth_logout_create
+      description: Revoke the caller's ``owner_session`` row and flush its session.
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Revoked'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/auth/refresh:
+    post:
+      operationId: api_v1_auth_refresh_create
+      description: Push expiry forward by the Section 9.10 lifetime; return it.
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refreshed'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/devices:
+    post:
+      operationId: api_v1_devices_create
+      description: Create Device + device token atomically; plaintext returned once.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DeviceRegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DeviceRegisterRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegisterResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/devices/{id}:
+    delete:
+      operationId: api_v1_devices_destroy
+      description: Revoke one of the caller's devices (immediate on both rows).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Revoked'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/projects:
+    get:
+      operationId: list_projects
+      description: 'List registered projects. Sort: project id ascending — PID generation
+        order, i.e. creation order (zero-padded Section 7.3 ids make lexicographic
+        order deterministic; pagination.md rule 2). Pagination: cursor-based — pass
+        `cursor` from the previous `next_cursor`; `page_size` defaults to 25, clamped
+        to 100. Caller: Owner only — agent read-only access for a token''s own project
+        activates in WP-2.x and is denied until then.'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults, same per-endpoint choice
+          as GET /tokens).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    post:
+      operationId: create_project
+      description: 'Create a project. The `PID` id is assigned server-side from the
+        Section 7.3 database sequence — no client-supplied id is accepted (an `id`
+        key is rejected as unknown). The default Project Policy (Section 7.2 defaults)
+        is created as a pair (Section 7.1). Caller: Owner only.'
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/projects/{pid}:
+    get:
+      operationId: retrieve_project
+      description: 'Read one project. Caller: Owner only — agent read-only access
+        for a token''s own project activates in WP-2.x and is denied until then. A
+        malformed or unknown pid answers VALIDATION_ERROR (400): the catalog has no
+        PROJECT_NOT_FOUND.'
+      parameters:
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    patch:
+      operationId: partial_update_project
+      description: 'Partially update a project: `name`, `repo_path`, `default_branch`,
+        `system_prompt_rules`, `active_status` (transitions among active | paused
+        | archived — FR-PRJ-04; projects are never deleted). Unspecified fields keep
+        their current values. The `id` is immutable (Section 7.3/7.4) and is rejected
+        if sent. Caller: Owner only. Emits `project.updated` once WP-1.9''s event
+        helper exists.'
+      parameters:
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectUpdate'
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/projects/{pid}/manifest:
+    get:
+      operationId: retrieve_project_manifest
+      description: 'Download the project manifest (orchestrator.json) as an attachment
+        — the Section 10.3 wire contract: schema_version 1, the allowlisted keys only,
+        `auto_branch_prefix` from policy (G-09), `orchestrator_api` from server configuration
+        (NFR-06), `audit_required_default` from policy. No secret values: safe to
+        commit (FR-SEC-04). Validate against the published schemas/manifest.v1.json.
+        Caller: Owner only — agents read their own project''s manifest from the bridge''s
+        local file (Section 10.3), and endpoint access for them activates in WP-2.x.
+        A malformed or unknown pid answers VALIDATION_ERROR (400).'
+      parameters:
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrchestratorManifest'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/projects/{pid}/policy:
+    get:
+      operationId: retrieve_project_policy
+      description: 'Read the project''s full policy with current values (Section 7.2
+        field names and documented defaults). Caller: Owner only — agent access activates
+        in WP-2.x and is denied until then. A malformed or unknown pid answers VALIDATION_ERROR
+        (400).'
+      parameters:
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPolicy'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    patch:
+      operationId: partial_update_project_policy
+      description: 'Partially update the policy — the only supported way to change
+        it (Section 12.5). Validation states exactly what Section 7.2 states: enums
+        (`lease_extension_mode`, `merge_strategy`), positive durations/retries/thresholds,
+        `auditor_min_confidence` 1-5, `max_concurrent_tasks` >= 0, non-empty branch
+        prefix and glob lists when supplied; unknown fields are rejected, never ignored.
+        Unspecified fields keep their current values. `branch_prefix` is the G-09
+        canonical prefix (default `feat/{PID}-`) applied when bridge branch names
+        are derived. Caller: Owner only. Policy edits emit an audit event once WP-1.9''s
+        helper exists.'
+      parameters:
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPolicy'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPolicy'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPolicy'
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPolicy'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/projects/{pid}/tasks:
+    get:
+      operationId: list_tasks
+      description: 'List one project''s tasks (Section 9.2; caller: Owner only). Default
+        order is FR-TSK-05 canonical: `urgent > high > medium > low`, then oldest
+        `created_at` first (FIFO), then the task id''s generation order (`T001` …
+        `T999` < `T1000`) — one deterministic sort computed in the database (NFR-09).
+        Filters: repeat `state` for canonical values, single `priority`; archived
+        tasks are excluded unless `include_archived=true` (T19 default visibility).
+        Pagination: cursor-based — pass `cursor` from the previous `next_cursor` *with
+        the same filters* (pagination.md rule 1); `page_size` defaults to 25, clamped
+        to 100. Results never cross the path project.'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor; valid only
+          with the same filters it was issued under (pagination.md rule 1).
+      - in: query
+        name: include_archived
+        schema:
+          type: boolean
+          default: false
+        description: Include soft-archived tasks; default false — archived tasks are
+          hidden from boards by default (Section 8.2 T19).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults, same per-endpoint choice
+          as GET /projects).
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: priority
+        schema:
+          enum:
+          - urgent
+          - high
+          - medium
+          - low
+          type: string
+          minLength: 1
+        description: |-
+          FR-TSK-05 priority filter (single value).
+
+          * `urgent` - urgent
+          * `high` - high
+          * `medium` - medium
+          * `low` - low
+      - in: query
+        name: state
+        schema:
+          type: array
+          items:
+            enum:
+            - draft
+            - pending
+            - in_progress
+            - to_be_audited
+            - in_human_review
+            - completed
+            type: string
+            description: |-
+              * `draft` - draft
+              * `pending` - pending
+              * `in_progress` - in_progress
+              * `to_be_audited` - to_be_audited
+              * `in_human_review` - in_human_review
+              * `completed` - completed
+        description: Canonical states to include; repeat for several (?state=draft&state=pending).
+          Unknown values are VALIDATION_ERROR.
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    post:
+      operationId: create_task
+      description: 'Create a task (Section 9.2 Tasks row; caller: Owner only). T1''s
+        model-level step: the id is allocated server-side (`{PID}-T{index}`, Section
+        7.3), `state` starts at `draft`, `version` starts at 1 (FR-TSK-06), `audit_required`
+        copies the project policy, and `target_scope` globs are validated against
+        Section 12.3. Accepts the FR-TSK-02 field set only — `state`, `version`, `id`,
+        lease/merge fields are rejected as unknown. `Idempotency-Key` replays a retry
+        without duplicating the task (ADR-012).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of re-executing
+          it; reusing it with a different request is an open point (headers.md) and
+          executes normally.
+      - in: path
+        name: pid
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tasks/{id}:
+    get:
+      operationId: retrieve_task
+      description: 'Read one task by id (Section 9.2; caller: Owner only). Every Section
+        7.2 field is returned. A malformed id answers VALIDATION_ERROR (400) — the
+        boundary check of Section 7.3; an unknown but well-formed id answers TASK_NOT_FOUND
+        (404). Archived and completed tasks remain readable (MT-1.4-06).'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    patch:
+      operationId: partial_update_task
+      description: 'Partially update a task (FR-TSK-02 fields; caller: Owner only).
+        The body must carry the `version` the client saw (FR-TSK-06): a match applies
+        the change and increments `version`; a stale value answers VERSION_CONFLICT
+        (409) so a drag-and-drop client never silently overwrites an agent''s change.
+        `state`, lease, merge and archive fields are not client-settable — they are
+        rejected as unknown fields (the state machine of WP-1.5 owns `state`). `Idempotency-Key`
+        replays a retried PATCH (ADR-012). Refused with TASK_STATE_CONFLICT (409)
+        while the row is `completed` (FR-TSK-08 read-only; Section 7.4 rule 3) or
+        archived — both stay fully readable by id and in lists (MT-1.4-06).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of re-executing
+          it; reusing it with a different request is an open point (headers.md) and
+          executes normally.
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTaskUpdate'
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tokens:
+    get:
+      operationId: api_v1_tokens_retrieve
+      description: 'List the caller''s API tokens as metadata (no hash, no plaintext).
+        Sort: id descending (newest first). Pagination: cursor-based — pass `cursor`
+        from the previous `next_cursor`; `page_size` defaults to 25 and is clamped
+        to 100.'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor.
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - owner_session
+          - agent
+          - device
+          type: string
+          minLength: 1
+        description: |-
+          Filter by token kind.
+
+          * `owner_session` - owner session
+          * `agent` - agent
+          * `device` - device
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults).
+      - in: query
+        name: project_id
+        schema:
+          type: string
+          pattern: ^PID[0-9]{5}$
+          minLength: 1
+        description: Filter by project id (agent tokens are project-scoped).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tokens/{id}:
+    delete:
+      operationId: api_v1_tokens_destroy
+      description: Revoke one of the caller's tokens (immediate — no cache).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Revoked'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tokens/agent:
+    post:
+      operationId: api_v1_tokens_agent_create
+      description: Issue one agent token; plaintext returned exactly once.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentTokenIssueRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AgentTokenIssueRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AgentTokenIssueRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentTokenIssueResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /health/live:
+    get:
+      operationId: health_live_retrieve
+      description: 200 whenever the process serves requests; never touches a dependency.
+      tags:
+      - health
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthLive'
+          description: ''
+  /health/ready:
+    get:
+      operationId: health_ready_retrieve
+      description: 200 when every required dependency answers; 503 envelope otherwise.
+      tags:
+      - health
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReady'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+components:
+  schemas:
+    ActiveStatusEnum:
+      enum:
+      - active
+      - paused
+      - archived
+      type: string
+      description: |-
+        * `active` - active
+        * `paused` - paused
+        * `archived` - archived
+    AgentHints:
+      type: object
+      description: Section 10.3 ``agent_hints`` — every key optional.
+      properties:
+        test_command_default:
+          type: string
+          description: 'Fallback test-command hint (Section 10.3 example: "see task").'
+        worktree_mode:
+          type: boolean
+          description: 'Per-task worktree advice (Section 10.3 example: false; ADR-013).'
+    AgentTokenIssueRequest:
+      type: object
+      description: 'POST /tokens/agent body: which project, which roles.'
+      properties:
+        project_id:
+          type: string
+          description: Target project id (PID + five digits, Section 7.3).
+          pattern: ^PID[0-9]{5}$
+        scopes:
+          type: array
+          items:
+            type: string
+          description: 'Agent roles this token may act as (Section 12.2 matrix roles).
+            Allowed: coder, auditor, decomposer, merge_executor.'
+      required:
+      - project_id
+    AgentTokenIssueResponse:
+      type: object
+      description: 'POST /tokens/agent 201 body: plaintext exactly once + row metadata.'
+      properties:
+        id:
+          type: integer
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        project_id:
+          type: string
+          nullable: true
+        scopes: {}
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        token:
+          type: string
+          description: The plaintext bearer token — returned exactly once, now. The
+            server stores only its SHA-256 hash and cannot show it again (Section
+            7.2); lost tokens must be revoked and reissued.
+      required:
+      - expires_at
+      - id
+      - kind
+      - project_id
+      - scopes
+      - token
+    CodeEnum:
+      enum:
+      - AUTH_REQUIRED
+      - AUTH_FORBIDDEN_PROJECT
+      - VALIDATION_ERROR
+      - TASK_NOT_FOUND
+      - TASK_STATE_CONFLICT
+      - TASK_ALREADY_CLAIMED
+      - LEASE_EXPIRED
+      - LEASE_NOT_OWNED
+      - DEPENDENCY_UNMET
+      - CONCURRENCY_LIMIT_REACHED
+      - SCOPE_VIOLATION
+      - ROLE_NOT_PERMITTED
+      - AUDITOR_SAME_AS_CODER
+      - ATTACHMENT_NOT_READY
+      - ATTACHMENT_UNSUPPORTED_FORMAT
+      - POLICY_VIOLATION
+      - RATE_LIMITED
+      - VERSION_CONFLICT
+      - SERVER_ERROR
+      type: string
+      description: |-
+        * `AUTH_REQUIRED` - AUTH_REQUIRED
+        * `AUTH_FORBIDDEN_PROJECT` - AUTH_FORBIDDEN_PROJECT
+        * `VALIDATION_ERROR` - VALIDATION_ERROR
+        * `TASK_NOT_FOUND` - TASK_NOT_FOUND
+        * `TASK_STATE_CONFLICT` - TASK_STATE_CONFLICT
+        * `TASK_ALREADY_CLAIMED` - TASK_ALREADY_CLAIMED
+        * `LEASE_EXPIRED` - LEASE_EXPIRED
+        * `LEASE_NOT_OWNED` - LEASE_NOT_OWNED
+        * `DEPENDENCY_UNMET` - DEPENDENCY_UNMET
+        * `CONCURRENCY_LIMIT_REACHED` - CONCURRENCY_LIMIT_REACHED
+        * `SCOPE_VIOLATION` - SCOPE_VIOLATION
+        * `ROLE_NOT_PERMITTED` - ROLE_NOT_PERMITTED
+        * `AUDITOR_SAME_AS_CODER` - AUDITOR_SAME_AS_CODER
+        * `ATTACHMENT_NOT_READY` - ATTACHMENT_NOT_READY
+        * `ATTACHMENT_UNSUPPORTED_FORMAT` - ATTACHMENT_UNSUPPORTED_FORMAT
+        * `POLICY_VIOLATION` - POLICY_VIOLATION
+        * `RATE_LIMITED` - RATE_LIMITED
+        * `VERSION_CONFLICT` - VERSION_CONFLICT
+        * `SERVER_ERROR` - SERVER_ERROR
+    DeviceRegisterRequest:
+      type: object
+      description: POST /devices body.
+      properties:
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          description: |-
+            Mobile platform: ios or android.
+
+            * `ios` - iOS
+            * `android` - Android
+        push_token:
+          type: string
+          description: APNs/FCM registration token for push dispatch (Section 9.8).
+            Sensitive at rest (Section 12.4) — stored, never returned.
+        biometric_bound:
+          type: boolean
+          default: false
+          description: Whether the client has enrolled the biometric gate for this
+            device (Section 12.2; enforcement is client-side, M5).
+      required:
+      - platform
+      - push_token
+    DeviceRegisterResponse:
+      type: object
+      description: 'POST /devices 201 body: metadata + the token shown exactly once.'
+      properties:
+        id:
+          type: integer
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        biometric_bound:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+        token:
+          type: string
+          description: The device-bound plaintext token — returned exactly once, now;
+            store it in platform secure storage. The server keeps only its SHA-256
+            hash (Section 7.2) and cannot show it again.
+      required:
+      - biometric_bound
+      - expires_at
+      - id
+      - platform
+      - token
+    ErrorEnvelope:
+      type: object
+      description: |-
+        The Section 9.2 wire envelope — five fields nested under ``error``.
+
+        ``apps.core.errors.build_error_envelope`` emits the wrapper on the wire;
+        the document must model that nesting, not a flat top-level body (the flat
+        schema was a contract bug, fixed at the Wave 2 end-of-wave gate).
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorEnvelopeBody'
+      required:
+      - error
+    ErrorEnvelopeBody:
+      type: object
+      description: The five Section 9.2 fields, in wire order, as they sit under ``error``.
+      properties:
+        code:
+          $ref: '#/components/schemas/CodeEnum'
+        message:
+          type: string
+        retryable:
+          type: boolean
+        details:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        correlation_id:
+          type: string
+      required:
+      - code
+      - correlation_id
+      - message
+      - retryable
+    HealthLive:
+      type: object
+      description: Response body of GET /health/live.
+      properties:
+        status:
+          type: string
+      required:
+      - status
+    HealthReady:
+      type: object
+      description: Response body of GET /health/ready.
+      properties:
+        status:
+          type: string
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - checks
+      - status
+    KindEnum:
+      enum:
+      - owner_session
+      - agent
+      - device
+      type: string
+      description: |-
+        * `owner_session` - owner session
+        * `agent` - agent
+        * `device` - device
+    LeaseExtensionModeEnum:
+      enum:
+      - checkpoint_only
+      - checkpoint_and_liveness
+      type: string
+      description: |-
+        * `checkpoint_only` - checkpoint only
+        * `checkpoint_and_liveness` - checkpoint and liveness
+    LoginRequest:
+      type: object
+      description: POST /auth/login body (Section 9.2 Auth row, caller Owner).
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+      - password
+      - username
+    MergeStrategyEnum:
+      enum:
+      - squash
+      - merge_commit
+      - fast_forward_only
+      type: string
+      description: |-
+        * `squash` - squash
+        * `merge_commit` - merge commit
+        * `fast_forward_only` - fast forward only
+    OrchestratorManifest:
+      type: object
+      properties:
+        $schema:
+          type: string
+          description: Location of the manifest schema (Section 10.3).
+        schema_version:
+          type: integer
+          description: Manifest generation — always 1 (Section 10.3).
+        project_id:
+          type: string
+          description: Canonical PID + five digits (Section 7.3).
+        project_name:
+          type: string
+        orchestrator_api:
+          type: string
+          description: API base URL from ORCHESTRATOR_API_BASE_URL (Section 9.10 /
+            NFR-06 — configuration, never code).
+        default_branch:
+          type: string
+        auto_branch_prefix:
+          type: string
+          description: Policy branch_prefix with {PID} resolved (G-09).
+        audit_required_default:
+          type: boolean
+          description: Policy default for new tasks (Section 7.2).
+        agent_hints:
+          allOf:
+          - $ref: '#/components/schemas/AgentHints'
+          description: All hint keys optional (Section 10.3).
+      required:
+      - $schema
+      - audit_required_default
+      - auto_branch_prefix
+      - default_branch
+      - orchestrator_api
+      - project_id
+      - project_name
+      - schema_version
+    OwnerSession:
+      type: object
+      description: 'The login payload: plaintext binding once + row expiry + identity.'
+      properties:
+        token:
+          type: string
+          description: 'The owner session token. Returned exactly once at login; the
+            server stores only its SHA-256 hash (Section 7.2). Web clients rely on
+            the session cookie and may ignore it; token-auth clients (Section 15.4)
+            send it as `Authorization: Bearer <token>`.'
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/UserSummary'
+      required:
+      - expires_at
+      - token
+      - user
+    PatchedProjectPolicy:
+      type: object
+      description: The Section 7.2 policy table as a validated read/write contract.
+      properties:
+        lease_duration_minutes:
+          type: integer
+          minimum: 1
+          description: Lease length and per-checkpoint extension; default 45 (7.2).
+        lease_max_total_minutes:
+          type: integer
+          minimum: 1
+          description: Hard cap on one continuous claim; default 240 (7.2).
+        lease_extension_mode:
+          allOf:
+          - $ref: '#/components/schemas/LeaseExtensionModeEnum'
+          description: |-
+            checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged).
+
+            * `checkpoint_only` - checkpoint only
+            * `checkpoint_and_liveness` - checkpoint and liveness
+        max_retries:
+          type: integer
+          minimum: 1
+          description: Lease failures before escalation; default 3 (7.2).
+        max_concurrent_tasks:
+          type: integer
+          minimum: 0
+          description: 'Simultaneous in_progress tasks; default 1 (G-26). 0 is legal:
+            it pauses claiming without touching active_status.'
+        autonomous_diff_threshold_lines:
+          type: integer
+          minimum: 1
+          description: Max changed lines for auto-complete; default 250 (7.2).
+        auditor_min_confidence:
+          type: integer
+          maximum: 5
+          minimum: 1
+          description: Minimum auditor confidence, 1-5; default 4 (7.2).
+        critical_path_globs:
+          type: array
+          items:
+            type: string
+          description: Escalating paths (CI/CD, root migrations, security config).
+        migration_path_globs:
+          type: array
+          items:
+            type: string
+          description: Escalating framework-specific migration paths.
+        sensitive_config_globs:
+          type: array
+          items:
+            type: string
+          description: Escalating env/key/security-rule paths.
+        auto_complete_enabled:
+          type: boolean
+          description: If false, every task goes to human review; default true (7.2).
+        merge_strategy:
+          allOf:
+          - $ref: '#/components/schemas/MergeStrategyEnum'
+          description: |-
+            squash (default) / merge_commit / fast_forward_only (7.2).
+
+            * `squash` - squash
+            * `merge_commit` - merge commit
+            * `fast_forward_only` - fast forward only
+        branch_prefix:
+          type: string
+          description: Canonical branch-name prefix, `{PID}` resolved per project
+            when names are derived (G-09; default `feat/{PID}-`). Changing it affects
+            bridge branch naming from WP-2.x on.
+        audit_required_default:
+          type: boolean
+          description: Default audit_required for new tasks; default true (7.2).
+        stalled_after_minutes:
+          type: integer
+          minimum: 1
+          description: UI warning when no checkpoint arrives; default 20 (7.2).
+    PatchedProjectUpdate:
+      type: object
+      description: PATCH /projects/{pid} body — every FR-PRJ-02 mutable field, optional.
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        repo_path:
+          type: string
+          maxLength: 500
+        default_branch:
+          type: string
+          maxLength: 255
+        system_prompt_rules:
+          type: string
+        active_status:
+          allOf:
+          - $ref: '#/components/schemas/ActiveStatusEnum'
+          description: |-
+            Transitions among active | paused | archived (FR-PRJ-04).
+
+            * `active` - active
+            * `paused` - paused
+            * `archived` - archived
+    PatchedTaskUpdate:
+      type: object
+      description: PATCH /tasks/{id} body — FR-TSK-02 fields + the FR-TSK-06 version.
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: The version the client saw (required — FR-TSK-06). A stale
+            value answers VERSION_CONFLICT; a match applies and increments.
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        acceptance_criteria:
+          type: array
+          items:
+            type: string
+        target_scope:
+          type: array
+          items:
+            type: string
+        test_command:
+          type: string
+          maxLength: 500
+        priority:
+          $ref: '#/components/schemas/PriorityEnum'
+        depends_on:
+          type: array
+          items:
+            type: string
+          description: 'Replace-the-set dependency write (MT-1.4-05): the payload
+            becomes the full set — omit to leave it untouched, `[]` clears it. Validated
+            under the version check, same transaction.'
+    PlatformEnum:
+      enum:
+      - ios
+      - android
+      type: string
+      description: |-
+        * `ios` - iOS
+        * `android` - Android
+    PriorityEnum:
+      enum:
+      - urgent
+      - high
+      - medium
+      - low
+      type: string
+      description: |-
+        * `urgent` - urgent
+        * `high` - high
+        * `medium` - medium
+        * `low` - low
+    Project:
+      type: object
+      description: GET representations of a project — Section 7.2 fields, in plan
+        order.
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: Server-assigned PID + five digits (Section 7.3); immutable.
+        name:
+          type: string
+          maxLength: 200
+        repo_path:
+          type: string
+          description: Path as seen by the bridge host (informational for the backend).
+          maxLength: 500
+        active_status:
+          allOf:
+          - $ref: '#/components/schemas/ActiveStatusEnum'
+          description: |-
+            active | paused | archived (FR-PRJ-04).
+
+            * `active` - active
+            * `paused` - paused
+            * `archived` - archived
+        default_branch:
+          type: string
+          maxLength: 255
+        system_prompt_rules:
+          type: string
+          description: Markdown text fed into the rules block (Section 10.6).
+        agent_policy:
+          type: integer
+          readOnly: true
+          description: The project's one-to-one Project Policy row (Section 7.1).
+        task_counter:
+          type: integer
+          readOnly: true
+          description: Atomic task index source for MT-1.4-02 (starts at 0).
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - active_status
+      - agent_policy
+      - created_at
+      - default_branch
+      - id
+      - name
+      - repo_path
+      - system_prompt_rules
+      - task_counter
+      - updated_at
+    ProjectCreate:
+      type: object
+      description: POST /projects body — the Section 9.2 create inputs, nothing else.
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        repo_path:
+          type: string
+          maxLength: 500
+        default_branch:
+          type: string
+          maxLength: 255
+        system_prompt_rules:
+          type: string
+          default: ''
+          description: Optional at creation; editable afterwards via PATCH.
+      required:
+      - default_branch
+      - name
+      - repo_path
+    ProjectListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
+    ProjectPolicy:
+      type: object
+      description: The Section 7.2 policy table as a validated read/write contract.
+      properties:
+        lease_duration_minutes:
+          type: integer
+          minimum: 1
+          description: Lease length and per-checkpoint extension; default 45 (7.2).
+        lease_max_total_minutes:
+          type: integer
+          minimum: 1
+          description: Hard cap on one continuous claim; default 240 (7.2).
+        lease_extension_mode:
+          allOf:
+          - $ref: '#/components/schemas/LeaseExtensionModeEnum'
+          description: |-
+            checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged).
+
+            * `checkpoint_only` - checkpoint only
+            * `checkpoint_and_liveness` - checkpoint and liveness
+        max_retries:
+          type: integer
+          minimum: 1
+          description: Lease failures before escalation; default 3 (7.2).
+        max_concurrent_tasks:
+          type: integer
+          minimum: 0
+          description: 'Simultaneous in_progress tasks; default 1 (G-26). 0 is legal:
+            it pauses claiming without touching active_status.'
+        autonomous_diff_threshold_lines:
+          type: integer
+          minimum: 1
+          description: Max changed lines for auto-complete; default 250 (7.2).
+        auditor_min_confidence:
+          type: integer
+          maximum: 5
+          minimum: 1
+          description: Minimum auditor confidence, 1-5; default 4 (7.2).
+        critical_path_globs:
+          type: array
+          items:
+            type: string
+          description: Escalating paths (CI/CD, root migrations, security config).
+        migration_path_globs:
+          type: array
+          items:
+            type: string
+          description: Escalating framework-specific migration paths.
+        sensitive_config_globs:
+          type: array
+          items:
+            type: string
+          description: Escalating env/key/security-rule paths.
+        auto_complete_enabled:
+          type: boolean
+          description: If false, every task goes to human review; default true (7.2).
+        merge_strategy:
+          allOf:
+          - $ref: '#/components/schemas/MergeStrategyEnum'
+          description: |-
+            squash (default) / merge_commit / fast_forward_only (7.2).
+
+            * `squash` - squash
+            * `merge_commit` - merge commit
+            * `fast_forward_only` - fast forward only
+        branch_prefix:
+          type: string
+          description: Canonical branch-name prefix, `{PID}` resolved per project
+            when names are derived (G-09; default `feat/{PID}-`). Changing it affects
+            bridge branch naming from WP-2.x on.
+        audit_required_default:
+          type: boolean
+          description: Default audit_required for new tasks; default true (7.2).
+        stalled_after_minutes:
+          type: integer
+          minimum: 1
+          description: UI warning when no checkpoint arrives; default 20 (7.2).
+      required:
+      - audit_required_default
+      - auditor_min_confidence
+      - auto_complete_enabled
+      - autonomous_diff_threshold_lines
+      - branch_prefix
+      - critical_path_globs
+      - lease_duration_minutes
+      - lease_extension_mode
+      - lease_max_total_minutes
+      - max_concurrent_tasks
+      - max_retries
+      - merge_strategy
+      - migration_path_globs
+      - sensitive_config_globs
+      - stalled_after_minutes
+    Refreshed:
+      type: object
+      description: 'POST /auth/refresh: the extended expiry (same lifetime settings).'
+      properties:
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - expires_at
+    Revoked:
+      type: object
+      description: 'POST /auth/logout: the instant the session token stopped working.'
+      properties:
+        revoked_at:
+          type: string
+          format: date-time
+      required:
+      - revoked_at
+    StateEnum:
+      enum:
+      - draft
+      - pending
+      - in_progress
+      - to_be_audited
+      - in_human_review
+      - completed
+      type: string
+      description: |-
+        * `draft` - draft
+        * `pending` - pending
+        * `in_progress` - in_progress
+        * `to_be_audited` - to_be_audited
+        * `in_human_review` - in_human_review
+        * `completed` - completed
+    Task:
+      type: object
+      description: GET representation of a task — Section 7.2 fields, in plan order.
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: '{PID}-T{index} (Section 7.3); server-assigned, immutable.'
+        project_id:
+          type: string
+          readOnly: true
+          description: Section 7.2 project_id FK — never changes (7.4 rule 4).
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+          description: Markdown description (FR-TSK-02).
+        acceptance_criteria:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        target_scope:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: Repo-relative path globs (Section 12.3).
+        test_command:
+          type: string
+          readOnly: true
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StateEnum'
+          readOnly: true
+          description: |-
+            Canonical G-01 state (ADR-010); draft on create (T1).
+
+            * `draft` - draft
+            * `pending` - pending
+            * `in_progress` - in_progress
+            * `to_be_audited` - to_be_audited
+            * `in_human_review` - in_human_review
+            * `completed` - completed
+        version:
+          type: integer
+          readOnly: true
+          description: 'FR-TSK-06: incremented on every change; PATCH echoes it.'
+        worker_agent_id:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Lease holder (WP-1.6).
+        worker_session_id:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Bridge session (G-18).
+        claimed_role:
+          type: string
+          readOnly: true
+          nullable: true
+          description: coder | auditor | null.
+        lease_acquired_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        lease_expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_checkpoint_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        failure_retry_count:
+          type: integer
+          readOnly: true
+        attempt_number:
+          type: integer
+          readOnly: true
+        audit_required:
+          type: boolean
+          readOnly: true
+          description: Copied from the project policy at creation (Section 7.2).
+        review_reason:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Section 8.4 enum | null.
+        latest_feedback:
+          type: string
+          readOnly: true
+        merge_status:
+          type: string
+          readOnly: true
+          description: none | pending | merging | merged | conflict | failed.
+        archived_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Soft-archive marker; archived tasks stay readable (7.3).
+        created_by:
+          type: string
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        depends_on:
+          type: array
+          items:
+            type: string
+          description: 'Section 7.1 N:N relation (FR-TSK-07): the task ids this task
+            waits on, ordered by id. Server-managed — written through the `depends_on`
+            field of POST/PATCH (replace-the-set), read here.'
+          readOnly: true
+      required:
+      - acceptance_criteria
+      - archived_at
+      - attempt_number
+      - audit_required
+      - claimed_role
+      - created_at
+      - created_by
+      - depends_on
+      - description
+      - failure_retry_count
+      - id
+      - last_checkpoint_at
+      - latest_feedback
+      - lease_acquired_at
+      - lease_expires_at
+      - merge_status
+      - priority
+      - project_id
+      - review_reason
+      - state
+      - target_scope
+      - test_command
+      - title
+      - updated_at
+      - version
+      - worker_agent_id
+      - worker_session_id
+    TaskCreate:
+      type: object
+      description: POST /projects/{pid}/tasks body — the FR-TSK-02 create inputs only.
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          default: ''
+          description: Markdown (FR-TSK-02); editable afterwards via PATCH.
+        acceptance_criteria:
+          type: array
+          items:
+            type: string
+          description: Acceptance-criteria strings (Section 7.2).
+        target_scope:
+          type: array
+          items:
+            type: string
+          description: Repo-relative globs, validated on creation (Section 12.3).
+        test_command:
+          type: string
+          default: ''
+          maxLength: 500
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/PriorityEnum'
+          default: medium
+          description: |-
+            FR-TSK-05; default medium (documented default — not a plan fact).
+
+            * `urgent` - urgent
+            * `high` - high
+            * `medium` - medium
+            * `low` - low
+        depends_on:
+          type: array
+          items:
+            type: string
+          description: Task ids this task waits on (Section 7.1 relation; FR-TSK-07).
+            Same-project ids only; existence, self and cycles validated — a refusal
+            rolls the whole create back (VALIDATION_ERROR).
+      required:
+      - title
+    TaskListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
+    TokenListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokenSummary'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
+    TokenSummary:
+      type: object
+      description: List item metadata — deliberately without ``hash`` (FR-SEC-04).
+      properties:
+        id:
+          type: integer
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        project_id:
+          type: string
+          nullable: true
+        scopes: {}
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - expires_at
+      - id
+      - kind
+      - last_used_at
+      - project_id
+      - revoked_at
+      - scopes
+    UserSummary:
+      type: object
+      description: The owner identity as returned by login.
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+      - id
+      - username
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Project-scoped agent token (or owner session token in the Section
+        15.4 token-auth transport) issued by POST /api/v1/tokens/agent or /auth/login.
+        The server stores only its SHA-256 hash; the plaintext is shown exactly once.
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+      description: Owner session cookie issued by POST /api/v1/auth/login (HTTP-only;
+        mutations also require the X-CSRFToken header duplicated from the csrftoken
+        cookie).

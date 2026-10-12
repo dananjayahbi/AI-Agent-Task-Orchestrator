@@ -1,0 +1,7 @@
+# Secrets never enter Git (parent plan Section 20.4 item 3; MT-5.1-01 risk
+# note). The WP-5.1 stack takes the tunnel token from infra/compose/.env
+# (git-ignored) only, but guard this folder too: a locally-managed tunnel's
+# credentials file or a stray env file must never be committed.
+*.json
+.env
+credentials*.json

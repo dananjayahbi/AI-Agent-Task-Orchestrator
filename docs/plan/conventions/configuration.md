@@ -58,8 +58,9 @@ identifies the group in the variable's name.
 | OCR engine | `OCR_` | `ORCHESTRATOR_OCR_ENGINE`, `ORCHESTRATOR_OCR_*` | Consumed by the attachment pipeline (Section 9.5). |
 | Description provider settings | `DESCRIPTION_` | `ORCHESTRATOR_DESCRIPTION_PROVIDER`, `ORCHESTRATOR_DESCRIPTION_*` | Implementations per Section 9.5: `disabled`, Anthropic-compatible vision model, local model. Default: `disabled` (Section 22, OQ-07 recommended default; enabling decision deferred to M1). Any API credential in this group is secret. |
 | FCM credentials | `FCM_` | `ORCHESTRATOR_FCM_*` | Secret; push dispatch (Section 9.8). Provisioning lands with WP-5.4. |
-| Cloudflare tunnel token | `CLOUDFLARE_TUNNEL_` | `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN` | Secret; provisioning lands with WP-5.1. |
+| Cloudflare tunnel | `CLOUDFLARE_TUNNEL_` | `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN`, `ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME` | Secret token plus the parameterized public hostname; provisioned in WP-5.1 (Section 15.4). |
 | Feature flags | `FEATURE_` | `ORCHESTRATOR_FEATURE_<NAME>` | Booleans (`true`/`false`); default documented per flag. |
+| Orchestrator API base URL (manifest binding) — Section 10.3, **added by MT-1.3-05** | `API_` | `ORCHESTRATOR_API_BASE_URL` | The `orchestrator_api` value of every generated manifest (Section 10.3; NFR-06 env-only). Section 9.10 enumerates groups without an API-base entry while the manifest contract requires the value — the group was created here first, following this document, and is flagged for owner confirmation (Section 20.1 item 5). |
 
 The table is a pattern record with representative names, not a closed list: each
 setting that lands in a later work package is added with its full metadata below,
@@ -96,7 +97,7 @@ names above this document is the authoritative catalog (MT-0.5-01).
 
 | Name | Group (leading segment) | Purpose | Default | Validation note | Required in `prod` | Secret |
 |---|---|---|---|---|---|---|
-| `ORCHESTRATOR_IMAGE_POSTGRES`, `ORCHESTRATOR_IMAGE_REDIS`, `ORCHESTRATOR_IMAGE_BACKEND`, `ORCHESTRATOR_IMAGE_WEB`, `ORCHESTRATOR_IMAGE_CLOUDFLARED`, `ORCHESTRATOR_IMAGE_MAILHOG` | Compose image basis (`IMAGE_`) — Section 16.1 | Container image per Compose service | `postgres:16-alpine`, `redis:7.4-alpine`, `orchestrator-backend:stub`, `orchestrator-web:stub`, `cloudflare/cloudflared:2026.10.0`, `mailhog/mailhog:v1.0.1` | Tag must exist at pull time; `prod` tags pinned, never `:latest` | no | no |
+| `ORCHESTRATOR_IMAGE_POSTGRES`, `ORCHESTRATOR_IMAGE_REDIS`, `ORCHESTRATOR_IMAGE_BACKEND`, `ORCHESTRATOR_IMAGE_WEB`, `ORCHESTRATOR_IMAGE_CLOUDFLARED`, `ORCHESTRATOR_IMAGE_MAILHOG` | Compose image basis (`IMAGE_`) — Section 16.1 | Container image per Compose service | `postgres:16-alpine`, `redis:7.4-alpine`, `orchestrator-backend:dev`, `orchestrator-web:stub`, `cloudflare/cloudflared:2026.10.0`, `mailhog/mailhog:v1.0.1` | Tag must exist at pull time; `prod` tags pinned, never `:latest` | no | no |
 | `ORCHESTRATOR_PORT_BACKEND` | Compose published ports (`PORT_`) — Section 16.1 | Host port published for the API | `8000` | Valid port 1–65535; only `backend` and `web` publish | no | no |
 | `ORCHESTRATOR_PORT_WEB` | Compose published ports (`PORT_`) — Section 16.1 | Host port published for the UI | `3000` | Valid port 1–65535 | no | no |
 | `ORCHESTRATOR_BIND_ADDR` | Compose published ports (`BIND_`) — Section 16.1 | Interface the published ports bind to | `127.0.0.1` when unset (template carries the host's LAN IP) | Must be an IP assigned to this host; never `0.0.0.0` on an internet-facing VPS — the tunnel (WP-5.1) is the only public edge | yes (set to this host's address) | no |
@@ -106,18 +107,25 @@ names above this document is the authoritative catalog (MT-0.5-01).
 | `ORCHESTRATOR_CACHE_BROKER_URL` | Database and cache (`CACHE_`) | Celery broker URL (Redis) | `redis://redis:6379/0` | Scheme `redis://` | no | no |
 | `ORCHESTRATOR_CACHE_APPENDONLY` | Database and cache (`CACHE_`) | Redis persistence toggle (Section 16.1) | `true` | Booleans take `true`/`false` (rule 5); Compose maps the value to Redis's mandated `--appendonly yes\|no` (rule 7) | no | no |
 | `ORCHESTRATOR_DEBUG` | Runtime debug posture (Compose dev/prod split, MT-0.2-02) — `DEBUG_` | Django debug flag | `false` | `prod` boot refused while `true` (Section 16.2); dev overlay sets `true` | yes (must be `false`) | no |
+| `ORCHESTRATOR_LOG_LEVEL` | Structured logging (`LOG_`) — Section 17 | Level of the JSON service/request logs (WP-1.1, MT-1.1-02) | `INFO` in the base/prod settings; `DEBUG` in the dev settings module | One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; an unknown level fails boot when the logging dict configures it | no | no |
 | `ORCHESTRATOR_STORAGE_MEDIA_ROOT` | Storage backend (`STORAGE_`) | Mount point of the shared media volume | `/media` | Absolute path; must equal the Compose volume mount | no | no |
 | `ORCHESTRATOR_STORAGE_S3_ENDPOINT` | Storage backend (`STORAGE_`) | S3-compatible API endpoint (Section 16.3) | empty — reserved until WP-6.2 | URL required when `ORCHESTRATOR_STORAGE_BACKEND=s3` | when `s3` | no |
 | `ORCHESTRATOR_STORAGE_S3_BUCKET` | Storage backend (`STORAGE_`) | S3 bucket | empty — reserved | Non-empty when `s3` | when `s3` | no |
 | `ORCHESTRATOR_STORAGE_S3_ACCESS_KEY_ID` | Storage backend (`STORAGE_`) | S3 credential pair — half 1 | empty — reserved | Required when `s3` | when `s3` | yes |
 | `ORCHESTRATOR_STORAGE_S3_SECRET_ACCESS_KEY` | Storage backend (`STORAGE_`) | S3 credential pair — half 2 | empty — reserved | Required when `s3` | when `s3` | yes |
-| `ORCHESTRATOR_TOKEN_LIFETIME_AGENT_HOURS` | Token lifetimes (`TOKEN_LIFETIME_`) | Agent token lifetime | none — fixed by WP-1.2 when token models land | Unit suffix mandatory; positive integer | no | no |
-| `ORCHESTRATOR_TOKEN_LIFETIME_DEVICE_DAYS` | Token lifetimes (`TOKEN_LIFETIME_`) | Device token lifetime | none — fixed by WP-1.2 when token models land | Unit suffix mandatory; positive integer | no | no |
-| `ORCHESTRATOR_RATE_LIMIT_API_PER_MINUTE` | Rate limits (`RATE_LIMIT_`) | API rate limit | none — fixed with the implementation (WP-1.2 / WP-6.1) | Unit suffix mandatory; positive integer | no | no |
+| `ORCHESTRATOR_TOKEN_LIFETIME_OWNER_SESSION_HOURS` | Token lifetimes (`TOKEN_LIFETIME_`) | Owner session (login) lifetime — drives the `owner_session` token expiry and the session cookie max-age (Section 12.2; MT-1.2-01) | `12` hours (fixed by WP-1.2; flagged for owner confirmation) | Unit suffix mandatory; positive integer | no | no |
+| `ORCHESTRATOR_TOKEN_LIFETIME_AGENT_HOURS` | Token lifetimes (`TOKEN_LIFETIME_`) | Agent bearer-token lifetime — the Section 12.2 "long-lived but revocable" default behind `POST /tokens/agent` (MT-1.2-03) | `720` hours / 30 days (fixed by WP-1.2; flagged for owner confirmation) | Unit suffix mandatory; positive integer | no | no |
+| `ORCHESTRATOR_TOKEN_LIFETIME_DEVICE_DAYS` | Token lifetimes (`TOKEN_LIFETIME_`) | Device-bound token lifetime — the Section 12.2 mobile credential behind `POST /devices` (MT-1.2-04); remote revocation, not expiry, is the primary lost-phone control | `90` days (fixed by WP-1.2; flagged for owner confirmation) | Unit suffix mandatory; positive integer | no | no |
+| `ORCHESTRATOR_RATE_LIMIT_AGENT_PER_MINUTE` | Rate limits (`RATE_LIMIT_`) | Per-token budget for Section 9.2 agent-facing endpoints (Agent/Auditor/Bridge callers; FR-SEC-05; MT-1.2-06) | `120` per minute (fixed by WP-1.2; flagged for owner confirmation) | Unit suffix mandatory; positive integer | no | no |
+| `ORCHESTRATOR_RATE_LIMIT_DEVICE_PER_MINUTE` | Rate limits (`RATE_LIMIT_`) | Per-token budget for the Section 9.2 Devices endpoints (Mobile caller; FR-SEC-05; MT-1.2-06) | `60` per minute (fixed by WP-1.2; flagged for owner confirmation) | Unit suffix mandatory; positive integer | no | no |
+| `ORCHESTRATOR_RATE_LIMIT_API_PER_MINUTE` | Rate limits (`RATE_LIMIT_`) | API-wide budget beyond FR-SEC-05's agent/device scope (owner-session endpoints stay unthrottled until then) | none — reserved; fixed with the WP-6.1 hardening | Unit suffix mandatory; positive integer | no | no |
+| `ORCHESTRATOR_API_BASE_URL` | Orchestrator API base URL (`API_`) — Section 10.3 manifest binding, added by MT-1.3-05 | Public base URL rendered as `orchestrator_api` in every project manifest (`GET /projects/{pid}/manifest`) | `http://localhost:8000/api/v1` — the Section 10.3 example's shape; **new group, flagged for owner confirmation** (Section 20.1 item 5) | Absolute `http(s)://` URL; startup fails fast otherwise (Section 9.10) | no | no |
 | `ORCHESTRATOR_OCR_ENGINE` | OCR engine (`OCR_`) | OCR engine selection (Section 6.6) | `tesseract` | One of the pluggable engine names | no | no |
 | `ORCHESTRATOR_DESCRIPTION_PROVIDER` | Description provider (`DESCRIPTION_`) | Attachment description provider | `disabled` (Section 22) | One of `disabled` or a configured vision-model provider | no | no |
 | `ORCHESTRATOR_FCM_PROJECT_ID` | FCM credentials (`FCM_`) | FCM project id (Section 9.8) | empty — reserved (WP-5.4) | Required once push dispatch is enabled | when push enabled | no |
 | `ORCHESTRATOR_FCM_CREDENTIALS_JSON` | FCM credentials (`FCM_`) | FCM service-account credentials | empty — reserved (WP-5.4) | Required once push dispatch is enabled | when push enabled | yes |
+| `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN` | Cloudflare tunnel (`CLOUDFLARE_TUNNEL_`) — Section 15.4 | Secret that starts the named tunnel from the environment (mapped to the container's image-mandated `TUNNEL_TOKEN`, rule 7) | empty — template placeholder | Non-empty once remote access is enabled; cloudflared refuses to run with a missing/invalid token (WP-5.1 fail-fast, verified); rotated via the Cloudflare dashboard (Section 15.4) | yes (when remote access is enabled) | yes |
+| `ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME` | Cloudflare tunnel (`CLOUDFLARE_TUNNEL_`) — Sections 15.1, 15.4 | Public tunnel hostname parameterizing the edge route mirrored from `infra/cloudflare/ingress.yaml` and the tunnel entry of the CORS/CSRF trusted origins (OQ-11: `orchestrator.<owner-domain>`) | empty — no environment-specific hostname in Git (plan 20.4 item 3) | Absolute DNS name (no scheme, no path) once remote access is enabled; consumed by the tunnel operations procedure (`infra/cloudflare/README.md`) | yes (when remote access is enabled) | no |
 | `ORCHESTRATOR_FEATURE_FLAGS` | Feature flags (`FEATURE_`) | Comma-separated list of enabled `ORCHESTRATOR_FEATURE_<NAME>` flags | empty — none enabled | Each member matches `ORCHESTRATOR_FEATURE_<NAME>`; flag values are `true`/`false` | no | no |
 | `ORCHESTRATOR_AGENT_TOKEN` | Secret keys — bridge agent token (Section 10.3; name fixed in "Secret handling" above) | Bridge → backend agent token, environment fallback | none — required when the bridge runs | Required; weak or missing refused | yes (when bridge runs) | yes |
 | `NODE_ENV` | Image-mandated (rule 7) — Node.js runtime | Dev-overlay mode marker for the future WP-4.1 web image | `development` in the dev overlay; absent in the prod render | Fixed literal set by `compose.dev.yaml`; not host-configurable | no | no |
@@ -130,6 +138,10 @@ Compose definition maps the canonical `ORCHESTRATOR_DATABASE_*` value into that
 name and the template and secret store hold only canonical names. `NODE_ENV` is
 likewise the Node runtime's mandated name; it has no template twin because its
 value is a fixed dev-overlay literal, not a host-configurable setting.
+`TUNNEL_TOKEN` (cloudflared, since WP-5.1) follows the Postgres pattern: the
+Compose definition maps the canonical `ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN`
+into the image-mandated key, while the template and secret store hold only the
+canonical name.
 
 ## The "same names everywhere" rule (NFR-06, Section 16.2)
 

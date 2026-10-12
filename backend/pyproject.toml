@@ -1,18 +1,33 @@
 # Tooling configuration for the Django control-plane backend (parent plan Section 6.6).
-# Application dependencies (Django, DRF, ...) arrive with WP-1.1; this file only fixes
-# the shared Python tooling baseline (MT-0.1-02).
+# WP-1.1 adds the application dependencies (Django, DRF, schema generation, ASGI
+# server) and the Django-aware mypy/pytest wiring; the Ruff and mypy tool *pins*
+# stay identical to bridge/ (MT-0.1-02), while Django-specific sections below
+# exist only in this package.
 
 [project]
 name = "orchestrator-backend"
 version = "0.0.1"
 description = "Django control plane for the AI Agent Task Orchestrator"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "django>=5.2,<6",
+    "djangorestframework>=3.18.3",
+    "drf-spectacular>=0.30.0",
+    "psycopg[binary]>=3.3.6",
+    "redis>=8.1.0",
+    "uvicorn>=0.54.0",
+]
 
 [dependency-groups]
 dev = [
     "ruff==0.17.0",
     "mypy==2.4.0",
+    "pytest>=9.1.1",
+    "django-stubs>=6.1.2",
+    "djangorestframework-stubs>=3.18.1",
+    "pytest-django>=4.14.0",
+    "jsonschema>=4.26.0",
+    "types-jsonschema>=4.26.0.20261006",
 ]
 
 # --- Ruff: formatter + linter (kept identical in backend/ and bridge/) ---
@@ -20,6 +35,11 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Django migrations are framework-generated artifacts: their long help_text
+# strings and operation tuples cannot satisfy the 100-col formatter without
+# fighting every regeneration (WP-1.2, MT-1.2-01). The migration gate itself
+# is `manage.py makemigrations --check --dry-run` (CI), not style linting.
+extend-exclude = ["**/migrations/"]
 
 [tool.ruff.lint]
 select = [
@@ -31,9 +51,29 @@ select = [
     "UP", # pyupgrade
 ]
 
-# --- mypy: type checker (kept identical in backend/ and bridge/) ---
+# Settings modules re-export the shared base with `from .base import *` — the
+# idiomatic Django settings pattern, exempted only inside that one package.
+[tool.ruff.lint.per-file-ignores]
+"apps/core/settings/*.py" = ["F403", "F405"]
+
+# --- mypy: type checker (tool pin shared with bridge/; Django plugins are backend-only) ---
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 exclude = ["\\.venv"]
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+
+# django-stubs plugin options (typeddjango/django-stubs): type-check settings
+# access strictly against the dev module, which imports with no environment.
+[tool.django-stubs]
+django_settings_module = "apps.core.settings.dev"
+
+# --- pytest (runner declared when the first test files landed — CONTRIBUTING.md) ---
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# pytest-django reads this before any conftest imports django (plugin
+# pytest_load_initial_conftests); the unit suite runs hermetic on SQLite —
+# see apps/core/settings/test.py for the Section 18 layering rationale.
+DJANGO_SETTINGS_MODULE = "apps.core.settings.test"

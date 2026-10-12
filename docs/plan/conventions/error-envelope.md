@@ -104,7 +104,12 @@ codes currently in use.
 
 When the backend lands (WP-1.1), the envelope becomes a reusable schema in the
 generated OpenAPI document — the single typed source for the web and mobile clients
-(NFR-11). Contract changes are guarded by schema diff in CI (Section 18 quality
+(NFR-11). The schema models the wire nesting exactly: an `ErrorEnvelope` component
+whose single required property `error` refs `ErrorEnvelopeBody` — the five fields
+above, `details` optional (the earlier flat top-level rendering was a contract bug;
+corrected and the snapshot regenerated at the Wave 2 end-of-wave gate — backend
+`apps/core/serializers.py::ErrorEnvelopeSerializer` is the source of truth).
+Contract changes are guarded by schema diff in CI (Section 18 quality
 gates; Section 20.4, item 4), so any drift from this document shows up as a reviewed
 schema diff, not a silent change.
 

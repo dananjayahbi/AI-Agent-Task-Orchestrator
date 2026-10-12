@@ -1,6 +1,7 @@
 # Flutter mobile client package (parent plan Section 6.6 / Section 14).
-# This is a tooling placeholder only: the real app skeleton (navigation, state
-# management, push, biometrics) is built in WP-5.5.
+# The app skeleton (navigation shell, state management, flavors, generated API
+# client) is built by WP-5.5; secure storage/biometrics (MT-5.5-04) add their
+# plugins in a later slice.
 name: orchestrator_mobile
 description: Mobile client for the AI Agent Task Orchestrator.
 publish_to: "none"
@@ -12,5 +13,25 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # State management — the single predictable pattern for the whole app
+  # (parent plan Section 6.6 "Riverpod for state"; WP-5.5 decision, see CHANGELOG).
+  flutter_riverpod: ^2.6.1
+  # Generated OpenAPI client runtime (MT-5.5-03: dart-dio, built_value
+  # serialization — versions satisfy the pinned generator's contract).
+  dio: ^5.7.0
+  built_value: ^8.9.0
+  built_collection: ^5.1.1
+  one_of: ">=1.5.0 <2.0.0"
+  one_of_serializer: ">=1.5.0 <2.0.0"
+
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   flutter_lints: ^6.0.0
+  # Regeneration tooling for tool/openapi_client.dart (MT-5.5-03).
+  crypto: ^3.0.3
+  build_runner: ^2.4.13
+  built_value_generator: ^8.9.0
+
+flutter:
+  uses-material-design: true

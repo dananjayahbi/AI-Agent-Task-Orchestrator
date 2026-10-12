@@ -187,6 +187,28 @@ Wave 1 ──> Wave 2 ──> Wave 3 ──> Wave 4 ──> Wave 5 ──> Wave 
 
 ---
 
+## 4a. Scheduling policy amendment (2026-10-12, owner-approved)
+
+**Dependency-based scheduling replaces strict wave gating (option 2).** The wave structure
+above remains the source of truth for *dependencies, grouping, sizing, and exit criteria*,
+but a WP (or an MT inside a WP whose own `Dependencies` row is satisfied) may start as soon
+as its actual dependencies are green — it does not wait for an entire previous wave's exit
+criteria. Rules:
+
+1. A micro-document may start only when its `Dependencies` row lists nothing outstanding;
+   blocked MTs are deferred and finished when their dependencies land (record the deferral
+   in the WP `CHANGELOG.md`).
+2. Each WP is owned by exactly one executing agent at a time; parallel agents must not
+   touch files owned by another agent's WP (hot shared contracts: `schemas/openapi.yaml`,
+   `docs/plan/conventions/configuration.md`, `infra/compose/.env.example`, migrations —
+   single-owner, re-read immediately before editing).
+3. Work is committed to `main` at WP boundaries (recovery point after agent failures);
+   tests still run at WP completion and wave exit as before.
+4. Wave exit criteria still gate the *wave summary* in §3; a wave is reported complete when
+   all its WPs are done regardless of when each started.
+
+---
+
 ## 5. Related documents
 
 * [`overview.md`](./overview.md) — full index of all 328 micro-documents with descriptions.

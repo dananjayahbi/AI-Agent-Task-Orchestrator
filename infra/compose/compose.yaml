@@ -7,8 +7,9 @@
 # differs per host is interpolated from the environment file — see
 # infra/compose/.env.example. Bring-up/tear-down: README.md in this folder.
 #
-# Placeholder images for `backend` and `web` are built from ./stubs (real images
-# arrive with WP-1.1 / WP-4.1; service names and health paths never change).
+# Placeholder image remains for `web` (real image arrives with WP-4.1);
+# `backend` is the real image from WP-1.1 / MT-1.1-05 — service names,
+# published ports and health paths never change.
 
 name: orchestrator
 
@@ -55,13 +56,13 @@ services:
 
   # --- migrate: one-shot, backend image, gated by its exit code ------------
   migrate:
-    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:dev}
     build:
-      context: ./stubs/backend
-    # One-shot migration runner. The exit code is this service's "health
-    # check" per Section 16.1; WP-1.1 swaps the stub command for real
-    # `manage.py migrate` without changing the service name.
-    command: ["python", "/opt/stub/stub.py", "migrate"]
+      context: ../../backend
+    # One-shot migration runner from the real backend image (MT-1.1-05). The
+    # exit code is this service's "health check" per Section 16.1; dependents
+    # wait on it through `service_completed_successfully`.
+    command: ["python", "manage.py", "migrate", "--noinput"]
     environment: &backend-env
       # Derived from ORCHESTRATOR_DATABASE_* by default; set
       # ORCHESTRATOR_DATABASE_URL in .env only to point at an external
@@ -71,8 +72,15 @@ services:
       ORCHESTRATOR_CACHE_URL: ${ORCHESTRATOR_CACHE_URL:-redis://redis:6379/0}
       ORCHESTRATOR_CACHE_BROKER_URL: ${ORCHESTRATOR_CACHE_BROKER_URL:-redis://redis:6379/0}
       ORCHESTRATOR_SECRET_KEY: ${ORCHESTRATOR_SECRET_KEY:-change-me}
-      ORCHESTRATOR_DEBUG: ${ORCHESTRATOR_DEBUG:-true}
-      ORCHESTRATOR_ALLOWED_HOSTS: ${ORCHESTRATOR_ALLOWED_HOSTS:-localhost}
+      # Prod-posture default (the dev overlay flips backend to "true"; dev.py
+      # itself defaults DEBUG on when the overlay selects it) — the base render
+      # must never ship debug-on by accident (MT-1.1-05 risk note).
+      ORCHESTRATOR_DEBUG: ${ORCHESTRATOR_DEBUG:-false}
+      ORCHESTRATOR_LOG_LEVEL: ${ORCHESTRATOR_LOG_LEVEL:-INFO}
+      # Loopback stays in the fallback: the container's own /health/ready
+      # probe requests 127.0.0.1 and Django validates the Host header.
+      # prod.py still refuses a loopback-ONLY list (real hostnames required).
+      ORCHESTRATOR_ALLOWED_HOSTS: ${ORCHESTRATOR_ALLOWED_HOSTS:-localhost,127.0.0.1}
       ORCHESTRATOR_STORAGE_MEDIA_ROOT: ${ORCHESTRATOR_STORAGE_MEDIA_ROOT:-/media}
     networks: [internal]
     depends_on:
@@ -83,9 +91,9 @@ services:
 
   # --- backend: ASGI server, LAN-published API port, media volume ----------
   backend:
-    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:dev}
     build:
-      context: ./stubs/backend
+      context: ../../backend
     environment: *backend-env
     ports:
       # LAN-interface-only binding (Section 16.1); the bind address comes from
@@ -95,8 +103,19 @@ services:
     volumes:
       - backend_media:/media
     networks: [internal]
-    healthcheck: # Section 16.1: /health/ready (real endpoint in WP-1.1; path stays)
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/health/ready || exit 1"]
+    healthcheck: # Section 16.1: GET /health/ready (real endpoint since MT-1.1-03; path stays)
+      # python slim ships no wget/curl — probe with stdlib urllib instead.
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          try:
+              response = urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=2)
+              sys.exit(0 if response.status == 200 else 1)
+          except Exception:
+              sys.exit(1)
       interval: 5s
       timeout: 3s
       retries: 10
@@ -112,16 +131,24 @@ services:
 
   # --- worker: backend image, Celery worker role, media volume -------------
   worker:
-    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:dev}
     build:
-      context: ./stubs/backend
-    command: ["python", "/opt/stub/stub.py", "worker"]
+      context: ../../backend
+    # Placeholder idle loop until WP-1.7 swaps in `celery worker` (MT-1.1-05:
+    # worker/beat behaviour is out of scope — only the shared image wiring).
+    command:
+      - python
+      - -c
+      - |
+        import time
+        while True:
+            time.sleep(60)
     environment: *backend-env
     volumes:
       - backend_media:/media
     networks: [internal]
-    healthcheck: # Section 16.1: worker ping (stub answers :8001/ping; WP-1.7 swaps in `celery inspect ping`)
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8001/ping || exit 1"]
+    healthcheck: # Section 16.1: worker liveness (WP-1.7 swaps in `celery inspect ping`)
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -134,14 +161,21 @@ services:
 
   # --- beat: backend image, Celery beat role, no volumes -------------------
   beat:
-    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:stub}
+    image: ${ORCHESTRATOR_IMAGE_BACKEND:-orchestrator-backend:dev}
     build:
-      context: ./stubs/backend
-    command: ["python", "/opt/stub/stub.py", "beat"]
+      context: ../../backend
+    # Placeholder idle loop until WP-1.7 swaps in `celery beat`.
+    command:
+      - python
+      - -c
+      - |
+        import time
+        while True:
+            time.sleep(60)
     environment: *backend-env
     networks: [internal]
-    healthcheck: # Section 16.1: process check (the beat loop is PID 1's task)
-      test: ["CMD-SHELL", "ps | grep -q '[s]tub.py beat'"]
+    healthcheck: # Section 16.1: process check (WP-1.7: beat schedule runner)
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -170,15 +204,40 @@ services:
         condition: service_healthy
 
   # --- cloudflared: official image, no ports, outbound-only tunnel ----------
+  # WP-5.1 (MT-5.1-01): the M0 tokenless quick-tunnel placeholder is replaced
+  # by the named tunnel started from the environment-provided token
+  # (Section 15.4 — the tunnel token is a secret in the environment; real value
+  # lives only in the git-ignored .env, never in Git). Pinned official image
+  # (prod rule; ORCHESTRATOR_IMAGE_CLOUDFLARED in .env.example documents the
+  # upgrade path). Zero published ports, internal network only (FR-NET-01,
+  # GOAL-4). Fail-fast (Section 16.2): with a missing or invalid token
+  # cloudflared exits non-zero at startup, so a prod `up --wait` can never go
+  # green without ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN.
+  #
+  # Profiles: [prod, tunnel] — deliberate (MT-5.1-01 scope):
+  #   * `--profile prod`  -> included; the Section 16.1 eight render as before,
+  #     and the token fail-fast above applies.
+  #   * `--profile dev`   -> NOT started: the documented dev behavior is to run
+  #     the stack without the tunnel (Section 16.2 fail-fast posture).
+  #   * `--profile dev --profile tunnel` -> tunnel opted into dev explicitly.
   cloudflared:
     image: ${ORCHESTRATOR_IMAGE_CLOUDFLARED:-cloudflare/cloudflared:2026.10.0}
-    # M0 placeholder: a tokenless quick tunnel (WP-5.1 replaces this with the
-    # named-tunnel command and ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN
-    # configuration).
+    profiles: [prod, tunnel]
+    # Global flags before the `tunnel` subcommand (MT-0.2-04 lesson); the
+    # config file is the canonical ingress ruleset (MT-5.1-02) mounted below —
+    # under a token run cloudflared takes its routes from the edge and uses
+    # this file as the validated/mirrored source of truth (infra/cloudflare/README.md).
     # Fixed metrics port so the `tunnel ready` health probe can find it.
-    command: ["--metrics", "0.0.0.0:20240", "tunnel", "--url", "http://web:3000"]
+    command: ["--metrics", "0.0.0.0:20240", "--no-autoupdate", "--config", "/etc/cloudflared/config.yaml", "tunnel", "run"]
     environment:
-      ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN: ${ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN:-}
+      # configuration.md rule 7: canonical name stays in the template; the
+      # container receives cloudflared's image-mandated TUNNEL_TOKEN.
+      # Empty default = template placeholder (fail-fast per the note above).
+      TUNNEL_TOKEN: ${ORCHESTRATOR_CLOUDFLARE_TUNNEL_TOKEN:-}
+    volumes:
+      # Canonical ingress rules (MT-5.1-02): internal service names only, no
+      # published ports referenced; read-only.
+      - ../cloudflare/ingress.yaml:/etc/cloudflared/config.yaml:ro
     networks: [internal]
     healthcheck: # Section 16.1: tunnel status (cloudflared's own readiness probe; distroless = exec form only)
       test: ["CMD", "cloudflared", "--metrics", "0.0.0.0:20240", "tunnel", "ready"]

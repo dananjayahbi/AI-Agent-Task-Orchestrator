@@ -67,6 +67,12 @@ with it (tests green, contracts updated, canonical error codes, events emitted, 
 All micro-documents are grouped into **10 one-directional waves** in [`roadmap.md`](./roadmap.md).
 A wave may only depend on earlier waves — never the reverse.
 
+**Scheduling amendment (2026-10-12, owner-approved):** execution uses **dependency-based
+scheduling** — a WP/MT starts as soon as its own `Dependencies` row is satisfied, without
+waiting for the previous wave's exit criteria (see `roadmap.md` Section 4a for the full
+rules: MT-level dependency checks, single-owner files, commits at WP boundaries, tests at WP
+completion and wave exit). The wave grouping, sizing, and exit criteria remain unchanged.
+
 ---
 
 ## 2. Micro-Document Index

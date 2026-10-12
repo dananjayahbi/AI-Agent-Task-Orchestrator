@@ -92,6 +92,41 @@ in `backend/pyproject.toml` and `bridge/pyproject.toml`. Python **3.12** is pinn
 | Format | `uv run --directory backend ruff format .` |
 | Format check (used by hooks/CI) | `uv run --directory backend ruff format --check .` |
 | Type check | `uv run --directory backend mypy .` |
+| Django system check | `uv run --directory backend python manage.py check` |
+| Migration drift check | `uv run --directory backend python manage.py makemigrations --check --dry-run` |
+| Regenerate OpenAPI snapshot | `uv run --directory backend python manage.py spectacular --file ../schemas/openapi.yaml` |
+
+**OpenAPI snapshot** (WP-1.1, MT-1.1-04): `schemas/openapi.yaml` is generated —
+never hand-edited. Any change to routes, serializers or `SPECTACULAR_SETTINGS`
+must be followed by the regen command above; CI regenerates the document and
+fails on drift against the committed snapshot (Section 18 contract gate). The
+document is served by the backend at `/api/v1/schema` (Swagger UI at
+`/api/v1/schema/swagger-ui`) — the path is fixed and recorded in the WP-1.1
+changelog because clients hardcode or discover it.
+
+**Settings layout** (WP-1.1, MT-1.1-01 decision — one module per environment, no
+second mechanism): `backend/apps/core/settings/` holds `base.py` (every shared
+setting, read from its canonical `ORCHESTRATOR_*` name with a documented default
+per parent plan 9.10 and [configuration.md](docs/plan/conventions/configuration.md)),
+plus `dev.py` and `prod.py` which import the base and differ only in validation
+strictness — `prod.py` implements the Section 16.2 fail-fast refusal of weak or
+missing required values. The module is selected exactly once, through Django's own
+`DJANGO_SETTINGS_MODULE`:
+
+| Run context | Selected module | Why |
+|---|---|---|
+| Host (`manage.py`, Uvicorn, pytest, CI) | `apps.core.settings.dev` — the default set in `manage.py` and `config/asgi.py` | a fresh clone boots with no secrets committed (plan 20.4 item 3) |
+| Container image (any Compose render) | `apps.core.settings.prod` — the image `ENV`; the compose dev overlay overrides it to `...dev` | the prod render enforces Section 16.2; the dev render stays one-command startable |
+
+Run commands (parent plan Section 6.6 — ASGI via Uvicorn):
+
+| Concern | Command (from the repository root) |
+|---|---|
+| Run dev server (ASGI) | `uv run --directory backend python -m uvicorn config.asgi:application --host 127.0.0.1 --port 8000 --reload --no-access-log` |
+
+(`--no-access-log` is deliberate: request lines are emitted as structured JSON by
+the backend's own request logging — MT-1.1-02 — so Uvicorn's plain-text access log
+never duplicates or replaces them.)
 
 ### Bridge (Python)
 
@@ -222,7 +257,7 @@ tooling tables above — the CI jobs copy it verbatim:
 | Unit — bridge | `uv run --directory bridge pytest` | CI skips explicitly while no `test_*.py` exists under `bridge/` |
 | Unit — web | `npm --prefix web run test` | CI skips explicitly while no `web/**/*.test.*` or `web/**/*.spec.*` file exists (script + runner arrive with WP-4.11) |
 | Unit — mobile | `flutter test` (run from `mobile/`) | CI skips explicitly while no `mobile/test/*_test.dart` exists |
-| Integration — backend | `uv run --directory backend pytest backend/tests/integration` | CI skips explicitly while no `test_*.py` exists under `backend/tests/integration/` |
+| Integration — backend | `uv run --directory backend pytest tests/integration --ds apps.core.settings.dev` | CI skips explicitly while no `test_*.py` exists under `backend/tests/integration/`; the path is relative to `--directory`'s cwd and `--ds` selects the Postgres/Redis settings module (without it the unit SQLite settings skip the layer — MT-1.4-02) |
 | Integration — bridge | `uv run --directory bridge pytest bridge/tests/integration` | same, for `bridge/tests/integration/` |
 
 - **Allow-empty is explicit, never silent:** the `unit-tests` / `integration-tests`

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orchestrator.local/schemas/manifest.v1.json",
+  "title": "Orchestrator project manifest (orchestrator.json)",
+  "description": "Wire contract for the downloadable project manifest — parent plan Section 10.3, reproduced key-for-key (FR-PRJ-03). Required keys are exactly the plan's; `$schema` and `agent_hints` are the optional extended keys the example carries. `additionalProperties: false` is the FR-SEC-04 guarantee: a rendered manifest can contain nothing beyond this allowlist, so no secret material fits. Published file: `schemas/manifest.v1.json` (repository-local; the `$id`/`$schema` URL host is the plan example's placeholder — recorded in the WP-1.3 changelog for WP-2.2 to confirm).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project_id",
+    "project_name",
+    "orchestrator_api",
+    "default_branch",
+    "auto_branch_prefix",
+    "audit_required_default"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Location of this schema (Section 10.3 example value; optional key)."
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Manifest schema generation — 1 (Section 10.3)."
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^PID[0-9]{5}$",
+      "description": "Canonical project identifier (Section 7.3)."
+    },
+    "project_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Project display name (Section 7.2)."
+    },
+    "orchestrator_api": {
+      "type": "string",
+      "minLength": 1,
+      "description": "API base URL the bridge calls (Section 9.10 configuration — ORCHESTRATOR_API_BASE_URL; never baked into code, NFR-06)."
+    },
+    "default_branch": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Project default branch (Section 7.2)."
+    },
+    "auto_branch_prefix": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical branch prefix with {PID} resolved (G-09; Section 7.2 policy branch_prefix)."
+    },
+    "audit_required_default": {
+      "type": "boolean",
+      "description": "Default audit_required for new tasks (Section 7.2 policy)."
+    },
+    "agent_hints": {
+      "type": "object",
+      "description": "All hint keys optional (Section 10.3).",
+      "additionalProperties": false,
+      "properties": {
+        "test_command_default": {
+          "type": "string",
+          "description": "Fallback test-command hint (Section 10.3 example: `see task`)."
+        },
+        "worktree_mode": {
+          "type": "boolean",
+          "description": "Whether per-task worktrees are advised (Section 10.3 example: false; ADR-013)."
+        }
+      }
+    }
+  }
+}

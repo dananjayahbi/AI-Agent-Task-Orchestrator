@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- prod flavor display name — installs beside dev (MT-5.5-02). -->
+<resources>
+    <string name="app_name">Orchestrator</string>
+</resources>

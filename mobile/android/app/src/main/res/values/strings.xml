@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fallback display name for builds without a flavor. Each flavor overrides
+     it: src/dev/res (Orchestrator Dev) and src/prod/res (Orchestrator). -->
+<resources>
+    <string name="app_name">AI Agent Task Orchestrator</string>
+</resources>

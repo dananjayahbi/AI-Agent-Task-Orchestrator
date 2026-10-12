@@ -15,10 +15,43 @@ services:
   backend:
     volumes:
       # Hot-reload source mount: repo backend/ appears at /app. Harmless for
-      # the M0 stub (which runs from /opt/stub); the WP-1.1 image reads /app.
+      # the M0 stub (which runs from /opt/stub); the WP-1.1 image reads /app
+      # (its venv lives at /opt/venv, outside this mount).
       - ../../backend:/app
+    command:
+      # MT-1.1-05: the real reload command promised by this file's header —
+      # Uvicorn with hot reload over the bind mount (prod render keeps the
+      # image CMD without --reload).
+      - python
+      - -m
+      - uvicorn
+      - config.asgi:application
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --no-access-log
     environment:
       ORCHESTRATOR_DEBUG: "true" # debug on in dev; the base/prod render is "false"
+      # The dev render selects the dev settings module for every backend-image
+      # service (the image default is prod — Section 16.2 fail-fast would
+      # otherwise refuse the placeholder secrets on migrate/worker/beat too).
+      DJANGO_SETTINGS_MODULE: apps.core.settings.dev
+
+  # One-shot migrate runs the same backend image: same dev settings override.
+  migrate:
+    environment:
+      DJANGO_SETTINGS_MODULE: apps.core.settings.dev
+
+  # Placeholder idle loops until WP-1.7 — settings override for coherence.
+  worker:
+    environment:
+      DJANGO_SETTINGS_MODULE: apps.core.settings.dev
+
+  beat:
+    environment:
+      DJANGO_SETTINGS_MODULE: apps.core.settings.dev
 
   web:
     volumes:
