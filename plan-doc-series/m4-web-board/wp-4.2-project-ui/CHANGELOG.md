@@ -184,3 +184,4 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   contributes 35 across `tests/projects/`), `npm --prefix web run build`
   (all routes + `ƒ Proxy`). Nothing was committed (no `git add`/`git
   commit` by this WP); no secrets or environment-specific paths committed.
+- Paused at MT-4.2-04, remaining: none (all 5 MTs done; final gates green; no mid-edit file open).
