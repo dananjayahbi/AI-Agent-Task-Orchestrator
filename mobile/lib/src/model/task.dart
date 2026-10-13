@@ -6,12 +6,13 @@
 import 'package:orchestrator_mobile/src/model/priority_enum.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:orchestrator_mobile/src/model/state_enum.dart';
+import 'package:orchestrator_mobile/src/model/attachment.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
 part 'task.g.dart';
 
-/// GET representation of a task — Section 7.2 fields, in plan order.
+/// GET representation of a task — Section 7.2 fields, in plan order.  One documented addition beyond the 7.2 table: ``attachments`` — the FR-ATT-03 descriptor list (MT-1.14-01; descriptors only, content stays lazy behind the Section 9.2 content endpoint).
 ///
 /// Properties:
 /// * [id] - {PID}-T{index} (Section 7.3); server-assigned, immutable.
@@ -31,6 +32,7 @@ part 'task.g.dart';
 /// * [leaseExpiresAt]
 /// * [lastCheckpointAt]
 /// * [failureRetryCount]
+/// * [auditRetryCount] - WP-3.3 / Section 8.2 T12: audit leases released by expiry (kept separate from failure_retry_count — Section 8.3 invariant 1).
 /// * [attemptNumber]
 /// * [auditRequired] - Copied from the project policy at creation (Section 7.2).
 /// * [reviewReason] - Section 8.4 enum | null.
@@ -41,6 +43,7 @@ part 'task.g.dart';
 /// * [createdAt]
 /// * [updatedAt]
 /// * [dependsOn] - Section 7.1 N:N relation (FR-TSK-07): the task ids this task waits on, ordered by id. Server-managed — written through the `depends_on` field of POST/PATCH (replace-the-set), read here.
+/// * [attachments] - FR-ATT-03 attachment descriptors — one per live attachment: `id`, `filename`, `size`, `token_count`, `short_description` (the MT-1.11-04 field set, one shape with the listing endpoints). Descriptors only — attachment content and derived text are never embedded; they are fetched on demand from GET /attachments/{id}/content (FR-ATT-03's lazy model, FR-ATT-04). `token_count` and `short_description` are null before `ready` and after OCR-only degradation. Newest first. Every response that returns a task object carries them (MT-1.14-01's recorded reading).
 @BuiltValue()
 abstract class Task implements Built<Task, TaskBuilder> {
   /// {PID}-T{index} (Section 7.3); server-assigned, immutable.
@@ -105,6 +108,10 @@ abstract class Task implements Built<Task, TaskBuilder> {
   @BuiltValueField(wireName: r'failure_retry_count')
   int get failureRetryCount;
 
+  /// WP-3.3 / Section 8.2 T12: audit leases released by expiry (kept separate from failure_retry_count — Section 8.3 invariant 1).
+  @BuiltValueField(wireName: r'audit_retry_count')
+  int get auditRetryCount;
+
   @BuiltValueField(wireName: r'attempt_number')
   int get attemptNumber;
 
@@ -139,6 +146,10 @@ abstract class Task implements Built<Task, TaskBuilder> {
   /// Section 7.1 N:N relation (FR-TSK-07): the task ids this task waits on, ordered by id. Server-managed — written through the `depends_on` field of POST/PATCH (replace-the-set), read here.
   @BuiltValueField(wireName: r'depends_on')
   BuiltList<String> get dependsOn;
+
+  /// FR-ATT-03 attachment descriptors — one per live attachment: `id`, `filename`, `size`, `token_count`, `short_description` (the MT-1.11-04 field set, one shape with the listing endpoints). Descriptors only — attachment content and derived text are never embedded; they are fetched on demand from GET /attachments/{id}/content (FR-ATT-03's lazy model, FR-ATT-04). `token_count` and `short_description` are null before `ready` and after OCR-only degradation. Newest first. Every response that returns a task object carries them (MT-1.14-01's recorded reading).
+  @BuiltValueField(wireName: r'attachments')
+  BuiltList<Attachment> get attachments;
 
   Task._();
 
@@ -260,6 +271,11 @@ class _$TaskSerializer implements PrimitiveSerializer<Task> {
       object.failureRetryCount,
       specifiedType: const FullType(int),
     );
+    yield r'audit_retry_count';
+    yield serializers.serialize(
+      object.auditRetryCount,
+      specifiedType: const FullType(int),
+    );
     yield r'attempt_number';
     yield serializers.serialize(
       object.attemptNumber,
@@ -315,6 +331,11 @@ class _$TaskSerializer implements PrimitiveSerializer<Task> {
     yield serializers.serialize(
       object.dependsOn,
       specifiedType: const FullType(BuiltList, [FullType(String)]),
+    );
+    yield r'attachments';
+    yield serializers.serialize(
+      object.attachments,
+      specifiedType: const FullType(BuiltList, [FullType(Attachment)]),
     );
   }
 
@@ -466,6 +487,13 @@ class _$TaskSerializer implements PrimitiveSerializer<Task> {
           ) as int;
           result.failureRetryCount = valueDes;
           break;
+        case r'audit_retry_count':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.auditRetryCount = valueDes;
+          break;
         case r'attempt_number':
           final valueDes = serializers.deserialize(
             value,
@@ -538,6 +566,13 @@ class _$TaskSerializer implements PrimitiveSerializer<Task> {
             specifiedType: const FullType(BuiltList, [FullType(String)]),
           ) as BuiltList<String>;
           result.dependsOn.replace(valueDes);
+          break;
+        case r'attachments':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(Attachment)]),
+          ) as BuiltList<Attachment>;
+          result.attachments.replace(valueDes);
           break;
         default:
           unhandled.add(key);

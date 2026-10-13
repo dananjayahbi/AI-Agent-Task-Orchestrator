@@ -207,6 +207,15 @@ class Task(models.Model):
         default=0,
         help_text="Canonical name for the spec's retry_count (Section 7.2).",
     )
+    audit_retry_count = models.PositiveIntegerField(
+        default=0,
+        help_text="WP-3.3 (Section 8.2 T12): audit leases released by expiry "
+        "increment this counter — the audit-side twin of failure_retry_count, "
+        "kept separate so an audit retry never consumes the coder retry budget "
+        "(Section 8.3 invariant 1). Section 7.2 prints no such column; "
+        "MT-3.3-03 requires T12 to increment one (recorded in the WP "
+        "changelog as the plan's missing-field gap fill).",
+    )
     attempt_number = models.PositiveIntegerField(
         default=0,
         help_text="Increments on each new coder claim (Section 7.2; WP-1.6).",
@@ -284,6 +293,10 @@ class Task(models.Model):
             models.CheckConstraint(
                 condition=models.Q(failure_retry_count__gte=0),
                 name="task_failure_retry_count_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(audit_retry_count__gte=0),
+                name="task_audit_retry_count_non_negative",
             ),
             models.CheckConstraint(
                 condition=models.Q(attempt_number__gte=0),

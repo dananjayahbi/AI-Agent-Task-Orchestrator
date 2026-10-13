@@ -41,6 +41,7 @@ Task makeTask({
         ..workerAgentId = workerAgentId
         ..attemptNumber = attemptNumber
         ..failureRetryCount = 0
+        ..auditRetryCount = 0
         ..auditRequired = false
         ..latestFeedback = ''
         ..mergeStatus = mergeStatus

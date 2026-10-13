@@ -234,8 +234,13 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
         "WP-3.2",
         True,
     ),
-    # --- Audit row (Auditor / Owner): WP-1.6
-    _Route("/api/v1/tasks/1/audit-verdict", AgentEndpointThrottle, "WP-1.6", False),
+    # --- Audit row (Auditor / Owner): landed with WP-3.3 -----------------
+    # The verdict POST carries the throttle on the view class
+    # (FR-SEC-05); the reports GET shares the class the WP-1.8/WP-1.11/
+    # WP-3.2 recorded pattern for Agent/Owner rows (the owner GET rides
+    # the same class budget — recorded in the WP-3.3 changelog).
+    _Route("/api/v1/tasks/1/audit-verdict", AgentEndpointThrottle, "WP-3.3", True),
+    _Route("/api/v1/tasks/1/audit-reports", AgentEndpointThrottle, "WP-3.3", True),
     # --- Merge queue row (Merge Executor): WP-3.x
     _Route("/api/v1/merge/pending", AgentEndpointThrottle, "WP-3.x", False),
     _Route("/api/v1/merge/1/start", AgentEndpointThrottle, "WP-3.x", False),

@@ -2,10 +2,13 @@
 
 * ``ClaimRequest`` — the Section 10.5 ``claim_task`` tool inputs that
   map onto the API: the session id (G-18; the bridge's
-  ``agent_session_id``) and the human-readable worker label
-  (``agent_identifier`` — G-18: a label only). The role is *not* a body
-  field: the token's scopes decide who may claim what (Section 12.2),
-  and T4 is coder-only in this WP (T11 auditor claims are WP-3.3).
+  ``agent_session_id``), the human-readable worker label
+  (``agent_identifier`` — G-18: a label only) and, since WP-3.3
+  (MT-3.3-01), the Section 10.5 ``role`` input (coder default,
+  auditor). The role is *request intent*, never trust: the token's
+  scopes answer first (Section 12.2) and the claim service validates
+  the declared role against the row's state inside the lock (mismatch →
+  ``ROLE_NOT_PERMITTED``).
 * ``ReleaseRequest`` — the fencing pair (``session_id`` +
   ``lease_generation``, ADR-012's carrier on agent mutations), an
   optional free-text ``reason`` (Section 10.5 ``release_task`` input →
@@ -33,7 +36,7 @@ from apps.tasks.serializers import TaskSerializer
 
 
 class ClaimRequestSerializer(StrictSerializerMixin, serializers.Serializer[Any]):
-    """``POST /tasks/{id}/claim`` input (Section 10.5 claim_task minus role)."""
+    """``POST /tasks/{id}/claim`` input (Section 10.5 claim_task)."""
 
     session_id = serializers.CharField(
         max_length=255,
@@ -43,6 +46,16 @@ class ClaimRequestSerializer(StrictSerializerMixin, serializers.Serializer[Any])
         max_length=255,
         help_text="Human-readable worker label (Section 7.2 worker_agent_id; "
         "self-declared and spoofable — a label only, G-18).",
+    )
+    role = serializers.ChoiceField(
+        choices=("coder", "auditor"),
+        required=False,
+        default="coder",
+        help_text="Section 10.5 claim_task role input (coder default, "
+        "auditor). Request intent only: the token's scopes gate first "
+        "(Section 12.2) and the state decides inside the lock — coder "
+        "claims only `pending` (T4), auditor only `to_be_audited` (T11) "
+        "— a mismatch answers ROLE_NOT_PERMITTED (MT-3.3-01).",
     )
 
 
@@ -148,7 +161,8 @@ class WorkQuerySerializer(serializers.Serializer[Any]):
         required=False,
         default="coder",
         help_text="Which offer list to read: coder → pending (default); "
-        "auditor → to_be_audited (the audit claim itself is WP-3.3's T11).",
+        "auditor → to_be_audited (T11's audit claim takes it — "
+        "MT-3.3-01).",
     )
     priority = serializers.ChoiceField(
         choices=TaskPriority.choices,

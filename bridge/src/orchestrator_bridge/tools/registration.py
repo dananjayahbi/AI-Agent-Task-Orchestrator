@@ -1,4 +1,5 @@
-"""Register the five core tools on the MCP server (Sections 10.5, 18; MT-2.4-01).
+"""Register the Section 10.5 tools on the MCP server (Sections 10.5, 18;
+MT-2.4-01, MT-2.6-01/04).
 
 The bridge publishes its **own deterministic schemas** (``schemas.py``) on the
 wire, not the MCP SDK's signature-derived ones. Two SDK seams make that exact
@@ -28,7 +29,7 @@ from mcp.server.mcpserver.tools import Tool
 
 from ..api_errors import ApiError
 from ..error_translation import translate_error
-from . import available_tasks, claim, context, release, task_details
+from . import available_tasks, checkpoint, claim, context, release, submit, task_details
 from .errors import ToolFailure, payload_text
 from .runtime import ToolRuntime
 from .schemas import TOOL_SPECS, ToolSpec
@@ -36,11 +37,14 @@ from .validation import validate_tool_input
 
 __all__ = ["BridgeTool", "build_tools"]
 
-#: One handler factory per tool — the registry of MT-2.4-01's wiring layer.
+#: One handler factory per tool — the registry of MT-2.4-01's wiring layer
+#: (WP-2.6 appends the checkpoint/submission pair).
 _HANDLER_FACTORIES = {
     "get_available_tasks": available_tasks.make_handler,
     "get_task_details": task_details.make_handler,
     "claim_task": claim.make_handler,
+    "log_task_checkpoint": checkpoint.make_handler,
+    "submit_task_resolution": submit.make_handler,
     "release_task": release.make_handler,
     "get_project_context": context.make_handler,
 }
@@ -93,7 +97,7 @@ class BridgeTool(Tool):
 
 
 def build_tools(runtime: ToolRuntime) -> list[Tool]:
-    """Instantiate the five core tools against *runtime* (MT-2.4-01 catalog)."""
+    """Instantiate every registered tool against *runtime* (Section 10.5 catalog)."""
     tools: list[Tool] = []
     for spec in TOOL_SPECS:
         factory = _HANDLER_FACTORIES[spec.name]

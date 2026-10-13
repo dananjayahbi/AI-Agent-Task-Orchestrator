@@ -11,11 +11,14 @@ class _$ClaimRequest extends ClaimRequest {
   final String sessionId;
   @override
   final String workerAgentId;
+  @override
+  final RoleEnum? role;
 
   factory _$ClaimRequest([void Function(ClaimRequestBuilder)? updates]) =>
       (ClaimRequestBuilder()..update(updates))._build();
 
-  _$ClaimRequest._({required this.sessionId, required this.workerAgentId})
+  _$ClaimRequest._(
+      {required this.sessionId, required this.workerAgentId, this.role})
       : super._();
   @override
   ClaimRequest rebuild(void Function(ClaimRequestBuilder) updates) =>
@@ -29,7 +32,8 @@ class _$ClaimRequest extends ClaimRequest {
     if (identical(other, this)) return true;
     return other is ClaimRequest &&
         sessionId == other.sessionId &&
-        workerAgentId == other.workerAgentId;
+        workerAgentId == other.workerAgentId &&
+        role == other.role;
   }
 
   @override
@@ -37,6 +41,7 @@ class _$ClaimRequest extends ClaimRequest {
     var _$hash = 0;
     _$hash = $jc(_$hash, sessionId.hashCode);
     _$hash = $jc(_$hash, workerAgentId.hashCode);
+    _$hash = $jc(_$hash, role.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -45,7 +50,8 @@ class _$ClaimRequest extends ClaimRequest {
   String toString() {
     return (newBuiltValueToStringHelper(r'ClaimRequest')
           ..add('sessionId', sessionId)
-          ..add('workerAgentId', workerAgentId))
+          ..add('workerAgentId', workerAgentId)
+          ..add('role', role))
         .toString();
   }
 }
@@ -63,6 +69,10 @@ class ClaimRequestBuilder
   set workerAgentId(String? workerAgentId) =>
       _$this._workerAgentId = workerAgentId;
 
+  RoleEnum? _role;
+  RoleEnum? get role => _$this._role;
+  set role(RoleEnum? role) => _$this._role = role;
+
   ClaimRequestBuilder() {
     ClaimRequest._defaults(this);
   }
@@ -72,6 +82,7 @@ class ClaimRequestBuilder
     if ($v != null) {
       _sessionId = $v.sessionId;
       _workerAgentId = $v.workerAgentId;
+      _role = $v.role;
       _$v = null;
     }
     return this;
@@ -97,6 +108,7 @@ class ClaimRequestBuilder
               sessionId, r'ClaimRequest', 'sessionId'),
           workerAgentId: BuiltValueNullFieldError.checkNotNull(
               workerAgentId, r'ClaimRequest', 'workerAgentId'),
+          role: role,
         );
     replace(_$result);
     return _$result;

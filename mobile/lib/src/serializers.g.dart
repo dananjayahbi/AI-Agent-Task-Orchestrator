@@ -14,8 +14,14 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(AgentTokenIssueRequest.serializer)
       ..add(AgentTokenIssueResponse.serializer)
       ..add(Attachment.serializer)
+      ..add(AttachmentContent.serializer)
       ..add(AttachmentDelete.serializer)
       ..add(AttachmentListEnvelope.serializer)
+      ..add(AuditDecision.serializer)
+      ..add(AuditReport.serializer)
+      ..add(AuditReportListEnvelope.serializer)
+      ..add(AuditVerdictRequest.serializer)
+      ..add(AuditVerdictResponse.serializer)
       ..add(CapabilityEnum.serializer)
       ..add(Checkpoint.serializer)
       ..add(CheckpointCreate.serializer)
@@ -50,6 +56,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(PatchedProjectUpdate.serializer)
       ..add(PatchedTaskUpdate.serializer)
       ..add(PlatformEnum.serializer)
+      ..add(PolicyDecisionEnum.serializer)
       ..add(PolicyPresetEnum.serializer)
       ..add(PriorityEnum.serializer)
       ..add(Project.serializer)
@@ -57,6 +64,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ProjectDashboardCard.serializer)
       ..add(ProjectListEnvelope.serializer)
       ..add(ProjectPolicy.serializer)
+      ..add(ProposedVerdictEnum.serializer)
       ..add(Refreshed.serializer)
       ..add(ReleaseRequest.serializer)
       ..add(Resolution.serializer)
@@ -66,6 +74,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ResolutionTaskState.serializer)
       ..add(ResolutionWriteResponse.serializer)
       ..add(Revoked.serializer)
+      ..add(RoleEnum.serializer)
       ..add(RulesBlock.serializer)
       ..add(StateCounts.serializer)
       ..add(StateEnum.serializer)
@@ -76,9 +85,22 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(TokenSummary.serializer)
       ..add(TransportEnum.serializer)
       ..add(UserSummary.serializer)
+      ..add(VerdictEnum.serializer)
+      ..add(VerdictTaskState.serializer)
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Attachment)]),
           () => ListBuilder<Attachment>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(AuditReport)]),
+          () => ListBuilder<AuditReport>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject)
+            ])
+          ]),
+          () => ListBuilder<BuiltMap<String, JsonObject?>>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Checkpoint)]),
           () => ListBuilder<Checkpoint>())
@@ -155,6 +177,9 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(Attachment)]),
+          () => ListBuilder<Attachment>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => ListBuilder<String>())

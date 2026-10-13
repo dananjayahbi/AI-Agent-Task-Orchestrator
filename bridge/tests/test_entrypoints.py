@@ -10,7 +10,8 @@ supplies a minimal temp manifest + token **and a stub backend** for the
 session open; a missing manifest still fails fast per MT-2.2-01 (asserted
 below), and a mismatched token aborts per MT-2.2-05 (``test_project_mismatch``).
 
-WP-2.4 note: with a bound session the server advertises the five core tools,
+WP-2.4 note: with a bound session the server advertises the registered tool
+catalog (the five core tools plus WP-2.6's checkpoint/submission pair),
 so the handshake test asserts the exact WP-2.4 tool set instead of the
 WP-2.1 empty one (the WP-2.1 contract is preserved for ``create_server``
 without a runtime — asserted above).
@@ -231,8 +232,11 @@ def test_stdio_run_emits_startup_and_shutdown_events(
     monkeypatch: pytest.MonkeyPatch,
     stub_manifest_env: dict[str, str],
     stub_http_backend: StubHttpBackend,
+    tmp_path: Path,
 ) -> None:
     stream = io.StringIO()
+    # WP-2.6: the startup spool sweep must never touch a real user profile.
+    monkeypatch.setenv("ORCHESTRATOR_SPOOL_DIR", str(tmp_path / "spool"))
     settings = _env_settings(stub_manifest_env)  # WP-2.2: bind + open before serving
     configure_logging(settings, stream=stream)
     fake = _FakeServer()
@@ -254,9 +258,10 @@ def test_stdio_run_emits_startup_and_shutdown_events(
 
 
 def test_stdio_run_respects_configured_log_level(
-    monkeypatch: pytest.MonkeyPatch, stub_manifest_env: dict[str, str]
+    monkeypatch: pytest.MonkeyPatch, stub_manifest_env: dict[str, str], tmp_path: Path
 ) -> None:
     stream = io.StringIO()
+    monkeypatch.setenv("ORCHESTRATOR_SPOOL_DIR", str(tmp_path / "spool"))
     env = {**stub_manifest_env, "ORCHESTRATOR_LOG_LEVEL": "ERROR"}
     settings = _env_settings(env)
     configure_logging(settings, stream=stream)
@@ -298,11 +303,11 @@ def test_stdio_run_fails_fast_without_manifest(
     assert captured.out == ""  # nothing can corrupt the JSON-RPC stream
 
 
-# --- WP-2.4 acceptance: stdio handshake lists the five core tools ----------------
+# --- WP-2.4 acceptance: stdio handshake lists the registered tools -------------
 
 
 def test_stdio_process_handshake_lists_core_tools(
-    stub_manifest_env: dict[str, str], stub_http_backend: StubHttpBackend
+    stub_manifest_env: dict[str, str], stub_http_backend: StubHttpBackend, tmp_path: Path
 ) -> None:
     """JSON-RPC handshake over a real stdio process — the inspector-equivalent proof.
 
@@ -310,11 +315,12 @@ def test_stdio_process_handshake_lists_core_tools(
     bridge's own diagnostics must appear as JSON lines on stderr only. Startup
     binds through a temp manifest + token **and the stub backend** (WP-2.2
     Section 10.3 steps 1–5 — the session opens before serving and ends on the
-    clean shutdown); the WP-2.4 contract is the exact core tool set on
+    clean shutdown); the contract is the exact registered tool set on
     ``tools/list``.
     """
     env = {key: value for key, value in os.environ.items() if not key.startswith("ORCHESTRATOR_")}
     env.update(stub_manifest_env)
+    env["ORCHESTRATOR_SPOOL_DIR"] = str(tmp_path / "spool")  # WP-2.6 hermetic sweep
     messages = "\n".join(
         [
             json.dumps(
@@ -403,7 +409,7 @@ def test_stdio_process_handshake_lists_core_tools(
 
     tools_response = next(message for message in rpc_messages if message.get("id") == 2)
     advertised = [tool["name"] for tool in tools_response["result"]["tools"]]
-    assert advertised == list(CORE_TOOL_NAMES)  # WP-2.4: the five core tools, no more
+    assert advertised == list(CORE_TOOL_NAMES)  # the registered catalog, no more
     # the advertised schemas are the MT-2.4-01 declared contracts, verbatim.
     by_name = {tool["name"]: tool for tool in tools_response["result"]["tools"]}
     for spec in TOOL_SPECS:
@@ -424,7 +430,7 @@ def test_stdio_process_handshake_lists_core_tools(
 
 
 def test_stdio_process_claim_response_carries_composed_rules(
-    stub_manifest_env: dict[str, str], stub_http_backend: StubHttpBackend
+    stub_manifest_env: dict[str, str], stub_http_backend: StubHttpBackend, tmp_path: Path
 ) -> None:
     """WP-2.7 inspector evidence: ``tools/call claim_task`` over the real wire.
 
@@ -462,6 +468,7 @@ def test_stdio_process_claim_response_carries_composed_rules(
     )
     env = {key: value for key, value in os.environ.items() if not key.startswith("ORCHESTRATOR_")}
     env.update(stub_manifest_env)
+    env["ORCHESTRATOR_SPOOL_DIR"] = str(tmp_path / "spool")  # WP-2.6 hermetic sweep
     messages = "\n".join(
         [
             json.dumps(

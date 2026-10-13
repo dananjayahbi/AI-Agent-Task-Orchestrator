@@ -64,10 +64,16 @@ export function installApi(routes: Route[]): { calls: RecordedCall[]; fetchMock:
     const url = new URL(request.url);
     let body: unknown;
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      try {
-        body = await request.clone().json();
-      } catch {
-        body = undefined;
+      // Only JSON bodies are parsed for assertions; multipart (upload)
+      // bodies would stall `clone().json()` in jsdom — route handlers
+      // can read `request` directly when they need the form.
+      const contentType = request.headers.get('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        try {
+          body = await request.clone().json();
+        } catch {
+          body = undefined;
+        }
       }
     }
     const info: RouteInfo = {
@@ -134,6 +140,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     lease_expires_at: null,
     last_checkpoint_at: null,
     failure_retry_count: 0,
+    audit_retry_count: 0,
     attempt_number: 0,
     audit_required: true,
     review_reason: null,
@@ -144,6 +151,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     created_at: '2026-10-01T09:00:00Z',
     updated_at: '2026-10-01T09:00:00Z',
     depends_on: [],
+    attachments: [],
     ...overrides,
   };
 }

@@ -17,6 +17,11 @@ It also owns the two pieces of *process-memory* state the tools need:
   successful claim so ``release_task`` can carry ``lease_generation``. Never
   persisted; a restarted bridge legitimately re-derives it from a new claim
   (the backend stays the authority — Section 19.3).
+* **submission spool** — the MT-2.6-05 durability seam :mod:`submit` writes
+  to before every upload (Section 10.10). The entrypoints bind the
+  user-level spool at startup; a runtime without one (bare unit tests)
+  rejects submissions with a structured wiring failure rather than risking
+  an undurable upload.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from dataclasses import dataclass, field
 
 from ..manifest import StartupBinding
 from ..session import AgentSession, ProjectContext, fetch_project_context
+from ..submission_spool import SubmissionSpool
 from ..transport import ApiClient
 
 __all__ = ["ToolRuntime"]
@@ -32,20 +38,28 @@ __all__ = ["ToolRuntime"]
 
 @dataclass(slots=True)
 class ToolRuntime:
-    """Bound session state for the five core tools (one per process)."""
+    """Bound session state for the core tools (one per process)."""
 
     binding: StartupBinding
     client: ApiClient
     session: AgentSession
     context: ProjectContext | None = field(default=None, repr=False)
+    spool: SubmissionSpool | None = field(default=None, repr=False)
     _lease_generations: dict[str, int] = field(default_factory=dict, repr=False)
 
     @classmethod
     def from_session(
-        cls, binding: StartupBinding, client: ApiClient, session: AgentSession
+        cls,
+        binding: StartupBinding,
+        client: ApiClient,
+        session: AgentSession,
+        *,
+        spool: SubmissionSpool | None = None,
     ) -> ToolRuntime:
         """Bind an opened session; the startup cache is already populated."""
-        return cls(binding=binding, client=client, session=session, context=session.context)
+        return cls(
+            binding=binding, client=client, session=session, context=session.context, spool=spool
+        )
 
     @property
     def project_id(self) -> str:

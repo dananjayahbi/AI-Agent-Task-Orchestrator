@@ -26,6 +26,7 @@ import {
   type BoardMoveController,
 } from '@/components/board/move-context';
 import { StreamStatusIndicator } from '@/components/board/stream-status';
+import { TaskFormModal } from '@/components/task/task-form-modal';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/errors/error-state';
 import { EmptyState } from '@/components/states/empty-state';
@@ -80,6 +81,11 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
   const [filters, setFilters] = useState<BoardFilters>(defaultFilters);
   const [drag, setDrag] = useState<BoardDragSession | null>(null);
   const [moveNotice, setMoveNotice] = useState<{ message: string; rejected: boolean } | null>(null);
+  // MT-4.5-01 entry points: "New task" (T1 create) and each card's Edit.
+  const [taskForm, setTaskForm] = useState<{ open: boolean; task: Task | null }>({
+    open: false,
+    task: null,
+  });
   const serverFilters = useMemo(() => serverFiltersOf(filters), [filters]);
 
   const tasksQuery = useBoardTasksQuery(pid, serverFilters);
@@ -148,7 +154,15 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
       <div data-testid="board" className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold text-foreground">Board — {pid}</h1>
-          <StreamStatusIndicator status={status} />
+          <div className="flex items-center gap-2">
+            <Button
+              data-testid="board-new-task"
+              onClick={() => setTaskForm({ open: true, task: null })}
+            >
+              New task
+            </Button>
+            <StreamStatusIndicator status={status} />
+          </div>
         </div>
 
         {/* Section 13.4: outcomes are announced as text (never color alone). */}
@@ -201,10 +215,23 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
                 percentFor={percentFor}
                 stalledAfterMinutes={stalledAfterMinutes}
                 nowMs={nowMs}
+                onEdit={(task) => setTaskForm({ open: true, task })}
               />
             ))}
           </div>
         )}
+
+        <TaskFormModal
+          pid={pid}
+          task={taskForm.task}
+          open={taskForm.open}
+          onOpenChange={(open) => setTaskForm((current) => ({ ...current, open }))}
+          onSaved={(created) =>
+            // Keep the current open state: closing mid-create must not
+            // re-open the modal, an open one switches to edit mode.
+            setTaskForm((current) => ({ open: current.open, task: created }))
+          }
+        />
       </div>
     </BoardMoveContext.Provider>
   );

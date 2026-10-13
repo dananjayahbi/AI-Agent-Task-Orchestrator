@@ -26,6 +26,8 @@ type BoardColumnProps = {
   percentFor: (task: Task) => number | null;
   stalledAfterMinutes: number;
   nowMs: number;
+  /** MT-4.5-01: opens the task modal in edit mode. */
+  onEdit?: ((task: Task) => void) | undefined;
 };
 
 export function BoardColumn({
@@ -34,6 +36,7 @@ export function BoardColumn({
   percentFor,
   stalledAfterMinutes,
   nowMs,
+  onEdit,
 }: BoardColumnProps) {
   const move = useBoardMove();
   const dragging = move?.drag ?? null;
@@ -115,6 +118,7 @@ export function BoardColumn({
               percent={percentFor(task)}
               stalledAfterMinutes={stalledAfterMinutes}
               nowMs={nowMs}
+              onEdit={onEdit}
             />
           )}
         />

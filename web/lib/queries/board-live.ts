@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { EventEnvelope, Task } from '@/lib/api/generated/types.gen';
 import { serverFiltersOf, type BoardFilters } from '@/lib/board/filters';
 import { applyEventToBoard, applyEventToProgress, mergeRefetchedTask } from '@/lib/board/patch';
+import { patchAttachmentCaches } from '@/lib/queries/attachments';
 import type { CheckpointProgressMap } from '@/lib/queries/checkpoint-progress';
 import { queryKeys } from '@/lib/queries/keys';
 import { fetchTaskRow } from '@/lib/queries/tasks';
@@ -66,6 +67,11 @@ export function useBoardLiveUpdates(
         return; // the server already filters; belt and braces (Section 9.6)
       }
       const server = serverFiltersOf(currentFilters);
+
+      // Attachment status (MT-4.5-05): `attachment.*` events patch every
+      // cached task-attachments list — the modal's per-file statuses move
+      // without a refetch (FR-ATT-07; no polling).
+      patchAttachmentCaches(queryClient, event);
 
       // Percent map first — maintained even before the task list loads.
       queryClient.setQueryData<CheckpointProgressMap>(

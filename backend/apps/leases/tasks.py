@@ -25,6 +25,7 @@ def sweep_expired_leases_task() -> dict[str, int]:
     return {
         "reclaimed": report.reclaimed,
         "escalated": report.escalated,
+        "audit_released": report.audit_released,
         "skipped": report.skipped,
     }
 

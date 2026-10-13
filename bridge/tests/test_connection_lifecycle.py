@@ -212,8 +212,13 @@ def test_connection_lifecycle_failed_handshake_leaves_no_state() -> None:
             message="reservation released after the failed handshake",
         )
         assert registry.size == 0
-        ends = [c for c in fake.calls if c.path.endswith("/end")]
-        assert ends, "the half-open backend session must be ended"
+        # The reservation drops before finalize() runs (app.py ordering), and
+        # finalize's best-effort backend /end is async relative to the
+        # response — wait for it the same way every other teardown test does.
+        wait_for(
+            lambda: any(call.path.endswith("/end") for call in fake.calls),
+            message="the half-open backend session must be ended",
+        )
         # capacity was never leaked: a real connection still binds
         client.connect()
         assert client.health().json()["connections"] == 1

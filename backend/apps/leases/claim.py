@@ -45,6 +45,7 @@ from django.db.models import Exists, OuterRef, QuerySet
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.exceptions import AuthForbiddenProject
+from apps.audit.transitions import ensure_audit_wired
 from apps.projects.models import Project
 from apps.tasks.exceptions import TaskNotFound
 from apps.tasks.models import Task, TaskDependency, TaskState
@@ -52,7 +53,7 @@ from apps.tasks.services.ids import ensure_valid_task_id
 from apps.tasks.services.tasks import task_list_queryset
 from apps.tasks.state_machine.dispatcher import dispatch_transition
 
-from .exceptions import TaskAlreadyClaimed
+from .exceptions import RoleNotAllowed, TaskAlreadyClaimed
 from .wiring import claim_extra, ensure_wired
 
 WorkRole = Literal["coder", "auditor"]
@@ -77,9 +78,9 @@ def eligible_work_queryset(
 ) -> QuerySet[Task]:
     """Offerable tasks for *role* (FR-PRJ-04, FR-TSK-07; non-locking read).
 
-    ``coder`` → ``pending``; ``auditor`` → ``to_be_audited`` (the audit
-    claim itself is WP-3.3's T11 — this list is the Section 9.2
-    ``GET /projects/{pid}/work`` read path). Archived rows are hidden
+    ``coder`` → ``pending``; ``auditor`` → ``to_be_audited`` (T11's
+    audit claim takes the matching half — this list is the Section 9.2
+    ``GET /projects/{pid}/work`` read path, MT-3.3-01). Archived rows are hidden
     (T19 default), dependencies must be completed (one ``EXISTS``
     negation — the same readiness semantics as
     ``services.dependencies.all_dependencies_completed``), and callers
@@ -104,8 +105,20 @@ def claim_task(
     session_id: str,
     worker_agent_id: str,
     caller_project_id: str | None,
+    role: WorkRole = "coder",
 ) -> Task:
     """Claim *task_id* per Section 9.3; return the claimed (locked) row.
+
+    ``role`` is the Section 10.5 ``claim_task`` input (coder default):
+    **request intent only** — it is validated against the row's state
+    inside the lock (Section 12.2: claim ``pending`` is coder-only, claim
+    ``to_be_audited`` is auditor-only), while the *token's scopes* answer
+    first at the permission gate (roles via token scopes; the parameter
+    is never trusted — MT-3.3-01 risk note). ``coder`` dispatches T4,
+    ``auditor`` dispatches T11 (whose guards carry the G-20 independence
+    rule and the audit-lease check); a role that mismatches the two
+    claimable states answers ``ROLE_NOT_PERMITTED``, any other
+    from-state answers the registry's ``TASK_STATE_CONFLICT``.
 
     Exactly one claimant can win: on Postgres the skip-locked lock makes
     every other concurrent caller either fast-fail on the follow-up read
@@ -116,6 +129,8 @@ def claim_task(
     """
     ensure_valid_task_id(task_id)
     _require_identity(session_id=session_id, worker_agent_id=worker_agent_id)
+    if role not in ("coder", "auditor"):
+        raise ValueError(f"role {role!r} must be 'coder' or 'auditor' (Section 10.5)")
     if caller_project_id is None:
         # Agent tokens always carry a project (WP-1.2); fail closed rather
         # than offer rows nobody proved they may see (ADR-004).
@@ -138,11 +153,18 @@ def claim_task(
             # Held — including expired-but-unswept: reclamation is T5's job
             # (Section 8.6), never a second claimant's.
             raise TaskAlreadyClaimed(task_id, holder=task.worker_agent_id)
-        # Every remaining from-state error (draft, to_be_audited, ...) is the
-        # registry's TASK_STATE_CONFLICT; the T4 guard re-validates the row.
+        # MT-3.3-01: the Section 12.2 claim cells, checked against the
+        # *declared* role before dispatch — the other role's claimable
+        # state is a role refusal (403); every remaining state falls to
+        # the registry's TASK_STATE_CONFLICT (the dispatch resolve).
+        claimable: dict[str, str] = {TaskState.PENDING: "coder", TaskState.TO_BE_AUDITED: "auditor"}
+        if task.state in claimable and claimable[task.state] != role:
+            raise RoleNotAllowed(task_id, role=role, state=task.state)
+        if role == "auditor":
+            ensure_audit_wired()  # T11's row (lazy wiring, MT-1.5-04 seam)
         return dispatch_transition(
             task_id=task.pk,
-            trigger="claim",
+            trigger="claim" if role == "coder" else "audit_claim",
             actor_type="agent",
             actor_ref=session_id,
             extra=claim_extra(

@@ -1,6 +1,6 @@
 """Leases-domain exceptions carrying Section 9.2 catalog codes (20.4 item 5).
 
-Four refusals the claim/release/extension services surface; each names a
+Five refusals the claim/release/extension services surface; each names a
 code that already exists in the closed 19-code catalog — this module
 never invents one. HTTP status decisions (recorded in the WP changelog,
 same practice as WP-1.4/WP-1.5):
@@ -30,6 +30,7 @@ from apps.core.errors import (
     CONCURRENCY_LIMIT_REACHED,
     LEASE_EXPIRED,
     LEASE_NOT_OWNED,
+    ROLE_NOT_PERMITTED,
     TASK_ALREADY_CLAIMED,
 )
 
@@ -91,3 +92,37 @@ class LeaseNotOwned(APIException):
         super().__init__(f"Task {task_id} lease not owned: {reason}.")
         self.task_id = task_id
         self.reason = reason
+
+
+class RoleNotAllowed(APIException):
+    """The caller's *declared role* may not act on this state (Section 12.2).
+
+    WP-3.3 (MT-3.3-01): ``POST /tasks/{id}/claim`` carries the Section
+    10.5 ``role`` input, and the Section 12.2 matrix is unambiguous —
+    claim ``pending`` is coder-only, claim ``to_be_audited`` is
+    auditor-only. A request whose ``role`` matches the *other* claimable
+    state is a **role** refusal (403 ``ROLE_NOT_PERMITTED``), distinct
+    from a state the role may claim from at all (the registry's 409
+    ``TASK_STATE_CONFLICT``). The token's scopes answer first (the
+    permission classes); this is the request-intent half behind them.
+    """
+
+    status_code = status.HTTP_403_FORBIDDEN
+    default_code = ROLE_NOT_PERMITTED
+    default_detail = "This role may not claim a task in that state."
+
+    def __init__(self, task_id: str, *, role: str, state: str) -> None:
+        """Name the role/state pair the matrix refused (no secrets).
+
+        The stored attribute is ``task_state`` (never spelled like the
+        Task column): the MT-1.5-06 direct-write scanner reads an
+        assignment to ``state`` as a Task state write, and this is an
+        exception field.
+        """
+        super().__init__(
+            f"Task {task_id} is {state}: the {role} role may not claim it "
+            "(Section 12.2 claim rows)."
+        )
+        self.task_id = task_id
+        self.role = role
+        self.task_state = state

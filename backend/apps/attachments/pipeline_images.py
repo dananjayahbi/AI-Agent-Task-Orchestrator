@@ -4,9 +4,11 @@ Order is the plan's: normalize resolution (**cap long edge, keep aspect
 ratio**), strip metadata (EXIF etc. — on the *derived* copy only; the
 stored original is never touched, Section 9.5), run the configured OCR
 engine (Section 9.10 / Section 6.6), then ask the description provider
-for the layout caption — whose v1 default is **disabled**
-(Section 22 OQ-07), so this stage completes OCR-only with no WP-1.13
-dependency.
+for the layout caption — through WP-1.13's cached provider seam
+(:func:`apps.attachments.caption.generate_caption`): the OQ-07 default
+provider is **disabled**, so the stage completes OCR-only out of the
+box, and the typed provider failure degrades to OCR-only (MT-1.13-05)
+instead of failing the stage.
 
 Recorded choices:
 
@@ -30,9 +32,10 @@ from typing import Final
 from django.conf import settings
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from .caption import generate_caption
 from .chunking import ExtractionResult
 from .derived import NORMALIZED_IMAGE_NAME, put_derived
-from .description import get_description_provider
+from .description import DescriptionProviderError
 from .errors import PermanentPipelineError, TransientPipelineError
 from .models import TaskAttachment
 from .ocr import get_ocr_engine
@@ -111,12 +114,18 @@ def process_image(attachment: TaskAttachment, data: bytes, *, deadline: float) -
 
     transcript = get_ocr_engine().recognize(normalized, mime_type="image/png")
 
-    # Section 9.5: failures degrade to OCR-only (never fail the stage);
-    # OQ-07's default provider returns "" without raising anyway.
+    # Section 9.5: failures degrade to OCR-only (never fail the stage).
+    # Only the *typed* provider failure degrades (MT-1.13-05): a
+    # programming error must surface instead of becoming an invisible
+    # "successful" run. The cache (MT-1.13-04) lives in generate_caption.
     try:
-        caption = get_description_provider().describe(image_png=normalized, ocr_text=transcript)
-    except Exception as exc:  # degradation is the contract (Section 9.5)
-        logger.warning("description provider failed: %s", type(exc).__name__)
+        caption = generate_caption(attachment, image_png=normalized, ocr_text=transcript)
+    except DescriptionProviderError as exc:
+        logger.warning(
+            "description provider failed; degrading to OCR-only (transient=%s, reason=%s)",
+            exc.transient,
+            exc.reason,
+        )
         caption = ""
 
     attachment.ocr_text = transcript

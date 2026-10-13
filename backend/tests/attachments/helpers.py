@@ -13,6 +13,7 @@ import zipfile
 from typing import Any
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from PIL import Image
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
@@ -52,6 +53,13 @@ def plain_zip_bytes() -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("readme.txt", "just a zip")
+    return buffer.getvalue()
+
+
+def png_bytes(width: int = 64, height: int = 64) -> bytes:
+    """A small, genuinely decodable PNG (WP-1.13 hermetic image fixture)."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), "white").save(buffer, format="PNG")
     return buffer.getvalue()
 
 
@@ -107,7 +115,58 @@ class StubOcrEngine:
         return self.text
 
 
+class RecordingDescriptionProvider:
+    """Hermetic :class:`apps.attachments.description.DescriptionProvider`.
+
+    Counts calls (generate-once assertions), returns a deterministic
+    caption, and can be armed to raise a typed failure — the WP-1.13
+    cache and degradation suites' subject without any network.
+    """
+
+    name = "recording"
+
+    def __init__(
+        self, caption: str = "A recorded layout caption.", fail_with: Exception | None = None
+    ):
+        self.caption = caption
+        self.fail_with = fail_with
+        self.calls: list[str] = []
+
+    def describe(self, *, attachment_id: str, image_png: bytes, ocr_text: str) -> str:
+        self.calls.append(attachment_id)
+        if self.fail_with is not None:
+            raise self.fail_with
+        return self.caption
+
+
 # --- rows and clients --------------------------------------------------------
+
+
+def process_ready(
+    task: Task,
+    data: bytes,
+    *,
+    name: str,
+    mime: str | None = None,
+    transcript: str = "stub transcript",
+) -> TaskAttachment:
+    """Upload through the real service path, then run the pipeline hermetically.
+
+    The WP-1.14 retrieval suites' fixture builder: the row lands
+    ``ready`` with real derived data (chunks, tokens, summary) under a
+    stubbed OCR engine — no broker, no Tesseract required.
+    """
+    from apps.attachments.ocr import set_ocr_engine
+    from apps.attachments.pipeline import run_pipeline
+
+    attachment = make_attachment(task, data, name=name, mime=mime)
+    set_ocr_engine(StubOcrEngine(transcript))
+    try:
+        outcome = run_pipeline(str(attachment.pk))
+    finally:
+        set_ocr_engine(None)
+    assert outcome == "ready", f"fixture pipeline for {name!r} landed {outcome!r}"
+    return TaskAttachment.objects.get(pk=attachment.pk)
 
 
 def make_project(*, pid: str = "PID00001") -> Project:

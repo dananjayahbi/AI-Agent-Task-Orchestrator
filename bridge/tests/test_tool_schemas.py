@@ -1,8 +1,10 @@
-"""MT-2.4-01 — deterministic schemas for the five core tools.
+"""MT-2.4-01 — deterministic schemas for the registered tools (WP-2.6 extends).
 
 Acceptance source: plan-doc-series/m2-mcp-bridge/wp-2.4-core-tools/
 MT-2.4-01-core-tool-schemas.md (parent plan Sections 10.3, 10.5, 18, 20.4,
-20.5; FR-MCP-03, NFR-11).
+20.5; FR-MCP-03, NFR-11), extended by WP-2.6/MT-2.6-01 and MT-2.6-04
+(``log_task_checkpoint`` and ``submit_task_resolution`` enter the catalog
+between ``claim_task`` and ``release_task`` — the Section 10.5 order).
 
 Pins the public contract against the Section 10.5 tool catalog table: exact
 names, no ``project_id`` anywhere, closed error vocabulary, strict validation
@@ -32,6 +34,13 @@ _VALID_FIXTURES: dict[str, dict[str, Any]] = {
     "get_available_tasks": {},
     "get_task_details": {"task_id": "PID00007-T004"},
     "claim_task": {"task_id": "PID00007-T004", "agent_identifier": "coder-1"},
+    "log_task_checkpoint": {"task_id": "PID00007-T004", "message": "halfway", "percentage": 50},
+    "submit_task_resolution": {
+        "task_id": "PID00007-T004",
+        "git_branch": "feat/PID00007-T004",
+        "commit_sha": "a" * 40,
+        "execution_summary": "Ran the tests; all green.",
+    },
     "release_task": {"task_id": "PID00007-T004", "reason": "scope expansion needed"},
     "get_project_context": {},
 }
@@ -44,11 +53,13 @@ def _spec(name: str) -> ToolSpec:
 # --- the catalog itself (Section 10.5 line by line) -----------------------------
 
 
-def test_exact_five_tools_in_plan_catalog_order() -> None:
+def test_exact_tools_in_plan_catalog_order() -> None:
     assert CORE_TOOL_NAMES == (
         "get_available_tasks",
         "get_task_details",
         "claim_task",
+        "log_task_checkpoint",
+        "submit_task_resolution",
         "release_task",
         "get_project_context",
     )
@@ -59,6 +70,15 @@ def test_key_inputs_match_the_section_10_5_table() -> None:
     assert properties["get_available_tasks"] == {"priority_filter", "limit", "role"}
     assert properties["get_task_details"] == {"task_id"}
     assert properties["claim_task"] == {"task_id", "agent_identifier", "role"}
+    assert properties["log_task_checkpoint"] == {"task_id", "message", "percentage"}
+    assert properties["submit_task_resolution"] == {
+        "task_id",
+        "git_branch",
+        "commit_sha",
+        "execution_summary",
+        "requires_human_attention",
+        "risk_justification",
+    }
     assert properties["release_task"] == {"task_id", "reason"}
     assert properties["get_project_context"] == set()
 
@@ -123,7 +143,13 @@ def test_none_arguments_normalize_to_empty_object() -> None:
     # the required-argument tools fail with VALIDATION_ERROR instead.
     for name in ("get_available_tasks", "get_project_context"):
         assert validate_tool_input(_spec(name), None) == {}
-    for name in ("get_task_details", "claim_task", "release_task"):
+    for name in (
+        "get_task_details",
+        "claim_task",
+        "log_task_checkpoint",
+        "submit_task_resolution",
+        "release_task",
+    ):
         with pytest.raises(ToolFailure):
             validate_tool_input(_spec(name), None)
 
@@ -139,6 +165,11 @@ def test_none_arguments_normalize_to_empty_object() -> None:
         ("get_task_details", {}),
         ("get_task_details", {"task_id": 42}),
         ("claim_task", {"task_id": "PID00007-T004"}),
+        ("log_task_checkpoint", {}),
+        ("log_task_checkpoint", {"task_id": "PID00007-T004", "percentage": 101}),
+        ("log_task_checkpoint", {"task_id": "PID00007-T004", "percentage": -1}),
+        ("submit_task_resolution", {"task_id": "PID00007-T004"}),
+        ("submit_task_resolution", {"task_id": "PID00007-T004", "commit_sha": "abc"}),
         ("release_task", {}),
         ("get_project_context", {"project_id": "PID00007"}),
         ("get_available_tasks", {"project_id": "PID00007"}),

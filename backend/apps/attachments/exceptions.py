@@ -8,6 +8,10 @@ OpenAPI contract documents for the attachments endpoints.
 
 Status decisions (recorded in the WP changelog):
 
+* ``ATTACHMENT_NOT_READY`` → **409**: the status Section 9.5 pins for
+  content retrieval while processing (MT-1.14-05); every non-``ready``
+  status answers it (see the class docstring for the ``failed``-status
+  reading).
 * ``ATTACHMENT_UNSUPPORTED_FORMAT`` → **415**: the semantically exact
   status for a content-sniffed type rejection (Section 9.5); the code
   stays the catalog contract, the status is this endpoint's documented
@@ -27,7 +31,31 @@ from __future__ import annotations
 from rest_framework import status
 from rest_framework.exceptions import APIException
 
-from apps.core.errors import ATTACHMENT_UNSUPPORTED_FORMAT, TASK_STATE_CONFLICT
+from apps.core.errors import (
+    ATTACHMENT_NOT_READY,
+    ATTACHMENT_UNSUPPORTED_FORMAT,
+    TASK_STATE_CONFLICT,
+)
+
+
+class AttachmentNotReady(APIException):
+    """Content requested while the attachment is not ``ready`` (Section 9.5).
+
+    Section 9.5 pins the behavior: *"retrieving content during
+    processing returns 409 ATTACHMENT_NOT_READY"*. The reading carried
+    here (MT-1.14-05, recorded in the WP changelog): every non-``ready``
+    status answers the same catalog code — ``uploaded`` (the pipeline
+    has not started) and ``failed`` (the pipeline will never produce
+    content) share the pre-condition "not ready"; ``failed`` adds the
+    stored human-readable reason in ``details.failure_reason`` so the
+    descriptor's FR-ATT-07 visibility holds on the read path too. The
+    closed catalog has no attachment-specific *failure* code
+    (Section 20.4 item 5 forbids inventing one).
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = ATTACHMENT_NOT_READY
+    default_detail = "The attachment is not ready for content retrieval."
 
 
 class AttachmentUnsupportedFormat(APIException):
@@ -61,4 +89,4 @@ class AttachmentOnImmutableTask(APIException):
     )
 
 
-__all__ = ["AttachmentOnImmutableTask", "AttachmentUnsupportedFormat"]
+__all__ = ["AttachmentNotReady", "AttachmentOnImmutableTask", "AttachmentUnsupportedFormat"]

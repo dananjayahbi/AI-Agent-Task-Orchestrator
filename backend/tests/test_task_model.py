@@ -119,7 +119,7 @@ def test_task_model_field_set_matches_section_7_2_exactly(project: Project) -> N
     # fencing counter — "every claim increments an internal lease generation"
     # — the one column outside the Section 7.2 table, recorded in the WP
     # changelog. Everything else stays verbatim (none added, dropped, renamed).
-    expected = PLAN_7_2_FIELDS | {"lease_generation"}
+    expected = PLAN_7_2_FIELDS | {"lease_generation", "audit_retry_count"}
     assert names == expected, sorted(names ^ expected)
     reverse = {field.name for field in Task._meta.get_fields() if not field.concrete}
     # WP-1.5 adds `transitions` (TaskTransition's FK, MT-1.5-05) — the
@@ -133,8 +133,12 @@ def test_task_model_field_set_matches_section_7_2_exactly(project: Project) -> N
     # WP-3.2 adds `resolutions` (TaskResolution's FK, submission artifacts)
     # — same reading: a reverse relation the resolution history attaches,
     # recorded in the WP changelog alongside `transitions`/`checkpoints`.
+    # WP-3.3 adds `audit_reports` (AuditReport's FK, Section 7.2's Audit
+    # Report relation) — same reading again; the `audit_retry_count`
+    # column above is T12's counter (MT-3.3-03's §7.2 gap fill).
     assert reverse == {
         "attachments",
+        "audit_reports",
         "checkpoints",
         "dependency_edges",
         "dependent_edges",
@@ -259,10 +263,11 @@ def test_task_constraint_accepts_ids_with_natural_growth(project: Project) -> No
 def test_task_constraint_enforces_version_and_counter_floors(
     project: Project,
 ) -> None:
-    """version >= 1, failure_retry_count >= 0, attempt_number >= 0."""
+    """version >= 1, failure/audit retry counts >= 0, attempt_number >= 0."""
     _insert_rejected(project, id=f"{project.pk}-T101", version=0)
     _insert_rejected(project, id=f"{project.pk}-T102", failure_retry_count=-1)
     _insert_rejected(project, id=f"{project.pk}-T103", attempt_number=-1)
+    _insert_rejected(project, id=f"{project.pk}-T104", audit_retry_count=-1)
 
 
 def test_task_constraint_rejects_out_of_set_state_and_priority(
@@ -301,13 +306,19 @@ def test_task_model_boundary_validation_rejects_out_of_set_enums(
 
 
 def test_task_model_constraints_and_indexes_are_declared() -> None:
-    """The six Section 7.4 checks plus the NFR-09 list indexes exist."""
+    """The seven Section 7.4-style checks plus the NFR-09 list indexes exist.
+
+    Six checks ride the Section 7.2 columns verbatim; the seventh
+    (``task_audit_retry_count_non_negative``) floors WP-3.3's T12
+    counter — the §7.2 gap fill MT-3.3-03 records.
+    """
     assert {constraint.name for constraint in Task._meta.constraints} == {
         "task_id_format",
         "task_state_canonical",
         "task_priority_canonical",
         "task_version_at_least_one",
         "task_failure_retry_count_non_negative",
+        "task_audit_retry_count_non_negative",
         "task_attempt_number_non_negative",
     }
     assert {index.name for index in Task._meta.indexes} == {

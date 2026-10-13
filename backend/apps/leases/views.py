@@ -148,18 +148,25 @@ class ClaimView(APIView):
         responses={status.HTTP_200_OK: ClaimResponseSerializer, **_CLAIM_ERRORS},
         parameters=[_IDEMPOTENCY_PARAMETER],
         description=(
-            "Atomically claim a pending task (Section 9.2 Agent-work row; "
-            "caller: Agent coder). One transaction takes the row with "
-            "`FOR UPDATE SKIP LOCKED`, re-validates state, project status, "
-            "dependencies and `max_concurrent_tasks` inside the lock, sets "
-            "the Section 8.6 lease and bumps `lease_generation` and "
-            "`attempt_number` (FR-LEA-01/02; ADR-012 fencing). 200 returns "
-            "task details, the lease record and the Section 10.6 rules "
-            "block. Errors: TASK_ALREADY_CLAIMED, TASK_NOT_FOUND, "
-            "TASK_STATE_CONFLICT, DEPENDENCY_UNMET, "
-            "CONCURRENCY_LIMIT_REACHED, AUTH_FORBIDDEN_PROJECT — all 409/"
-            "404/403 per the documented mapping. `Idempotency-Key` replays "
-            "a retried claim without leasing twice (NFR-12)."
+            "Atomically claim one task (Section 9.2 Agent-work row; caller: "
+            "Agent — the token's scopes pick the Section 12.2 cell: coder "
+            "for `pending` (T4), auditor for `to_be_audited` (T11)). One "
+            "transaction takes the row with `FOR UPDATE SKIP LOCKED`, "
+            "re-validates the declared `role` against the state plus the "
+            "T4/T11 guards (project status, dependencies, "
+            "`max_concurrent_tasks` for coders; auditor independence "
+            "(`AUDITOR_SAME_AS_CODER`, G-20) and audit-lease availability "
+            "for auditors), sets the Section 8.6 lease (policy duration, "
+            "`lease_generation` + 1) and bumps `attempt_number` on coder "
+            "claims only (FR-LEA-01/02; ADR-012 fencing; MT-3.3-01). 200 "
+            "returns task details, the lease record (role `coder`|`auditor`)"
+            " and the Section 10.6 rules block. Errors: "
+            "TASK_ALREADY_CLAIMED, TASK_NOT_FOUND, TASK_STATE_CONFLICT, "
+            "AUDITOR_SAME_AS_CODER, DEPENDENCY_UNMET, "
+            "CONCURRENCY_LIMIT_REACHED (409); ROLE_NOT_PERMITTED, "
+            "AUTH_FORBIDDEN_PROJECT (403) — all per the documented "
+            "mapping. `Idempotency-Key` replays a retried claim without "
+            "leasing twice (NFR-12)."
         ),
     )
     def post(self, request: Request, id: str, *args: Any, **kwargs: Any) -> Response:
@@ -177,6 +184,7 @@ class ClaimView(APIView):
             session_id=str(validated["session_id"]),
             worker_agent_id=str(validated["worker_agent_id"]),
             caller_project_id=_agent_project(request),
+            role=cast(WorkRole, validated["role"]),
         )
         response = Response(
             {
@@ -267,7 +275,8 @@ class WorkView(APIView):
             "List the project's offerable work (Section 9.2 Agent-work row; "
             "caller: Agent). `role=coder` (default) lists `pending` tasks "
             "whose dependencies are completed; `role=auditor` lists "
-            "`to_be_audited` (the audit claim arrives with WP-3.3). "
+            "`to_be_audited` — never a mixed or wrong-state listing "
+            "(MT-3.3-01; the matching T11 claim takes the auditor half). "
             "Archived tasks are hidden (T19), a non-active project returns "
             "an empty list (FR-PRJ-04), order is FR-TSK-05 canonical "
             "(priority, then oldest first), cursor-paginated. This read is "

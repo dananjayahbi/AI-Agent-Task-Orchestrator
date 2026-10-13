@@ -31,6 +31,7 @@ from ..manifest import bind_startup
 from ..scrub import scrub_text
 from ..server import create_server
 from ..session import close_session, open_session
+from ..submission_spool import SubmissionSpool
 from ..tools.runtime import ToolRuntime
 from ..transport import ApiClient
 from . import EXIT_CONFIG_ERROR, cli
@@ -62,7 +63,25 @@ def run(settings: Settings) -> int:
         )
         print(f"bridge startup error: {scrub_text(str(exc))}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
-    runtime = ToolRuntime.from_session(binding, client, session)
+    spool = SubmissionSpool.default()
+    runtime = ToolRuntime.from_session(binding, client, session, spool=spool)
+    # MT-2.6-05 restart recovery: replay this project's unacknowledged
+    # submissions (stored payload, stored idempotency key) before serving.
+    # Best-effort by contract — the spool never raises and startup never dies
+    # because the backend is unreachable; entries simply stay held.
+    try:
+        report = spool.resume(client, project_id=binding.project_id)
+    except Exception as exc:  # pragma: no cover - defensive: resume is non-raising
+        logger.error(
+            "submission spool resume failed",
+            extra={"event": "spool_resume_failed", "error_type": type(exc).__name__},
+        )
+    else:
+        if any(report.as_dict().values()):
+            logger.info(
+                "submission spool resume sweep finished",
+                extra={"event": "spool_resume", **report.as_dict()},
+            )
     server = create_server(settings, runtime=runtime)
     logger.info(
         "bridge starting",

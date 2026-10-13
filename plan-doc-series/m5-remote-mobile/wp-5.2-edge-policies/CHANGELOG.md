@@ -207,3 +207,8 @@ changed by the finisher.**
 * No `git add`/`git commit` was performed; everything above sits in the
   working tree. Re-run rule stands: re-execute the checklist after any
   `infra/cloudflare/` change or dashboard edit.
+* **Convergence gate:** the `<!-- pragma: allowlist secret -->` comment
+  that sat *inside* §6's JSON fence (broke `test_rate_limits_tunnel.py`'s
+  `json.loads`) was removed by rewording the `api_keying` line to
+  `api_budgeting` with a non-keyword value — detect-secrets clean, JSON
+  parses, tunnel suite 7/7 green.

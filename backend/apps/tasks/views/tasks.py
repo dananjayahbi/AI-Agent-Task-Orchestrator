@@ -188,7 +188,9 @@ class TaskListCreateView(APIView):
             states=validated.get("state"),
             priority=validated.get("priority"),
             include_archived=bool(validated.get("include_archived", False)),
-        )
+            # MT-1.14-01: every task payload embeds its attachment
+            # descriptors — prime them in one query, not per row.
+        ).prefetch_related("attachments")
         cursor = decode_task_cursor(validated.get("cursor"))
         if cursor is not None:
             queryset = filter_beyond_cursor(queryset, cursor)

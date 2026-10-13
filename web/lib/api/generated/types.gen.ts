@@ -137,6 +137,48 @@ export type Attachment = {
 };
 
 /**
+ * The content endpoint's 200 body (Section 9.5 retrieval behavior).
+ */
+export type AttachmentContent = {
+    /**
+     * The addressed attachment (Section 7.2).
+     */
+    attachment_id: string;
+    /**
+     * The resolved concrete format — `auto` never reaches the wire.
+     */
+    format: string;
+    /**
+     * The delivered text (markdown page or OCR transcript), prefixed with the untrusted-content banner (P10; Section 9.5). Null for image_base64.
+     */
+    content: string | null;
+    /**
+     * text_ocr only: the layout description, banner-prefixed (P10); empty after OCR-only degradation (MT-1.13-05); null for other formats.
+     */
+    description: string | null;
+    /**
+     * image_base64 only: the normalized image (Section 9.5 stage 2).
+     */
+    image_base64: string | null;
+    /**
+     * image_base64 only: the normalized image's media type (always image/png).
+     */
+    media_type: string | null;
+    /**
+     * Paginated responses only: this page's one-based number (Section 9.5).
+     */
+    page_number: number | null;
+    /**
+     * Paginated responses only: total pages — 1 for a single-page document (MT-1.14-03 convention).
+     */
+    total_pages: number | null;
+    /**
+     * Paginated responses only: this page's token estimate (as stored by WP-1.12) so an agent can budget context (9.5).
+     */
+    token_count: number | null;
+};
+
+/**
  * MT-1.11-05's DELETE response — the soft-deleted record's marker.
  */
 export type AttachmentDelete = {
@@ -163,6 +205,151 @@ export type AttachmentListEnvelope = {
      * Opaque cursor for the next page; null = end of list.
      */
     next_cursor: string | null;
+};
+
+/**
+ * The seam's decision the 201 body reports (Section 9.4).
+ */
+export type AuditDecision = {
+    /**
+     * True only when the installed Policy Engine approved (T13); the fail-closed default always returns false (invariant 8.3.4).
+     */
+    approve: boolean;
+    /**
+     * Section 8.4 escalation reason, or null on approval.
+     */
+    reason: string | null;
+};
+
+/**
+ * One stored report — the Section 7.2 field list, as returned.
+ */
+export type AuditReport = {
+    /**
+     * Server-generated row identity (Section 7.2).
+     */
+    id: string;
+    /**
+     * The audited task (Section 7.2).
+     */
+    task_id: string;
+    /**
+     * The audited submission (Section 7.2 — one report per verdict, accumulating across T12 audit retries).
+     */
+    resolution_id: string;
+    /**
+     * Bridge session that audited (Section 7.2; G-18 — always the auditor lease owner at submit time).
+     */
+    auditor_session_id: string;
+    /**
+     * Section 7.2 evidence JSON — the Section 10.5 structure as supplied (commands with exit codes, lint_clean, stats…).
+     */
+    evidence: unknown;
+    /**
+     * Section 7.2 confidence (1-5; DB-constrained).
+     */
+    confidence: number;
+    auditor_notes: string;
+    /**
+     * Section 10.5 enum the auditor proposed; the engine decides.
+     *
+     * * `pass` - pass
+     * * `flag_risk` - flag_risk
+     * * `fail` - fail
+     */
+    proposed_verdict: ProposedVerdictEnum;
+    /**
+     * Section 9.4 engine output (approve | escalate) — null until the Policy Engine writes it (MT-3.4-06), never faked here.
+     *
+     * * `approve` - approve
+     * * `escalate` - escalate
+     */
+    policy_decision: PolicyDecisionEnum | null;
+    /**
+     * Section 7.2/9.4 per-rule pass/fail — null until the engine persists it (MT-3.4-06), never faked here.
+     */
+    policy_rule_results: unknown;
+    /**
+     * Server clock at insertion (P7).
+     */
+    created_at: string;
+};
+
+/**
+ * pagination.md envelope: exactly ``results`` + ``next_cursor``.
+ */
+export type AuditReportListEnvelope = {
+    results: Array<AuditReport>;
+    /**
+     * Opaque cursor for the next page; null = end of list.
+     */
+    next_cursor: string | null;
+};
+
+/**
+ * ``POST /tasks/{id}/audit-verdict`` input (Section 10.5 contract).
+ */
+export type AuditVerdictRequest = {
+    /**
+     * Lease-holding auditor session id (G-18) — the fencing pair's identity half; becomes auditor_session_id (Section 7.2).
+     */
+    session_id: string;
+    /**
+     * Fencing generation from the claim response (Section 8.6; ADR-012 — the pair every agent mutation carries); a stale value answers LEASE_EXPIRED.
+     */
+    lease_generation: number;
+    /**
+     * The addressed task id — must equal the path id (Section 10.5 requires task_id in the payload; the path decides, the body echoes).
+     */
+    task_id: string;
+    /**
+     * Section 10.5 enum: pass | flag_risk | fail — the proposal only; the Policy Engine decides the outcome (invariant 8.3.4).
+     *
+     * * `pass` - pass
+     * * `flag_risk` - flag_risk
+     * * `fail` - fail
+     */
+    verdict: VerdictEnum;
+    /**
+     * Section 10.5 / 7.2 confidence (1-5) — the input rule R7 reads.
+     */
+    confidence: number;
+    /**
+     * Auditor notes (Section 10.5 `notes` → Section 7.2 `auditor_notes`), shown in the review panel.
+     */
+    notes?: string;
+    /**
+     * Section 10.5 evidence object: required `commands` array (label/command/exit_code per item); `lint_clean`, durations, changed files and diff stats pass through as supplied (FR-AUD-02 — stored verbatim, never reshaped).
+     */
+    evidence: unknown;
+    /**
+     * Section 10.5 optional array of {criterion, met} — validated here and stored inside the report's evidence JSON (§7.2 gives it no column; recorded reading, MT-3.3-05).
+     */
+    acceptance_criteria_results?: Array<{
+        [key: string]: unknown;
+    }> | null;
+};
+
+/**
+ * The frozen verdict response — report + outcome (Section 10.5).
+ */
+export type AuditVerdictResponse = {
+    /**
+     * The stored Section 7.2 row.
+     */
+    report: AuditReport;
+    /**
+     * Post-transition task identity — the outcome the agent is told (decided by the seam, never by this endpoint).
+     */
+    task: VerdictTaskState;
+    /**
+     * Which Section 8.2 row fired: audit_verdict_escalated (T14) or audit_verdict_pass (T13, engine-only).
+     */
+    trigger: string;
+    /**
+     * The Policy Engine seam's decision (approve/escalate + reason).
+     */
+    decision: AuditDecision;
 };
 
 /**
@@ -286,7 +473,7 @@ export type CheckpointWriteResponse = {
 };
 
 /**
- * ``POST /tasks/{id}/claim`` input (Section 10.5 claim_task minus role).
+ * ``POST /tasks/{id}/claim`` input (Section 10.5 claim_task).
  */
 export type ClaimRequest = {
     /**
@@ -297,6 +484,13 @@ export type ClaimRequest = {
      * Human-readable worker label (Section 7.2 worker_agent_id; self-declared and spoofable — a label only, G-18).
      */
     worker_agent_id: string;
+    /**
+     * Section 10.5 claim_task role input (coder default, auditor). Request intent only: the token's scopes gate first (Section 12.2) and the state decides inside the lock — coder claims only `pending` (T4), auditor only `to_be_audited` (T11) — a mismatch answers ROLE_NOT_PERMITTED (MT-3.3-01).
+     *
+     * * `coder` - coder
+     * * `auditor` - auditor
+     */
+    role?: RoleEnum;
 };
 
 /**
@@ -761,6 +955,12 @@ export type PatchedTaskUpdate = {
 export type PlatformEnum = 'ios' | 'android';
 
 /**
+ * * `approve` - approve
+ * * `escalate` - escalate
+ */
+export type PolicyDecisionEnum = 'approve' | 'escalate';
+
+/**
  * * `django` - django
  * * `nextjs` - nextjs
  * * `flutter` - flutter
@@ -940,6 +1140,13 @@ export type ProjectPolicy = {
      */
     stalled_after_minutes: number;
 };
+
+/**
+ * * `pass` - pass
+ * * `flag_risk` - flag_risk
+ * * `fail` - fail
+ */
+export type ProposedVerdictEnum = 'pass' | 'flag_risk' | 'fail';
 
 /**
  * POST /auth/refresh: the extended expiry (same lifetime settings).
@@ -1161,6 +1368,12 @@ export type Revoked = {
 };
 
 /**
+ * * `coder` - coder
+ * * `auditor` - auditor
+ */
+export type RoleEnum = 'coder' | 'auditor';
+
+/**
  * Section 10.6 rules block: standard rules + project rules appended.
  */
 export type RulesBlock = {
@@ -1214,6 +1427,10 @@ export type StateEnum = 'draft' | 'pending' | 'in_progress' | 'to_be_audited' | 
 
 /**
  * GET representation of a task — Section 7.2 fields, in plan order.
+ *
+ * One documented addition beyond the 7.2 table: ``attachments`` — the
+ * FR-ATT-03 descriptor list (MT-1.14-01; descriptors only, content
+ * stays lazy behind the Section 9.2 content endpoint).
  */
 export type Task = {
     /**
@@ -1267,6 +1484,10 @@ export type Task = {
     readonly lease_expires_at: string | null;
     readonly last_checkpoint_at: string | null;
     readonly failure_retry_count: number;
+    /**
+     * WP-3.3 / Section 8.2 T12: audit leases released by expiry (kept separate from failure_retry_count — Section 8.3 invariant 1).
+     */
+    readonly audit_retry_count: number;
     readonly attempt_number: number;
     /**
      * Copied from the project policy at creation (Section 7.2).
@@ -1292,6 +1513,10 @@ export type Task = {
      * Section 7.1 N:N relation (FR-TSK-07): the task ids this task waits on, ordered by id. Server-managed — written through the `depends_on` field of POST/PATCH (replace-the-set), read here.
      */
     readonly depends_on: Array<string>;
+    /**
+     * FR-ATT-03 attachment descriptors — one per live attachment: `id`, `filename`, `size`, `token_count`, `short_description` (the MT-1.11-04 field set, one shape with the listing endpoints). Descriptors only — attachment content and derived text are never embedded; they are fetched on demand from GET /attachments/{id}/content (FR-ATT-03's lazy model, FR-ATT-04). `token_count` and `short_description` are null before `ready` and after OCR-only degradation. Newest first. Every response that returns a task object carries them (MT-1.14-01's recorded reading).
+     */
+    readonly attachments: Array<Attachment>;
 };
 
 /**
@@ -1377,9 +1602,40 @@ export type UserSummary = {
 };
 
 /**
+ * * `pass` - pass
+ * * `flag_risk` - flag_risk
+ * * `fail` - fail
+ */
+export type VerdictEnum = 'pass' | 'flag_risk' | 'fail';
+
+/**
+ * The post-transition task identity the verdict response carries.
+ */
+export type VerdictTaskState = {
+    id: string;
+    /**
+     * Canonical state after the dispatch — in_human_review (T14, the fail-closed escalate) or to_be_audited with merge_status pending (T13, engine-approved; Section 8.2).
+     */
+    state: string;
+    /**
+     * Optimistic-lock version after the row (7.2).
+     */
+    version: number;
+    /**
+     * Section 8.4 member T14 set; null on the T13 approve branch.
+     */
+    review_reason: string | null;
+    /**
+     * none | pending | merging | merged | conflict | failed (7.2) — pending marks T13's merge-pending sub-status.
+     */
+    merge_status: string;
+};
+
+/**
  * Section 9.3 step 6: task details, lease record, rules block.
  */
 export type ClaimResponseWritable = {
+    task: TaskWritable;
     lease: LeaseRecord;
     rules_block: RulesBlock;
 };
@@ -1582,10 +1838,21 @@ export type ProjectPolicyWritable = {
 };
 
 /**
+ * GET representation of a task — Section 7.2 fields, in plan order.
+ *
+ * One documented addition beyond the 7.2 table: ``attachments`` — the
+ * FR-ATT-03 descriptor list (MT-1.14-01; descriptors only, content
+ * stays lazy behind the Section 9.2 content endpoint).
+ */
+export type TaskWritable = {
+    [key: string]: unknown;
+};
+
+/**
  * pagination.md envelope: exactly ``results`` + ``next_cursor``.
  */
 export type TaskListEnvelopeWritable = {
-    results: Array<unknown>;
+    results: Array<TaskWritable>;
     /**
      * Opaque cursor for the next page; null = end of list.
      */
@@ -1702,6 +1969,45 @@ export type RetrieveAttachmentResponses = {
 };
 
 export type RetrieveAttachmentResponse = RetrieveAttachmentResponses[keyof RetrieveAttachmentResponses];
+
+export type RetrieveAttachmentContentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        /**
+         * Section 9.5 retrieval table: auto (default; text-safe — documents resolve to markdown, images to text_ocr), image_base64, text_ocr, markdown. Unknown values answer VALIDATION_ERROR.
+         *
+         * * `auto` - auto
+         * * `image_base64` - image_base64
+         * * `text_ocr` - text_ocr
+         * * `markdown` - markdown
+         */
+        format?: 'auto' | 'image_base64' | 'text_ocr' | 'markdown';
+        /**
+         * One-based page for paginated formats (markdown; auto on documents — Section 9.5 pagination clause, the pagination.md content exception). Defaults to 1; out-of-range and non-integer values answer VALIDATION_ERROR. Ignored by the non-paginated formats.
+         */
+        page?: number;
+    };
+    url: '/api/v1/attachments/{id}/content';
+};
+
+export type RetrieveAttachmentContentErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    409: ErrorEnvelope;
+    415: ErrorEnvelope;
+};
+
+export type RetrieveAttachmentContentError = RetrieveAttachmentContentErrors[keyof RetrieveAttachmentContentErrors];
+
+export type RetrieveAttachmentContentResponses = {
+    200: AttachmentContent;
+};
+
+export type RetrieveAttachmentContentResponse = RetrieveAttachmentContentResponses[keyof RetrieveAttachmentContentResponses];
 
 export type ApiV1AuthLoginCreateData = {
     body: LoginRequest;
@@ -2203,7 +2509,7 @@ export type ListWorkData = {
          */
         priority?: 'urgent' | 'high' | 'medium' | 'low';
         /**
-         * Which offer list to read: coder → pending (default); auditor → to_be_audited (the audit claim itself is WP-3.3's T11).
+         * Which offer list to read: coder → pending (default); auditor → to_be_audited (T11's audit claim takes it — MT-3.3-01).
          *
          * * `coder` - coder
          * * `auditor` - auditor
@@ -2371,6 +2677,71 @@ export type UploadAttachmentResponses = {
 };
 
 export type UploadAttachmentResponse = UploadAttachmentResponses[keyof UploadAttachmentResponses];
+
+export type ListAuditReportsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        /**
+         * Opaque cursor from the previous page's next_cursor; valid only for this task's listing (pagination.md rule 1).
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults, same per-endpoint choice as the other list routes).
+         */
+        page_size?: number;
+    };
+    url: '/api/v1/tasks/{id}/audit-reports';
+};
+
+export type ListAuditReportsErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+};
+
+export type ListAuditReportsError = ListAuditReportsErrors[keyof ListAuditReportsErrors];
+
+export type ListAuditReportsResponses = {
+    200: AuditReportListEnvelope;
+};
+
+export type ListAuditReportsResponse = ListAuditReportsResponses[keyof ListAuditReportsResponses];
+
+export type SubmitAuditVerdictData = {
+    body: AuditVerdictRequest;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second Audit Report or firing a second transition.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{id}/audit-verdict';
+};
+
+export type SubmitAuditVerdictErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type SubmitAuditVerdictError = SubmitAuditVerdictErrors[keyof SubmitAuditVerdictErrors];
+
+export type SubmitAuditVerdictResponses = {
+    201: AuditVerdictResponse;
+};
+
+export type SubmitAuditVerdictResponse = SubmitAuditVerdictResponses[keyof SubmitAuditVerdictResponses];
 
 export type ListCheckpointsData = {
     body?: never;

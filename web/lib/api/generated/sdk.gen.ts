@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiV1AuthLoginCreateData, ApiV1AuthLoginCreateErrors, ApiV1AuthLoginCreateResponses, ApiV1AuthLogoutCreateData, ApiV1AuthLogoutCreateErrors, ApiV1AuthLogoutCreateResponses, ApiV1AuthRefreshCreateData, ApiV1AuthRefreshCreateErrors, ApiV1AuthRefreshCreateResponses, ApiV1DevicesCreateData, ApiV1DevicesCreateErrors, ApiV1DevicesCreateResponses, ApiV1DevicesDestroyData, ApiV1DevicesDestroyErrors, ApiV1DevicesDestroyResponses, ApiV1DevicesRetrieveData, ApiV1DevicesRetrieveErrors, ApiV1DevicesRetrieveResponses, ApiV1EventsRetrieveData, ApiV1EventsRetrieveErrors, ApiV1EventsRetrieveResponses, ApiV1EventsStreamRetrieveData, ApiV1EventsStreamRetrieveErrors, ApiV1EventsStreamRetrieveResponse, ApiV1EventsStreamRetrieveResponses, ApiV1TokensAgentCreateData, ApiV1TokensAgentCreateErrors, ApiV1TokensAgentCreateResponses, ApiV1TokensDestroyData, ApiV1TokensDestroyErrors, ApiV1TokensDestroyResponses, ApiV1TokensRetrieveData, ApiV1TokensRetrieveErrors, ApiV1TokensRetrieveResponses, ClaimTaskData, ClaimTaskErrors, ClaimTaskResponses, CreateCheckpointData, CreateCheckpointErrors, CreateCheckpointResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateTaskData, CreateTaskErrors, CreateTaskResponses, DeleteAttachmentData, DeleteAttachmentErrors, DeleteAttachmentResponses, EndAgentSessionData, EndAgentSessionErrors, EndAgentSessionResponses, GetResolutionPatchData, GetResolutionPatchErrors, GetResolutionPatchResponses, HealthLiveRetrieveData, HealthLiveRetrieveResponses, HealthReadyRetrieveData, HealthReadyRetrieveErrors, HealthReadyRetrieveResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListResolutionsData, ListResolutionsErrors, ListResolutionsResponses, ListTaskAttachmentsData, ListTaskAttachmentsErrors, ListTaskAttachmentsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListWorkData, ListWorkErrors, ListWorkResponses, OpenAgentSessionData, OpenAgentSessionErrors, OpenAgentSessionResponses, PartialUpdateProjectData, PartialUpdateProjectErrors, PartialUpdateProjectPolicyData, PartialUpdateProjectPolicyErrors, PartialUpdateProjectPolicyResponses, PartialUpdateProjectResponses, PartialUpdateTaskData, PartialUpdateTaskErrors, PartialUpdateTaskResponses, ReleaseTaskData, ReleaseTaskErrors, ReleaseTaskResponses, RetrieveAttachmentData, RetrieveAttachmentErrors, RetrieveAttachmentResponses, RetrieveDashboardSummaryData, RetrieveDashboardSummaryErrors, RetrieveDashboardSummaryResponses, RetrieveProjectData, RetrieveProjectErrors, RetrieveProjectManifestData, RetrieveProjectManifestErrors, RetrieveProjectManifestResponses, RetrieveProjectPolicyData, RetrieveProjectPolicyErrors, RetrieveProjectPolicyResponses, RetrieveProjectResponses, RetrieveTaskData, RetrieveTaskErrors, RetrieveTaskResponses, SubmitResolutionData, SubmitResolutionErrors, SubmitResolutionResponses, UploadAttachmentData, UploadAttachmentErrors, UploadAttachmentResponses } from './types.gen';
+import type { ApiV1AuthLoginCreateData, ApiV1AuthLoginCreateErrors, ApiV1AuthLoginCreateResponses, ApiV1AuthLogoutCreateData, ApiV1AuthLogoutCreateErrors, ApiV1AuthLogoutCreateResponses, ApiV1AuthRefreshCreateData, ApiV1AuthRefreshCreateErrors, ApiV1AuthRefreshCreateResponses, ApiV1DevicesCreateData, ApiV1DevicesCreateErrors, ApiV1DevicesCreateResponses, ApiV1DevicesDestroyData, ApiV1DevicesDestroyErrors, ApiV1DevicesDestroyResponses, ApiV1DevicesRetrieveData, ApiV1DevicesRetrieveErrors, ApiV1DevicesRetrieveResponses, ApiV1EventsRetrieveData, ApiV1EventsRetrieveErrors, ApiV1EventsRetrieveResponses, ApiV1EventsStreamRetrieveData, ApiV1EventsStreamRetrieveErrors, ApiV1EventsStreamRetrieveResponse, ApiV1EventsStreamRetrieveResponses, ApiV1TokensAgentCreateData, ApiV1TokensAgentCreateErrors, ApiV1TokensAgentCreateResponses, ApiV1TokensDestroyData, ApiV1TokensDestroyErrors, ApiV1TokensDestroyResponses, ApiV1TokensRetrieveData, ApiV1TokensRetrieveErrors, ApiV1TokensRetrieveResponses, ClaimTaskData, ClaimTaskErrors, ClaimTaskResponses, CreateCheckpointData, CreateCheckpointErrors, CreateCheckpointResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateTaskData, CreateTaskErrors, CreateTaskResponses, DeleteAttachmentData, DeleteAttachmentErrors, DeleteAttachmentResponses, EndAgentSessionData, EndAgentSessionErrors, EndAgentSessionResponses, GetResolutionPatchData, GetResolutionPatchErrors, GetResolutionPatchResponses, HealthLiveRetrieveData, HealthLiveRetrieveResponses, HealthReadyRetrieveData, HealthReadyRetrieveErrors, HealthReadyRetrieveResponses, ListAuditReportsData, ListAuditReportsErrors, ListAuditReportsResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListResolutionsData, ListResolutionsErrors, ListResolutionsResponses, ListTaskAttachmentsData, ListTaskAttachmentsErrors, ListTaskAttachmentsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListWorkData, ListWorkErrors, ListWorkResponses, OpenAgentSessionData, OpenAgentSessionErrors, OpenAgentSessionResponses, PartialUpdateProjectData, PartialUpdateProjectErrors, PartialUpdateProjectPolicyData, PartialUpdateProjectPolicyErrors, PartialUpdateProjectPolicyResponses, PartialUpdateProjectResponses, PartialUpdateTaskData, PartialUpdateTaskErrors, PartialUpdateTaskResponses, ReleaseTaskData, ReleaseTaskErrors, ReleaseTaskResponses, RetrieveAttachmentContentData, RetrieveAttachmentContentErrors, RetrieveAttachmentContentResponses, RetrieveAttachmentData, RetrieveAttachmentErrors, RetrieveAttachmentResponses, RetrieveDashboardSummaryData, RetrieveDashboardSummaryErrors, RetrieveDashboardSummaryResponses, RetrieveProjectData, RetrieveProjectErrors, RetrieveProjectManifestData, RetrieveProjectManifestErrors, RetrieveProjectManifestResponses, RetrieveProjectPolicyData, RetrieveProjectPolicyErrors, RetrieveProjectPolicyResponses, RetrieveProjectResponses, RetrieveTaskData, RetrieveTaskErrors, RetrieveTaskResponses, SubmitAuditVerdictData, SubmitAuditVerdictErrors, SubmitAuditVerdictResponses, SubmitResolutionData, SubmitResolutionErrors, SubmitResolutionResponses, UploadAttachmentData, UploadAttachmentErrors, UploadAttachmentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -71,6 +71,19 @@ export const retrieveAttachment = <ThrowOnError extends boolean = false>(options
             type: 'apiKey'
         }],
     url: '/api/v1/attachments/{id}',
+    ...options
+});
+
+/**
+ * Retrieve one attachment's content (Section 9.2; caller: Owner or an agent token scoped to the attachment's project). The `format` parameter follows the Section 9.5 retrieval table: `auto` (default) is text-safe — documents resolve to paginated `markdown`, images to `text_ocr` (OCR transcript plus layout description); `image_base64` serves the normalized image and answers ATTACHMENT_UNSUPPORTED_FORMAT (415) for non-images; `markdown` and `text_ocr` answer 415 where the attachment has no such representation. `page` is one-based (the pagination.md content exception): paginated responses carry `page_number`, `total_pages` and the page's token count so an agent can budget context; non-paginated responses omit them. Every delivered text value is prefixed with the untrusted-content banner (P10). Attachments not `ready` answer 409 ATTACHMENT_NOT_READY (`failed` includes the stored reason). Unknown `format`/`page` values and unknown query parameters answer VALIDATION_ERROR (400).
+ */
+export const retrieveAttachmentContent = <ThrowOnError extends boolean = false>(options: Options<RetrieveAttachmentContentData, ThrowOnError>): RequestResult<RetrieveAttachmentContentResponses, RetrieveAttachmentContentErrors, ThrowOnError> => (options.client ?? client).get<RetrieveAttachmentContentResponses, RetrieveAttachmentContentErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/attachments/{id}/content',
     ...options
 });
 
@@ -328,7 +341,7 @@ export const createTask = <ThrowOnError extends boolean = false>(options: Option
 });
 
 /**
- * List the project's offerable work (Section 9.2 Agent-work row; caller: Agent). `role=coder` (default) lists `pending` tasks whose dependencies are completed; `role=auditor` lists `to_be_audited` (the audit claim arrives with WP-3.3). Archived tasks are hidden (T19), a non-active project returns an empty list (FR-PRJ-04), order is FR-TSK-05 canonical (priority, then oldest first), cursor-paginated. This read is deliberately non-locking: the locking select-and-claim twin is the claim-next service (Section 9.3).
+ * List the project's offerable work (Section 9.2 Agent-work row; caller: Agent). `role=coder` (default) lists `pending` tasks whose dependencies are completed; `role=auditor` lists `to_be_audited` — never a mixed or wrong-state listing (MT-3.3-01; the matching T11 claim takes the auditor half). Archived tasks are hidden (T19), a non-active project returns an empty list (FR-PRJ-04), order is FR-TSK-05 canonical (priority, then oldest first), cursor-paginated. This read is deliberately non-locking: the locking select-and-claim twin is the claim-next service (Section 9.3).
  */
 export const listWork = <ThrowOnError extends boolean = false>(options: Options<ListWorkData, ThrowOnError>): RequestResult<ListWorkResponses, ListWorkErrors, ThrowOnError> => (options.client ?? client).get<ListWorkResponses, ListWorkErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }, {
@@ -415,6 +428,36 @@ export const uploadAttachment = <ThrowOnError extends boolean = false>(options: 
 });
 
 /**
+ * One task's Audit Reports, newest first (Section 9.2 Audit row; caller: Auditor / Owner — the review panel and mobile review sheet read surface, MT-3.3-04). Cursor pagination per pagination.md: `page_size` (default 25, maximum 100), the opaque `cursor` from the previous page's `next_cursor`, stable (created_at, id) ordering so inserts during paging never shift or duplicate rows. Reports accumulate per resolution across T12 audit retries (recorded reading). Empty tasks return an empty page. Coder agents and devices answer ROLE_NOT_PERMITTED (403), cross-project agent tokens AUTH_FORBIDDEN_PROJECT (403), unknown tasks TASK_NOT_FOUND (404).
+ */
+export const listAuditReports = <ThrowOnError extends boolean = false>(options: Options<ListAuditReportsData, ThrowOnError>): RequestResult<ListAuditReportsResponses, ListAuditReportsErrors, ThrowOnError> => (options.client ?? client).get<ListAuditReportsResponses, ListAuditReportsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/tasks/{id}/audit-reports',
+    ...options
+});
+
+/**
+ * Store the auditor's proposal and delegate the outcome to the Policy Engine seam (Section 9.2 Audit row; caller: Auditor, current lease owner — §12.2). One transaction: verify the fencing pair (`session_id` + `lease_generation`) against the locked `to_be_audited` row, re-prove independence (`AUDITOR_SAME_AS_CODER`, G-20), persist the Audit Report (§7.2: evidence verbatim, confidence 1-5, proposed verdict), then dispatch exactly one row: T14 `audit_verdict_escalated` → `in_human_review` with an enumerated §8.4 reason (the fail-closed default until MT-3.4-07 installs the engine) or T13 `audit_verdict_pass` → `merge_status = pending` (engine approval only — invariant 8.3.4: this endpoint never approves). 201 returns the report, the post-transition task identity, the trigger and the decision. `Idempotency-Key` replays a retried verdict with no second report and no second transition. Rejections: VALIDATION_ERROR (400), LEASE_NOT_OWNED (403), ROLE_NOT_PERMITTED (403), TASK_STATE_CONFLICT / LEASE_EXPIRED / AUDITOR_SAME_AS_CODER (409), TASK_NOT_FOUND (404).
+ */
+export const submitAuditVerdict = <ThrowOnError extends boolean = false>(options: Options<SubmitAuditVerdictData, ThrowOnError>): RequestResult<SubmitAuditVerdictResponses, SubmitAuditVerdictErrors, ThrowOnError> => (options.client ?? client).post<SubmitAuditVerdictResponses, SubmitAuditVerdictErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/tasks/{id}/audit-verdict',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * One task's checkpoint history, newest first (Section 9.2 Progress row; caller: Agent / Owner). Cursor pagination per WP-0.5-04: `page_size` (default 25, maximum 100), the opaque `cursor` from the previous page's `next_cursor`, stable (timestamp, id) ordering so inserts during paging never shift or duplicate rows. Empty tasks return an empty page, not an error. Cross-project agent tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown tasks TASK_NOT_FOUND (404). History/backfill only — live updates are the WP-1.10 `task.checkpoint` event stream.
  */
 export const listCheckpoints = <ThrowOnError extends boolean = false>(options: Options<ListCheckpointsData, ThrowOnError>): RequestResult<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError> => (options.client ?? client).get<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError>({
@@ -445,7 +488,7 @@ export const createCheckpoint = <ThrowOnError extends boolean = false>(options: 
 });
 
 /**
- * Atomically claim a pending task (Section 9.2 Agent-work row; caller: Agent coder). One transaction takes the row with `FOR UPDATE SKIP LOCKED`, re-validates state, project status, dependencies and `max_concurrent_tasks` inside the lock, sets the Section 8.6 lease and bumps `lease_generation` and `attempt_number` (FR-LEA-01/02; ADR-012 fencing). 200 returns task details, the lease record and the Section 10.6 rules block. Errors: TASK_ALREADY_CLAIMED, TASK_NOT_FOUND, TASK_STATE_CONFLICT, DEPENDENCY_UNMET, CONCURRENCY_LIMIT_REACHED, AUTH_FORBIDDEN_PROJECT — all 409/404/403 per the documented mapping. `Idempotency-Key` replays a retried claim without leasing twice (NFR-12).
+ * Atomically claim one task (Section 9.2 Agent-work row; caller: Agent — the token's scopes pick the Section 12.2 cell: coder for `pending` (T4), auditor for `to_be_audited` (T11)). One transaction takes the row with `FOR UPDATE SKIP LOCKED`, re-validates the declared `role` against the state plus the T4/T11 guards (project status, dependencies, `max_concurrent_tasks` for coders; auditor independence (`AUDITOR_SAME_AS_CODER`, G-20) and audit-lease availability for auditors), sets the Section 8.6 lease (policy duration, `lease_generation` + 1) and bumps `attempt_number` on coder claims only (FR-LEA-01/02; ADR-012 fencing; MT-3.3-01). 200 returns task details, the lease record (role `coder`|`auditor`) and the Section 10.6 rules block. Errors: TASK_ALREADY_CLAIMED, TASK_NOT_FOUND, TASK_STATE_CONFLICT, AUDITOR_SAME_AS_CODER, DEPENDENCY_UNMET, CONCURRENCY_LIMIT_REACHED (409); ROLE_NOT_PERMITTED, AUTH_FORBIDDEN_PROJECT (403) — all per the documented mapping. `Idempotency-Key` replays a retried claim without leasing twice (NFR-12).
  */
 export const claimTask = <ThrowOnError extends boolean = false>(options: Options<ClaimTaskData, ThrowOnError>): RequestResult<ClaimTaskResponses, ClaimTaskErrors, ThrowOnError> => (options.client ?? client).post<ClaimTaskResponses, ClaimTaskErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }, {

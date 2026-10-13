@@ -182,3 +182,7 @@ generated files.
   no generated file hand-edited, no hand-written model deleted (the
   reconciliation the docstring defers stays deferred); `flutter analyze`
   clean, format stable, **165/165 green**, client `check` exit 0.
+* **Convergence gate:** the schema regen added required `Task.
+  audit_retry_count` (WP-3.3 migration 0008); the `makeTask` fixture sets
+  it to `0` — suite still **165/165 green**, analyze/format clean, client
+  `check` exit 0.

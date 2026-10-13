@@ -1,10 +1,11 @@
-"""Deterministic schemas for the five core tools (parent plan Sections 10.5,
-18; FR-MCP-03, NFR-11; MT-2.4-01).
+"""Deterministic schemas for the registered tools (parent plan Sections 10.5,
+18; FR-MCP-03, NFR-11; MT-2.4-01, MT-2.6-01/04).
 
-The **public contract** of WP-2.4, modeled from Section 10.5's tool catalog
-table by pointer, never re-derived: the exact tool names, their exact inputs,
-strict-validation keywords (``additionalProperties: false``, enums, ``limit``
-bounds) and the Section 9.2 error codes each tool may surface.
+The **public contract** of WP-2.4 (extended by WP-2.6), modeled from
+Section 10.5's tool catalog table by pointer, never re-derived: the exact
+tool names, their exact inputs, strict-validation keywords
+(``additionalProperties: false``, enums, ``limit`` bounds) and the Section
+9.2 error codes each tool may surface.
 
 Design rules enforced here and pinned by ``tests/test_tool_schemas.py``:
 
@@ -155,8 +156,84 @@ _GET_PROJECT_CONTEXT_SCHEMA: Final[dict[str, Any]] = {
     "description": "No inputs — the answer is always the bound session's project.",
 }
 
+_LOG_TASK_CHECKPOINT_SCHEMA: Final[dict[str, Any]] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Held task to report progress on (Section 10.5).",
+        },
+        "message": {
+            "type": "string",
+            "default": "",
+            "description": "The agent's free-text progress report (Section 7.2).",
+        },
+        "percentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Optional 0-100 completion hint (Section 7.2 bounds).",
+        },
+    },
+    "required": ["task_id"],
+}
 
-#: Section 10.5's five tools, in the plan's catalog order.
+_SUBMIT_TASK_RESOLUTION_SCHEMA: Final[dict[str, Any]] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Held task to finish (Section 10.5).",
+        },
+        "git_branch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": (
+                "Branch the work was committed on — must be the task's assigned "
+                "branch (G-09; the bridge verifies it)."
+            ),
+        },
+        "commit_sha": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 64,
+            "description": (
+                "Commit the submission points at — must resolve and be reachable "
+                "on the assigned branch (the bridge verifies it)."
+            ),
+        },
+        "execution_summary": {
+            "type": "string",
+            "description": (
+                "The coder's summary of what was done and which tests ran (rules items 3 and 8)."
+            ),
+        },
+        "requires_human_attention": {
+            "type": "boolean",
+            "default": False,
+            "description": (
+                "Self-flag: routes the submission to human review (T8, "
+                "review_reason self_flagged) instead of straight audit."
+            ),
+        },
+        "risk_justification": {
+            "type": "string",
+            "default": "",
+            "description": "Why the coder is flagging the submission (Section 7.2).",
+        },
+    },
+    "required": ["task_id", "git_branch", "commit_sha", "execution_summary"],
+}
+
+
+#: Section 10.5's tools, in the plan's catalog order (WP-2.4's five core
+#: plus WP-2.6's checkpoint/submission pair, which the plan lists between
+#: claim and release; read_task_attachment lands with WP-2.5).
 TOOL_SPECS: Final[tuple[ToolSpec, ...]] = (
     ToolSpec(
         name="get_available_tasks",
@@ -201,6 +278,43 @@ TOOL_SPECS: Final[tuple[ToolSpec, ...]] = (
         ),
     ),
     ToolSpec(
+        name="log_task_checkpoint",
+        description=(
+            "Report progress on a held task and extend its lease (Section 10.5; "
+            "rule 5). Returns the new lease expiry plus the next_checkpoint_due "
+            "hint (RISK-02). A LEASE_EXPIRED answer means stop immediately and "
+            "re-claim — never keep working on a dead lease."
+        ),
+        input_schema=_LOG_TASK_CHECKPOINT_SCHEMA,
+        errors=(
+            *READ_ERRORS,
+            ErrorCode.TASK_NOT_FOUND,
+            ErrorCode.TASK_STATE_CONFLICT,
+            ErrorCode.LEASE_EXPIRED,
+            ErrorCode.LEASE_NOT_OWNED,
+        ),
+    ),
+    ToolSpec(
+        name="submit_task_resolution",
+        description=(
+            "Finish coder work on a held task (Section 10.5): the bridge verifies "
+            "the assigned branch and commit sha host-side, captures the merge-base "
+            "patch with its file list (Section 9.7), retains the payload locally "
+            "and uploads it with an idempotency key. Reports the actual outcome — "
+            "to_be_audited (T7) or in_human_review with its review_reason (T8)."
+        ),
+        input_schema=_SUBMIT_TASK_RESOLUTION_SCHEMA,
+        errors=(
+            *READ_ERRORS,
+            ErrorCode.TASK_NOT_FOUND,
+            ErrorCode.TASK_STATE_CONFLICT,
+            ErrorCode.LEASE_EXPIRED,
+            ErrorCode.LEASE_NOT_OWNED,
+            ErrorCode.SCOPE_VIOLATION,
+            ErrorCode.ROLE_NOT_PERMITTED,
+        ),
+    ),
+    ToolSpec(
         name="release_task",
         description=(
             "Voluntarily return a held task to pending (Section 10.5). No "
@@ -230,6 +344,7 @@ TOOL_SPECS: Final[tuple[ToolSpec, ...]] = (
     ),
 )
 
-#: The exact tool set the MCP server must advertise after WP-2.4 (MT-2.4-07
-#: inspector check; ordered per Section 10.5's catalog).
+#: The exact tool set the MCP server must advertise (MT-2.4-07 inspector
+#: check, extended by WP-2.6's checkpoint/submission pair; ordered per
+#: Section 10.5's catalog).
 CORE_TOOL_NAMES: Final[tuple[str, ...]] = tuple(spec.name for spec in TOOL_SPECS)

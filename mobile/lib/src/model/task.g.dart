@@ -42,6 +42,8 @@ class _$Task extends Task {
   @override
   final int failureRetryCount;
   @override
+  final int auditRetryCount;
+  @override
   final int attemptNumber;
   @override
   final bool auditRequired;
@@ -61,6 +63,8 @@ class _$Task extends Task {
   final DateTime updatedAt;
   @override
   final BuiltList<String> dependsOn;
+  @override
+  final BuiltList<Attachment> attachments;
 
   factory _$Task([void Function(TaskBuilder)? updates]) =>
       (TaskBuilder()..update(updates))._build();
@@ -83,6 +87,7 @@ class _$Task extends Task {
       this.leaseExpiresAt,
       this.lastCheckpointAt,
       required this.failureRetryCount,
+      required this.auditRetryCount,
       required this.attemptNumber,
       required this.auditRequired,
       this.reviewReason,
@@ -92,7 +97,8 @@ class _$Task extends Task {
       this.createdBy,
       required this.createdAt,
       required this.updatedAt,
-      required this.dependsOn})
+      required this.dependsOn,
+      required this.attachments})
       : super._();
   @override
   Task rebuild(void Function(TaskBuilder) updates) =>
@@ -122,6 +128,7 @@ class _$Task extends Task {
         leaseExpiresAt == other.leaseExpiresAt &&
         lastCheckpointAt == other.lastCheckpointAt &&
         failureRetryCount == other.failureRetryCount &&
+        auditRetryCount == other.auditRetryCount &&
         attemptNumber == other.attemptNumber &&
         auditRequired == other.auditRequired &&
         reviewReason == other.reviewReason &&
@@ -131,7 +138,8 @@ class _$Task extends Task {
         createdBy == other.createdBy &&
         createdAt == other.createdAt &&
         updatedAt == other.updatedAt &&
-        dependsOn == other.dependsOn;
+        dependsOn == other.dependsOn &&
+        attachments == other.attachments;
   }
 
   @override
@@ -154,6 +162,7 @@ class _$Task extends Task {
     _$hash = $jc(_$hash, leaseExpiresAt.hashCode);
     _$hash = $jc(_$hash, lastCheckpointAt.hashCode);
     _$hash = $jc(_$hash, failureRetryCount.hashCode);
+    _$hash = $jc(_$hash, auditRetryCount.hashCode);
     _$hash = $jc(_$hash, attemptNumber.hashCode);
     _$hash = $jc(_$hash, auditRequired.hashCode);
     _$hash = $jc(_$hash, reviewReason.hashCode);
@@ -164,6 +173,7 @@ class _$Task extends Task {
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jc(_$hash, dependsOn.hashCode);
+    _$hash = $jc(_$hash, attachments.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -188,6 +198,7 @@ class _$Task extends Task {
           ..add('leaseExpiresAt', leaseExpiresAt)
           ..add('lastCheckpointAt', lastCheckpointAt)
           ..add('failureRetryCount', failureRetryCount)
+          ..add('auditRetryCount', auditRetryCount)
           ..add('attemptNumber', attemptNumber)
           ..add('auditRequired', auditRequired)
           ..add('reviewReason', reviewReason)
@@ -197,7 +208,8 @@ class _$Task extends Task {
           ..add('createdBy', createdBy)
           ..add('createdAt', createdAt)
           ..add('updatedAt', updatedAt)
-          ..add('dependsOn', dependsOn))
+          ..add('dependsOn', dependsOn)
+          ..add('attachments', attachments))
         .toString();
   }
 }
@@ -283,6 +295,11 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
   set failureRetryCount(int? failureRetryCount) =>
       _$this._failureRetryCount = failureRetryCount;
 
+  int? _auditRetryCount;
+  int? get auditRetryCount => _$this._auditRetryCount;
+  set auditRetryCount(int? auditRetryCount) =>
+      _$this._auditRetryCount = auditRetryCount;
+
   int? _attemptNumber;
   int? get attemptNumber => _$this._attemptNumber;
   set attemptNumber(int? attemptNumber) =>
@@ -328,6 +345,12 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
   set dependsOn(ListBuilder<String>? dependsOn) =>
       _$this._dependsOn = dependsOn;
 
+  ListBuilder<Attachment>? _attachments;
+  ListBuilder<Attachment> get attachments =>
+      _$this._attachments ??= ListBuilder<Attachment>();
+  set attachments(ListBuilder<Attachment>? attachments) =>
+      _$this._attachments = attachments;
+
   TaskBuilder() {
     Task._defaults(this);
   }
@@ -352,6 +375,7 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
       _leaseExpiresAt = $v.leaseExpiresAt;
       _lastCheckpointAt = $v.lastCheckpointAt;
       _failureRetryCount = $v.failureRetryCount;
+      _auditRetryCount = $v.auditRetryCount;
       _attemptNumber = $v.attemptNumber;
       _auditRequired = $v.auditRequired;
       _reviewReason = $v.reviewReason;
@@ -362,6 +386,7 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
       _createdAt = $v.createdAt;
       _updatedAt = $v.updatedAt;
       _dependsOn = $v.dependsOn.toBuilder();
+      _attachments = $v.attachments.toBuilder();
       _$v = null;
     }
     return this;
@@ -410,6 +435,8 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
             lastCheckpointAt: lastCheckpointAt,
             failureRetryCount: BuiltValueNullFieldError.checkNotNull(
                 failureRetryCount, r'Task', 'failureRetryCount'),
+            auditRetryCount: BuiltValueNullFieldError.checkNotNull(
+                auditRetryCount, r'Task', 'auditRetryCount'),
             attemptNumber: BuiltValueNullFieldError.checkNotNull(
                 attemptNumber, r'Task', 'attemptNumber'),
             auditRequired: BuiltValueNullFieldError.checkNotNull(
@@ -426,6 +453,7 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
             updatedAt: BuiltValueNullFieldError.checkNotNull(
                 updatedAt, r'Task', 'updatedAt'),
             dependsOn: dependsOn.build(),
+            attachments: attachments.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -437,6 +465,8 @@ class TaskBuilder implements Builder<Task, TaskBuilder> {
 
         _$failedField = 'dependsOn';
         dependsOn.build();
+        _$failedField = 'attachments';
+        attachments.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(r'Task', _$failedField, e.toString());
       }

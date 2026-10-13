@@ -96,6 +96,14 @@ class TransitionReason(models.TextChoices):
     # through the same extension point as every other row.
     SUBMIT_UNREVIEWED = "submit_unreviewed", "submit_unreviewed"
     SUBMIT_POLICY_APPROVED = "submit_policy_approved", "submit_policy_approved"
+    # WP-3.3 rows (T11-T14): catalog-first (Section 20.4 item 5) — the new
+    # codes are the Section 9.6 event strings verbatim as ADR-010 snake_case
+    # machine values (`audit.claimed`/`audit.passed`/`audit.escalated`), never
+    # free text; T12 reuses the existing `lease_expired` code (its Section
+    # 9.6 event is the same `task.lease_expired` string T5 emits).
+    AUDIT_CLAIMED = "audit_claimed", "audit_claimed"
+    AUDIT_PASSED = "audit_passed", "audit_passed"
+    AUDIT_ESCALATED = "audit_escalated", "audit_escalated"
 
 
 class TransitionQuerySet(models.QuerySet["TaskTransition"]):

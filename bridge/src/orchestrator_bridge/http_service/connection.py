@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Any, Final
 from ..logging import get_logger
 from ..server import create_server
 from ..session import AgentSession, close_session
+from ..submission_spool import SubmissionSpool
 from ..tools.runtime import ToolRuntime
 from .binding import OpenedConnection, connection_settings
 
@@ -117,7 +118,17 @@ def create_connection(
     bounds (MT-2.9-03: one capacity authority, one idle authority).
     """
     conn_settings = connection_settings(settings, token)
-    runtime = ToolRuntime.from_session(opened.binding, opened.client, opened.session)
+    # MT-2.6-05 in HTTP mode: submissions still persist before upload (the
+    # spool is bound; hold/ack work identically). The startup *resume sweep*
+    # is stdio-wired only for now — a per-connection sweep needs a
+    # project-level cadence decision (recorded follow-up, WP-2.6 changelog);
+    # entries simply wait on disk until a stdio bridge for the project runs.
+    runtime = ToolRuntime.from_session(
+        opened.binding,
+        opened.client,
+        opened.session,
+        spool=SubmissionSpool.default(),
+    )
     server = create_server(settings, runtime=runtime)
     project_id = opened.binding.project_id
     server.streamable_http_app(

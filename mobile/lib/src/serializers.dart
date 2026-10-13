@@ -21,8 +21,14 @@ import 'package:orchestrator_mobile/src/model/agent_session_create.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_request.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_response.dart';
 import 'package:orchestrator_mobile/src/model/attachment.dart';
+import 'package:orchestrator_mobile/src/model/attachment_content.dart';
 import 'package:orchestrator_mobile/src/model/attachment_delete.dart';
 import 'package:orchestrator_mobile/src/model/attachment_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/audit_decision.dart';
+import 'package:orchestrator_mobile/src/model/audit_report.dart';
+import 'package:orchestrator_mobile/src/model/audit_report_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/audit_verdict_request.dart';
+import 'package:orchestrator_mobile/src/model/audit_verdict_response.dart';
 import 'package:orchestrator_mobile/src/model/capability_enum.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_create.dart';
@@ -57,6 +63,7 @@ import 'package:orchestrator_mobile/src/model/patched_project_policy.dart';
 import 'package:orchestrator_mobile/src/model/patched_project_update.dart';
 import 'package:orchestrator_mobile/src/model/patched_task_update.dart';
 import 'package:orchestrator_mobile/src/model/platform_enum.dart';
+import 'package:orchestrator_mobile/src/model/policy_decision_enum.dart';
 import 'package:orchestrator_mobile/src/model/policy_preset_enum.dart';
 import 'package:orchestrator_mobile/src/model/priority_enum.dart';
 import 'package:orchestrator_mobile/src/model/project.dart';
@@ -64,6 +71,7 @@ import 'package:orchestrator_mobile/src/model/project_create.dart';
 import 'package:orchestrator_mobile/src/model/project_dashboard_card.dart';
 import 'package:orchestrator_mobile/src/model/project_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/project_policy.dart';
+import 'package:orchestrator_mobile/src/model/proposed_verdict_enum.dart';
 import 'package:orchestrator_mobile/src/model/refreshed.dart';
 import 'package:orchestrator_mobile/src/model/release_request.dart';
 import 'package:orchestrator_mobile/src/model/resolution.dart';
@@ -73,6 +81,7 @@ import 'package:orchestrator_mobile/src/model/resolution_submit.dart';
 import 'package:orchestrator_mobile/src/model/resolution_task_state.dart';
 import 'package:orchestrator_mobile/src/model/resolution_write_response.dart';
 import 'package:orchestrator_mobile/src/model/revoked.dart';
+import 'package:orchestrator_mobile/src/model/role_enum.dart';
 import 'package:orchestrator_mobile/src/model/rules_block.dart';
 import 'package:orchestrator_mobile/src/model/state_counts.dart';
 import 'package:orchestrator_mobile/src/model/state_enum.dart';
@@ -83,6 +92,8 @@ import 'package:orchestrator_mobile/src/model/token_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/token_summary.dart';
 import 'package:orchestrator_mobile/src/model/transport_enum.dart';
 import 'package:orchestrator_mobile/src/model/user_summary.dart';
+import 'package:orchestrator_mobile/src/model/verdict_enum.dart';
+import 'package:orchestrator_mobile/src/model/verdict_task_state.dart';
 
 part 'serializers.g.dart';
 
@@ -94,8 +105,14 @@ part 'serializers.g.dart';
   AgentTokenIssueRequest,
   AgentTokenIssueResponse,
   Attachment,
+  AttachmentContent,
   AttachmentDelete,
   AttachmentListEnvelope,
+  AuditDecision,
+  AuditReport,
+  AuditReportListEnvelope,
+  AuditVerdictRequest,
+  AuditVerdictResponse,
   CapabilityEnum,
   Checkpoint,
   CheckpointCreate,
@@ -130,6 +147,7 @@ part 'serializers.g.dart';
   PatchedProjectUpdate,
   PatchedTaskUpdate,
   PlatformEnum,
+  PolicyDecisionEnum,
   PolicyPresetEnum,
   PriorityEnum,
   Project,
@@ -137,6 +155,7 @@ part 'serializers.g.dart';
   ProjectDashboardCard,
   ProjectListEnvelope,
   ProjectPolicy,
+  ProposedVerdictEnum,
   Refreshed,
   ReleaseRequest,
   Resolution,
@@ -146,6 +165,7 @@ part 'serializers.g.dart';
   ResolutionTaskState,
   ResolutionWriteResponse,
   Revoked,
+  RoleEnum,
   RulesBlock,
   StateCounts,
   StateEnum,
@@ -156,6 +176,8 @@ part 'serializers.g.dart';
   TokenSummary,
   TransportEnum,
   UserSummary,
+  VerdictEnum,
+  VerdictTaskState,
 ])
 Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
@@ -163,8 +185,22 @@ Serializers serializers = (_$serializers.toBuilder()
         () => MapBuilder<String, String>(),
       )
       ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(TokenSummary)]),
+        () => ListBuilder<TokenSummary>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(AuditReport)]),
+        () => ListBuilder<AuditReport>(),
+      )
+      ..addBuilderFactory(
         const FullType(BuiltList, [FullType(ProjectDashboardCard)]),
         () => ListBuilder<ProjectDashboardCard>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [
+          FullType(BuiltMap, [FullType(String), FullType(JsonObject)])
+        ]),
+        () => ListBuilder<BuiltMap<String, JsonObject>>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(EventEnvelope)]),
@@ -173,10 +209,6 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Resolution)]),
         () => ListBuilder<Resolution>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(TokenSummary)]),
-        () => ListBuilder<TokenSummary>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Checkpoint)]),

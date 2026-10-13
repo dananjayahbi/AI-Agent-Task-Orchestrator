@@ -35,6 +35,7 @@ from orchestrator_bridge import correlation
 from orchestrator_bridge.config import RunMode, Settings
 from orchestrator_bridge.manifest import StartupBinding
 from orchestrator_bridge.session import AgentSession, ProjectContext
+from orchestrator_bridge.submission_spool import SubmissionSpool
 from orchestrator_bridge.tools.runtime import ToolRuntime
 from orchestrator_bridge.transport import ApiClient, WireResponse
 
@@ -290,11 +291,18 @@ def build_runtime(
     *,
     context: ProjectContext | None = None,
     settings: Settings | None = None,
+    spool: SubmissionSpool | None = None,
+    binding: StartupBinding | None = None,
 ) -> ToolRuntime:
-    """A runtime bound to the fixture project over the fake transport."""
+    """A runtime bound to the fixture project over the fake transport.
+
+    ``spool``/``binding`` exist for the WP-2.6 tools: submission tests inject
+    a tmp-path spool (never a real user profile), and git tests bind a real
+    fixture repository's manifest.
+    """
     backend = fake if fake is not None else FakeBackend()
-    binding = build_binding()
-    client = ApiClient.for_binding(binding, settings or build_settings(), send=backend.send)
+    bound = binding if binding is not None else build_binding()
+    client = ApiClient.for_binding(bound, settings or build_settings(), send=backend.send)
     session = AgentSession(
         agent_session_id="fixture-session-0001",
         context=context
@@ -306,7 +314,7 @@ def build_runtime(
             policy_summary={"max_concurrent_tasks": 1, "lease_duration_minutes": 45},
         ),
     )
-    return ToolRuntime.from_session(binding, client, session)
+    return ToolRuntime.from_session(bound, client, session, spool=spool)
 
 
 @pytest.fixture

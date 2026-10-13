@@ -41,6 +41,8 @@ type TaskCardProps = {
   nowMs: number;
   /** Known attachment count; unknown until the contract exposes it (OQ-4.3-01). */
   attachmentCount?: number | null;
+  /** MT-4.5-01 entry point: opens the task modal in edit mode. */
+  onEdit?: ((task: Task) => void) | undefined;
 };
 
 /** Section 8.1 note: merge-pending is a sub-status badge, never a column. */
@@ -54,6 +56,7 @@ export function TaskCard({
   stalledAfterMinutes = DEFAULT_STALLED_AFTER_MINUTES,
   nowMs,
   attachmentCount = null,
+  onEdit,
 }: TaskCardProps) {
   const move = useBoardMove();
   const [moveOpen, setMoveOpen] = useState(false);
@@ -90,6 +93,18 @@ export function TaskCard({
         </span>
         <div className="flex items-center gap-1">
           <PriorityChip priority={task.priority} />
+          {onEdit !== undefined && (
+            <button
+              type="button"
+              data-testid="task-card-edit"
+              aria-label={`Edit task ${task.id}`}
+              title={`Edit ${task.id}`}
+              onClick={() => onEdit(task)}
+              className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              Edit
+            </button>
+          )}
           {move !== null && (
             <button
               type="button"

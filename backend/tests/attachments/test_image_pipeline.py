@@ -195,13 +195,19 @@ def test_description_provider_disabled_completes_ocr_only(task: Any) -> None:
 
 
 def test_unimplemented_description_provider_fails_fast() -> None:
-    """A configured-but-unimplemented provider is a config error (9.10)."""
+    """A configured-but-undelivered provider is a config error (9.10).
+
+    WP-1.13 delivered ``disabled`` and ``anthropic-vision``; the
+    Section 9.5 ``local model`` stays undelivered (no OQ asks for it),
+    so it is the fail-fast example now.
+    """
     from django.core.exceptions import ImproperlyConfigured
 
-    with override_settings(DESCRIPTION_PROVIDER="anthropic-vision"):
+    with override_settings(DESCRIPTION_PROVIDER="local-model"):
         with pytest.raises(ImproperlyConfigured) as caught:
             get_description_provider()
-    assert "WP-1.13" in str(caught.value)
+    assert "local-model" in str(caught.value)
+    assert "anthropic-vision" in str(caught.value)  # names the supported set
 
 
 # --- derived data, originals, idempotence (Section 9.5; risk notes) ---------

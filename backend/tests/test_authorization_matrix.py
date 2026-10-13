@@ -58,7 +58,6 @@ from apps.accounts.permissions import (
     CanPublishTasks,
     CanReadMergeQueue,
     CanReviewDecisions,
-    CanSubmitAuditVerdict,
 )
 from apps.core.errors import (
     AUTH_FORBIDDEN_PROJECT,
@@ -69,7 +68,7 @@ from apps.core.errors import (
     VALIDATION_ERROR,
 )
 from apps.projects.models import Project, ProjectPolicy
-from apps.tasks.models import Task, TaskState
+from apps.tasks.models import Task, TaskResolution, TaskState
 
 # WP-1.6: the two Claim rows now claim through the *real* route, whose
 # service calls ``ensure_wired()`` and replaces the T4/T6 stubs on the
@@ -141,7 +140,9 @@ urlpatterns = [
     # *Submit resolution* onto the real submission route (its probe path
     # retired with it — the landing cases below carry the row).
     path("probe/publish", _probe_view(CanPublishTasks).as_view()),
-    path("probe/verdict", _probe_view(CanSubmitAuditVerdict).as_view()),
+    # WP-3.3 retired the *Submit verdict* probe: the row now runs on
+    # the real ``POST /api/v1/tasks/{id}/audit-verdict`` below (its
+    # permission class is the accounts row the probe used to mount).
     path("probe/review", _probe_view(CanReviewDecisions).as_view()),
     path("probe/merge-queue", _probe_view(CanReadMergeQueue).as_view()),
     path("probe/merge-queue/start", _probe_view(CanOperateMergeQueue).as_view()),
@@ -166,6 +167,9 @@ urlpatterns = [
     # WP-1.11's real attachment routes — the landed Attachments-row cases
     # (upload/list/detail/delete) run against them below.
     path("api/v1/", include("apps.attachments.urls")),
+    # WP-3.3's real audit routes (MT-3.3-04/05) — the *Submit verdict*
+    # row and the landed audit-route cases below resolve here.
+    path("api/v1/", include("apps.audit.urls")),
 ]
 
 
@@ -212,25 +216,30 @@ PROBES: tuple[_Probe, ...] = (
     ),
     _Probe("Publish tasks", "/probe/publish", "POST", _cells(owner=True, device=True)),
     # Both *Claim* rows run on the real WP-1.6 route (MT-1.6-07): the
-    # service answers 200 (claimed) — or, for the to_be_audited row, 409:
-    # the auditor path runs through the T11 transition guard and WP-3.x
-    # wires it, so "allowed" there means "passed authorization, reached
-    # the state machine". Denied actors never reach the service (403).
+    # service answers 200 — the to_be_audited cell now carries the
+    # Section 10.5 ``role: auditor`` input and succeeds outright since
+    # WP-3.3 wired T11 (the fixture seeds the current-attempt resolution
+    # the G-20 independence guard compares against). Denied actors
+    # never reach the service (403).
     _Probe(
         "Claim pending",
         f"/api/v1/tasks/{PID_ONE}-T001/claim",
         "POST",
         _cells(coder=True),
         payload={"session_id": "sess-matrix-claim", "worker_agent_id": "matrix-coder"},
-        ok=(200, 409),
+        ok=(200,),
     ),
     _Probe(
         "Claim to_be_audited",
         f"/api/v1/tasks/{PID_ONE}-T002/claim",
         "POST",
         _cells(auditor=True),
-        payload={"session_id": "sess-matrix-audit", "worker_agent_id": "matrix-auditor"},
-        ok=(200, 409),
+        payload={
+            "session_id": "sess-matrix-audit",
+            "worker_agent_id": "matrix-auditor",
+            "role": "auditor",
+        },
+        ok=(200,),
     ),
     # *Submit resolution* runs on the real WP-3.2 route (its probe path
     # retired with the deferred entries below): the earlier *Claim
@@ -253,7 +262,22 @@ PROBES: tuple[_Probe, ...] = (
         },
         ok=(201,),
     ),
-    _Probe("Submit verdict", "/probe/verdict", "POST", _cells(auditor=True)),
+    _Probe(
+        "Submit verdict",
+        f"/api/v1/tasks/{PID_ONE}-T002/audit-verdict",
+        "POST",
+        _cells(auditor=True),
+        payload={
+            "session_id": "sess-matrix-audit",
+            "lease_generation": 1,
+            "task_id": f"{PID_ONE}-T002",
+            "verdict": "pass",
+            "confidence": 4,
+            "notes": "matrix audit",
+            "evidence": {"commands": [{"label": "tests", "command": "pytest -q", "exit_code": 0}]},
+        },
+        ok=(201,),
+    ),
     _Probe("Review decisions", "/probe/review", "POST", _cells(owner=True, device=True)),
     # Merge queue: Owner's cell is *Read* — the write half is the executor's.
     _Probe("Merge queue", "/probe/merge-queue", "GET", _cells(owner=True, merge_executor=True)),
@@ -344,8 +368,11 @@ def matrix(owner_client: APIClient, tmp_path: Path) -> Iterator[_Authz]:
 
     # Two real task rows for the two Claim rows (WP-1.6, MT-1.6-07): a
     # pending task the coder cell claims and a to_be_audited one the
-    # auditor cell reaches (answered 409 until WP-3.x wires the T11
-    # guard). Direct rows keep the matrix self-contained.
+    # auditor cell reaches (200 since WP-3.3 wired T11). The audit row
+    # carries its current-attempt resolution — the G-20 independence
+    # guard's input (MT-3.3-02) — submitted by a *different* session so
+    # the matrix auditor is independent. Direct rows keep the matrix
+    # self-contained.
     project = Project.objects.get(id=PID_ONE)
     Task.objects.create(
         id=f"{PID_ONE}-T001",
@@ -353,11 +380,20 @@ def matrix(owner_client: APIClient, tmp_path: Path) -> Iterator[_Authz]:
         title="Claim probe (pending)",
         state=TaskState.PENDING,
     )
-    Task.objects.create(
+    audit_probe = Task.objects.create(
         id=f"{PID_ONE}-T002",
         project=project,
         title="Claim probe (to_be_audited)",
         state=TaskState.TO_BE_AUDITED,
+        attempt_number=1,
+    )
+    TaskResolution.objects.create(
+        task=audit_probe,
+        attempt_number=1,
+        branch_name=f"feat/{PID_ONE}-T002",
+        commit_sha="0123456789abcdef0123456789abcdef01234567",  # pragma: allowlist secret
+        execution_summary="matrix audit probe submission",
+        submitted_by_session="sess-matrix-coder-sub",
     )
     # The seeds occupy indices 1-2: advance the allocator's counter (it
     # lives on the project row) so the Create-drafts probe's first
@@ -385,7 +421,12 @@ def matrix(owner_client: APIClient, tmp_path: Path) -> Iterator[_Authz]:
         client = owner_client if actor == "owner" else plain
         headers = _headers(actor)
         kwargs: dict[str, Any] = {"headers": headers} if headers else {}
-        return client.post(path, data, **kwargs)
+        # The WP-3.3 *Submit verdict* probe carries the Section 10.5
+        # nested evidence object (DRF multipart refuses dict values);
+        # flat payloads keep the default multipart encoding the other
+        # probes (and the upload row's 400 path) assert against.
+        wants_json = any(isinstance(value, (dict, list)) for value in data.values())
+        return client.post(path, data, format="json" if wants_json else None, **kwargs)
 
     with (
         override_settings(ROOT_URLCONF=__name__),
@@ -812,6 +853,72 @@ def test_wp111_landed_attachment_routes_enforce_their_callers(
     assert deleted.json()["deleted_at"] is not None
 
 
+# --- WP-1.14 landing: the content route's real callers (deferred retired) ----
+
+
+def test_wp114_landed_content_route_enforces_its_callers(
+    matrix: _Authz, owner_client: APIClient, tmp_path: Path
+) -> None:
+    """Real-route cases for ``GET /attachments/{id}/content`` (deferred retired).
+
+    Same caller cell as the other reads — Section 9.2 Attachments row
+    "Owner / Agent (read)": the route answers an owner session and an
+    agent token scoped to the attachment's project, with
+    AUTH_FORBIDDEN_PROJECT for a cross-project agent (ADR-004
+    zero-bleed), ROLE_NOT_PERMITTED for devices, AUTH_REQUIRED for
+    anonymous. The not-ready 409 (ATTACHMENT_NOT_READY) lands before
+    any format work, so the freshly uploaded ``uploaded``-status fixture
+    exercises both the cell and the catalog branch (the services' full
+    error catalogs live in tests/attachments/test_content_errors.py).
+    """
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    task = f"{PID_ONE}-T001"
+    client = APIClient()
+    login = client.post("/api/v1/auth/login", {"username": "owner", "password": PASSWORD})
+    assert login.status_code == 200, login.content
+    with override_settings(STORAGE_BACKEND="local", MEDIA_ROOT=str(tmp_path)):
+        created = client.post(
+            f"/api/v1/tasks/{task}/attachments",
+            {
+                "file": SimpleUploadedFile(
+                    "wp114.png",
+                    b"\x89PNG\r\n\x1a\n" + b"\x00" * 8,
+                    content_type="image/png",
+                )
+            },
+            format="multipart",
+        )
+    assert created.status_code == 201, created.content
+    content = f"/api/v1/attachments/{created.json()['id']}/content"
+
+    # Admitted callers pass the cell and hit the catalog 409 (still
+    # `uploaded` — the pipeline has not run in this hermetic suite).
+    for actor in ("owner", "coder"):
+        response = matrix.call(actor, "GET", content)
+        assert response.status_code == 409, (actor, response.content)
+        assert _code(response) == "ATTACHMENT_NOT_READY", actor
+
+    # Not in the cell: device 403 ROLE_NOT_PERMITTED, anonymous 401.
+    device = matrix.call("device", "GET", content)
+    assert device.status_code == 403
+    assert _code(device) == ROLE_NOT_PERMITTED
+    anonymous = matrix.call("anonymous", "GET", content)
+    assert anonymous.status_code == 401
+    assert _code(anonymous) == AUTH_REQUIRED
+
+    # Cross-project agent token: AUTH_FORBIDDEN_PROJECT before the cell
+    # (issued against PID00002, addressing a PID00001 attachment).
+    issued = owner_client.post("/api/v1/tokens/agent", {"project_id": PID_TWO, "scopes": ["coder"]})
+    assert issued.status_code == 201, issued.content
+    foreign = APIClient()
+    foreign_token = issued.json()["token"]
+    foreign.credentials(HTTP_AUTHORIZATION="Bearer " + foreign_token)
+    denied = foreign.get(content)
+    assert denied.status_code == 403
+    assert _code(denied) == AUTH_FORBIDDEN_PROJECT
+
+
 # --- WP-2.x activation: §9.2 agent read-only cells on their real routes -----
 
 
@@ -984,6 +1091,96 @@ def test_wp32_landed_resolution_routes_enforce_their_callers(matrix: _Authz) -> 
     assert agent_patch.json()["patch"] == ""
 
 
+# --- WP-3.3 landing: the Audit row's real callers (deferred retired) ---------
+
+
+def test_wp33_landed_audit_routes_enforce_their_callers(matrix: _Authz) -> None:
+    """Real-route cases for audit-verdict POST + audit-reports GET (removed deferred).
+
+    POST's caller cell is **Auditor, current lease owner** (Section 12.2
+    "Submit verdict" — Owner's cell is No there): anonymous 401;
+    owner/device/coder 403 ``ROLE_NOT_PERMITTED``; the auditor's own
+    POST runs the real gates (a foreign session 403 ``LEASE_NOT_OWNED``,
+    a stale generation 409 ``LEASE_EXPIRED``) and lands 201 with a
+    stored Section 7.2 report (the service's full catalog lives in
+    ``tests/test_audit_verdict.py``). The GET is the Section 9.2
+    **Auditor / Owner** cell: anonymous 401, device/coder 403, owner and
+    auditor 200 — scope still answers ``AUTH_FORBIDDEN_PROJECT`` before
+    role logic (ADR-004 zero-bleed, asserted on the reports route in
+    ``tests/test_audit_report.py``).
+    """
+    task = f"{PID_ONE}-T002"
+    verdict = f"/api/v1/tasks/{task}/audit-verdict"
+    reports = f"/api/v1/tasks/{task}/audit-reports"
+    body = {
+        "session_id": "sess-wp33-lander",
+        "lease_generation": 1,
+        "task_id": task,
+        "verdict": "pass",
+        "confidence": 4,
+        "notes": "wp33 landing",
+        "evidence": {"commands": [{"label": "tests", "command": "pytest -q", "exit_code": 0}]},
+    }
+
+    # POST (auditor lease owner): denied shapes die at the permission gate.
+    anon_post = matrix.call("anonymous", "POST", verdict)
+    assert anon_post.status_code == 401
+    assert _code(anon_post) == AUTH_REQUIRED
+
+    for denied in ("owner", "device", "coder"):
+        refused = matrix.post(denied, verdict, body)
+        assert refused.status_code == 403, denied
+        assert _code(refused) == ROLE_NOT_PERMITTED, denied
+
+    # The auditor reaches the service: claim first (Section 9.3/T11),
+    # then the lease checks answer their catalog codes for the wrong
+    # callers before anything persists.
+    claim = matrix.post(
+        "auditor",
+        f"/api/v1/tasks/{task}/claim",
+        {
+            "session_id": "sess-wp33-lander",
+            "worker_agent_id": "matrix-auditor",
+            "role": "auditor",
+        },
+    )
+    assert claim.status_code == 200, claim.content
+
+    foreign = matrix.post("auditor", verdict, {**body, "session_id": "sess-intruder"})
+    assert foreign.status_code == 403
+    assert _code(foreign) == "LEASE_NOT_OWNED"
+
+    stale = matrix.post("auditor", verdict, {**body, "lease_generation": 0})
+    assert stale.status_code == 409
+    assert _code(stale) == "LEASE_EXPIRED"
+
+    submitted = matrix.post("auditor", verdict, body)
+    assert submitted.status_code == 201, submitted.content
+    submitted_body = submitted.json()
+    assert submitted_body["report"]["proposed_verdict"] == "pass"
+    assert submitted_body["task"]["state"] == "in_human_review", "fail-closed T14"
+
+    # GET /tasks/{id}/audit-reports (Auditor / Owner).
+    anon_list = matrix.call("anonymous", "GET", reports)
+    assert anon_list.status_code == 401
+    assert _code(anon_list) == AUTH_REQUIRED
+
+    device_list = matrix.call("device", "GET", reports)
+    assert device_list.status_code == 403
+    assert _code(device_list) == ROLE_NOT_PERMITTED
+
+    coder_list = matrix.call("coder", "GET", reports)
+    assert coder_list.status_code == 403
+    assert _code(coder_list) == ROLE_NOT_PERMITTED
+
+    owner_list = matrix.call("owner", "GET", reports)
+    assert owner_list.status_code == 200
+
+    auditor_list = matrix.call("auditor", "GET", reports)
+    assert auditor_list.status_code == 200
+    assert len(auditor_list.json()["results"]) == 1
+
+
 # --- deferred routes: an untested row must never be silently green ----------
 
 
@@ -1020,8 +1217,11 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     # carries the real POST/GET cases (the *Submit resolution* matrix
     # row now runs on the real route in PROBES above), so the
     # resolution paths are asserted live instead of absent.
-    "/api/v1/tasks/1/audit-verdict",  # Submit verdict (WP-1.6)
-    "/api/v1/tasks/1/audit-reports",  # WP-1.6
+    # WP-3.3 removed its two audit entries as it landed the Audit row:
+    # the *Submit verdict* row runs on the real route in PROBES above
+    # and test_wp33_landed_audit_routes_enforce_their_callers below
+    # carries the verdict/reports per-caller cases (leak-guard: the
+    # rows are now asserted live, never left untested — MT-1.2-07).
     "/api/v1/tasks/1/review",  # Review decisions (WP-1.5/1.6)
     "/api/v1/merge/pending",  # Merge queue read (WP-3.x)
     "/api/v1/merge/1/start",  # Merge queue write (WP-3.x)
@@ -1031,7 +1231,9 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     # below carries the real per-actor cases (the Section 9.2 Attachments
     # caller column "Owner / Agent (read)" — §12.2 prints no attachments
     # capability row, so no PROBES entry exists or is needed).
-    "/api/v1/attachments/1/content",  # WP-1.14 (MT-1.11-04 out of scope)
+    # WP-1.14 removed /api/v1/attachments/1/content as it landed the
+    # route: test_wp114_landed_content_route_enforces_its_callers below
+    # carries the real per-actor cases on the live endpoint.
     # WP-1.10 (MT-1.10-05) removed its entries as it landed them: the
     # *Read events* row now runs on the real /api/v1/events and
     # /api/v1/events/stream routes (probes above), and

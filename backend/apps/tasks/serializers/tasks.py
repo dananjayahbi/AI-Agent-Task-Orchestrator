@@ -22,8 +22,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.attachments.models import TaskAttachment
+from apps.attachments.serializers import AttachmentSerializer
+from apps.attachments.services import attachment_payload
 from apps.core.pagination import MAX_PAGE_SIZE
 from apps.core.serializers import StrictSerializerMixin
 
@@ -45,7 +49,12 @@ EDITABLE_FIELDS: tuple[str, ...] = (
 
 
 class TaskSerializer(serializers.Serializer[Any]):
-    """GET representation of a task — Section 7.2 fields, in plan order."""
+    """GET representation of a task — Section 7.2 fields, in plan order.
+
+    One documented addition beyond the 7.2 table: ``attachments`` — the
+    FR-ATT-03 descriptor list (MT-1.14-01; descriptors only, content
+    stays lazy behind the Section 9.2 content endpoint).
+    """
 
     id = serializers.CharField(
         read_only=True,
@@ -93,6 +102,11 @@ class TaskSerializer(serializers.Serializer[Any]):
     lease_expires_at = serializers.DateTimeField(allow_null=True, read_only=True)
     last_checkpoint_at = serializers.DateTimeField(allow_null=True, read_only=True)
     failure_retry_count = serializers.IntegerField(read_only=True)
+    audit_retry_count = serializers.IntegerField(
+        read_only=True,
+        help_text="WP-3.3 / Section 8.2 T12: audit leases released by expiry "
+        "(kept separate from failure_retry_count — Section 8.3 invariant 1).",
+    )
     attempt_number = serializers.IntegerField(read_only=True)
     audit_required = serializers.BooleanField(
         read_only=True,
@@ -132,6 +146,37 @@ class TaskSerializer(serializers.Serializer[Any]):
             .order_by("depends_on_id")
             .values_list("depends_on_id", flat=True)
         )
+
+    attachments = serializers.SerializerMethodField(
+        help_text=(
+            "FR-ATT-03 attachment descriptors — one per live attachment: "
+            "`id`, `filename`, `size`, `token_count`, `short_description` "
+            "(the MT-1.11-04 field set, one shape with the listing "
+            "endpoints). Descriptors only — attachment content and derived "
+            "text are never embedded; they are fetched on demand from "
+            "GET /attachments/{id}/content (FR-ATT-03's lazy model, "
+            "FR-ATT-04). `token_count` and `short_description` are null "
+            "before `ready` and after OCR-only degradation. Newest first. "
+            "Every response that returns a task object carries them "
+            "(MT-1.14-01's recorded reading)."
+        )
+    )
+
+    @extend_schema_field(AttachmentSerializer(many=True))
+    def get_attachments(self, obj: Task) -> list[dict[str, Any]]:
+        """FR-ATT-03 descriptors for *obj* — reuse the prefetch when primed.
+
+        Built by :func:`apps.attachments.services.attachment_payload` —
+        the single descriptor-shape source shared with the upload and
+        listing endpoints (MT-1.11-04; MT-1.14-01's drift-prevention
+        risk note).
+        """
+        cache = getattr(obj, "_prefetched_objects_cache", None) or {}
+        if "attachments" in cache:
+            rows = obj.attachments.all()
+        else:
+            rows = TaskAttachment.objects.filter(task=obj)
+        return [attachment_payload(row) for row in rows.order_by("-created_at", "-pk")]
 
 
 class TaskCreateSerializer(StrictSerializerMixin, serializers.Serializer[Any]):

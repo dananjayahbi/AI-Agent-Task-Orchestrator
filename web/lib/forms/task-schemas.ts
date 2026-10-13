@@ -92,8 +92,7 @@ export function validateTaskCoreFields(values: TaskFormValues): TaskFieldErrors 
  * field key in `VALIDATION_ERROR` details is enough to attach this
  * generic guidance to that field.
  */
-export const SERVER_REJECTED_FIELD =
-  'The server rejected this value. Review it and try again.';
+export const SERVER_REJECTED_FIELD = 'The server rejected this value. Review it and try again.';
 
 const KNOWN_FIELDS: readonly TaskFormField[] = [
   'title',
@@ -120,6 +119,36 @@ export function fieldErrorsFromDetails(details: unknown): TaskFieldErrors {
   for (const field of KNOWN_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(details, field)) {
       errors[field] = SERVER_REJECTED_FIELD;
+    }
+  }
+  return errors;
+}
+
+export type ListFieldIndexErrors = Record<number, string>;
+
+/**
+ * Map one *list* field's `VALIDATION_ERROR` details (the backend's
+ * per-index `{field: {index: [...]}}` shape) onto friendly per-index
+ * messages (MT-4.5-03). Unrecognized shapes degrade to no index errors —
+ * the field-level message from `fieldErrorsFromDetails` still lands, so a
+ * new server detail shape can never crash the form.
+ */
+export function listFieldErrorsFromDetails(
+  details: unknown,
+  field: TaskFormField,
+): ListFieldIndexErrors {
+  const errors: ListFieldIndexErrors = {};
+  if (typeof details !== 'object' || details === null) {
+    return errors;
+  }
+  const perField = (details as Record<string, unknown>)[field];
+  if (typeof perField !== 'object' || perField === null) {
+    return errors;
+  }
+  for (const key of Object.keys(perField)) {
+    const index = Number(key);
+    if (Number.isInteger(index) && index >= 0) {
+      errors[index] = SERVER_REJECTED_FIELD;
     }
   }
   return errors;

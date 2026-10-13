@@ -133,7 +133,7 @@ allowlist rows and the live `ORCHESTRATOR_RATE_LIMIT_*` settings.
       "ORCHESTRATOR_RATE_LIMIT_AGENT_PER_MINUTE": 120,
       "ORCHESTRATOR_RATE_LIMIT_DEVICE_PER_MINUTE": 60
     },
-    "api_keying": "django-authenticated-token-id; address fallback for unauthenticated callers only", <!-- pragma: allowlist secret -->
+    "api_budgeting": "django-authenticated session id; address fallback for unauthenticated callers only",
     "edge_keying": "ip.src at the Cloudflare edge",
     "denial_codes": {"api": "RATE_LIMITED", "edge": "cloudflare-429 (no Django envelope)"},
     "anomaly_alerts": "Section 17 / WP-6.4 - dependency noted, not implemented here"

@@ -19,10 +19,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..api_errors import ApiError
+from ..api_errors import ApiError, ErrorCode
 from ..error_translation import TranslatedError, translate_error
+from ..git_helper.errors import GitHelperError
 
-__all__ = ["ToolFailure", "failure_from_api_error", "payload_text"]
+__all__ = ["ToolFailure", "failure_from_api_error", "failure_from_git_error", "payload_text"]
 
 
 class ToolFailure(Exception):
@@ -36,6 +37,28 @@ class ToolFailure(Exception):
 def failure_from_api_error(error: ApiError) -> ToolFailure:
     """Translate a typed backend error into a tool failure (MT-2.3-04)."""
     return ToolFailure(translate_error(error))
+
+
+def failure_from_git_error(error: GitHelperError) -> ToolFailure:
+    """Wrap a WP-2.10 Git-helper failure as the tool layer's structured failure.
+
+    The helper speaks the same Section 9.2 catalog and the same
+    hint/next-action contract (its own docstring pins the mirroring), so the
+    conversion is a structural copy: code, message, hint, next action,
+    retryable flag and details — with no backend correlation id, since no
+    HTTP call was involved (MT-2.6-02 consumes this).
+    """
+    return ToolFailure(
+        TranslatedError(
+            code=ErrorCode(str(error.code)),
+            message=error.message,
+            hint=error.hint,
+            next_action=error.next_action,
+            retryable=error.retryable,
+            details=error.details,
+            correlation_id=None,
+        )
+    )
 
 
 def payload_text(tool_name: str, translated: TranslatedError) -> str:

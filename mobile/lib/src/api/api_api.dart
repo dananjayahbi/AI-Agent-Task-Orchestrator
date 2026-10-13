@@ -17,8 +17,12 @@ import 'package:orchestrator_mobile/src/model/agent_session_create.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_request.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_response.dart';
 import 'package:orchestrator_mobile/src/model/attachment.dart';
+import 'package:orchestrator_mobile/src/model/attachment_content.dart';
 import 'package:orchestrator_mobile/src/model/attachment_delete.dart';
 import 'package:orchestrator_mobile/src/model/attachment_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/audit_report_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/audit_verdict_request.dart';
+import 'package:orchestrator_mobile/src/model/audit_verdict_response.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_create.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_write_response.dart';
@@ -1140,7 +1144,7 @@ class ApiApi {
   }
 
   /// claimTask
-  /// Atomically claim a pending task (Section 9.2 Agent-work row; caller: Agent coder). One transaction takes the row with &#x60;FOR UPDATE SKIP LOCKED&#x60;, re-validates state, project status, dependencies and &#x60;max_concurrent_tasks&#x60; inside the lock, sets the Section 8.6 lease and bumps &#x60;lease_generation&#x60; and &#x60;attempt_number&#x60; (FR-LEA-01/02; ADR-012 fencing). 200 returns task details, the lease record and the Section 10.6 rules block. Errors: TASK_ALREADY_CLAIMED, TASK_NOT_FOUND, TASK_STATE_CONFLICT, DEPENDENCY_UNMET, CONCURRENCY_LIMIT_REACHED, AUTH_FORBIDDEN_PROJECT — all 409/404/403 per the documented mapping. &#x60;Idempotency-Key&#x60; replays a retried claim without leasing twice (NFR-12).
+  /// Atomically claim one task (Section 9.2 Agent-work row; caller: Agent — the token&#39;s scopes pick the Section 12.2 cell: coder for &#x60;pending&#x60; (T4), auditor for &#x60;to_be_audited&#x60; (T11)). One transaction takes the row with &#x60;FOR UPDATE SKIP LOCKED&#x60;, re-validates the declared &#x60;role&#x60; against the state plus the T4/T11 guards (project status, dependencies, &#x60;max_concurrent_tasks&#x60; for coders; auditor independence (&#x60;AUDITOR_SAME_AS_CODER&#x60;, G-20) and audit-lease availability for auditors), sets the Section 8.6 lease (policy duration, &#x60;lease_generation&#x60; + 1) and bumps &#x60;attempt_number&#x60; on coder claims only (FR-LEA-01/02; ADR-012 fencing; MT-3.3-01). 200 returns task details, the lease record (role &#x60;coder&#x60;|&#x60;auditor&#x60;) and the Section 10.6 rules block. Errors: TASK_ALREADY_CLAIMED, TASK_NOT_FOUND, TASK_STATE_CONFLICT, AUDITOR_SAME_AS_CODER, DEPENDENCY_UNMET, CONCURRENCY_LIMIT_REACHED (409); ROLE_NOT_PERMITTED, AUTH_FORBIDDEN_PROJECT (403) — all per the documented mapping. &#x60;Idempotency-Key&#x60; replays a retried claim without leasing twice (NFR-12).
   ///
   /// Parameters:
   /// * [id]
@@ -1871,6 +1875,111 @@ class ApiApi {
     );
   }
 
+  /// listAuditReports
+  /// One task&#39;s Audit Reports, newest first (Section 9.2 Audit row; caller: Auditor / Owner — the review panel and mobile review sheet read surface, MT-3.3-04). Cursor pagination per pagination.md: &#x60;page_size&#x60; (default 25, maximum 100), the opaque &#x60;cursor&#x60; from the previous page&#39;s &#x60;next_cursor&#x60;, stable (created_at, id) ordering so inserts during paging never shift or duplicate rows. Reports accumulate per resolution across T12 audit retries (recorded reading). Empty tasks return an empty page. Coder agents and devices answer ROLE_NOT_PERMITTED (403), cross-project agent tokens AUTH_FORBIDDEN_PROJECT (403), unknown tasks TASK_NOT_FOUND (404).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cursor] - Opaque cursor from the previous page's next_cursor; valid only for this task's listing (pagination.md rule 1).
+  /// * [pageSize] - Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults, same per-endpoint choice as the other list routes).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AuditReportListEnvelope] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AuditReportListEnvelope>> listAuditReports({
+    required String id,
+    String? cursor,
+    int? pageSize,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/tasks/{id}/audit-reports'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor':
+            encodeQueryParameter(_serializers, cursor, const FullType(String)),
+      if (pageSize != null)
+        r'page_size':
+            encodeQueryParameter(_serializers, pageSize, const FullType(int)),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AuditReportListEnvelope? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AuditReportListEnvelope),
+            ) as AuditReportListEnvelope;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AuditReportListEnvelope>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// listCheckpoints
   /// One task&#39;s checkpoint history, newest first (Section 9.2 Progress row; caller: Agent / Owner). Cursor pagination per WP-0.5-04: &#x60;page_size&#x60; (default 25, maximum 100), the opaque &#x60;cursor&#x60; from the previous page&#39;s &#x60;next_cursor&#x60;, stable (timestamp, id) ordering so inserts during paging never shift or duplicate rows. Empty tasks return an empty page, not an error. Cross-project agent tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown tasks TASK_NOT_FOUND (404). History/backfill only — live updates are the WP-1.10 &#x60;task.checkpoint&#x60; event stream.
   ///
@@ -2411,14 +2520,14 @@ class ApiApi {
   }
 
   /// listWork
-  /// List the project&#39;s offerable work (Section 9.2 Agent-work row; caller: Agent). &#x60;role&#x3D;coder&#x60; (default) lists &#x60;pending&#x60; tasks whose dependencies are completed; &#x60;role&#x3D;auditor&#x60; lists &#x60;to_be_audited&#x60; (the audit claim arrives with WP-3.3). Archived tasks are hidden (T19), a non-active project returns an empty list (FR-PRJ-04), order is FR-TSK-05 canonical (priority, then oldest first), cursor-paginated. This read is deliberately non-locking: the locking select-and-claim twin is the claim-next service (Section 9.3).
+  /// List the project&#39;s offerable work (Section 9.2 Agent-work row; caller: Agent). &#x60;role&#x3D;coder&#x60; (default) lists &#x60;pending&#x60; tasks whose dependencies are completed; &#x60;role&#x3D;auditor&#x60; lists &#x60;to_be_audited&#x60; — never a mixed or wrong-state listing (MT-3.3-01; the matching T11 claim takes the auditor half). Archived tasks are hidden (T19), a non-active project returns an empty list (FR-PRJ-04), order is FR-TSK-05 canonical (priority, then oldest first), cursor-paginated. This read is deliberately non-locking: the locking select-and-claim twin is the claim-next service (Section 9.3).
   ///
   /// Parameters:
   /// * [pid]
   /// * [cursor] - Opaque cursor from the previous next_cursor; valid only with the same role/priority (pagination.md rule 1).
   /// * [pageSize] - Items per page (default 25, maximum 100; values above are clamped).
   /// * [priority] - FR-TSK-05 priority filter (single value).  * `urgent` - urgent * `high` - high * `medium` - medium * `low` - low
-  /// * [role] - Which offer list to read: coder → pending (default); auditor → to_be_audited (the audit claim itself is WP-3.3's T11).  * `coder` - coder * `auditor` - auditor
+  /// * [role] - Which offer list to read: coder → pending (default); auditor → to_be_audited (T11's audit claim takes it — MT-3.3-01).  * `coder` - coder * `auditor` - auditor
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -3189,6 +3298,110 @@ class ApiApi {
     );
   }
 
+  /// retrieveAttachmentContent
+  /// Retrieve one attachment&#39;s content (Section 9.2; caller: Owner or an agent token scoped to the attachment&#39;s project). The &#x60;format&#x60; parameter follows the Section 9.5 retrieval table: &#x60;auto&#x60; (default) is text-safe — documents resolve to paginated &#x60;markdown&#x60;, images to &#x60;text_ocr&#x60; (OCR transcript plus layout description); &#x60;image_base64&#x60; serves the normalized image and answers ATTACHMENT_UNSUPPORTED_FORMAT (415) for non-images; &#x60;markdown&#x60; and &#x60;text_ocr&#x60; answer 415 where the attachment has no such representation. &#x60;page&#x60; is one-based (the pagination.md content exception): paginated responses carry &#x60;page_number&#x60;, &#x60;total_pages&#x60; and the page&#39;s token count so an agent can budget context; non-paginated responses omit them. Every delivered text value is prefixed with the untrusted-content banner (P10). Attachments not &#x60;ready&#x60; answer 409 ATTACHMENT_NOT_READY (&#x60;failed&#x60; includes the stored reason). Unknown &#x60;format&#x60;/&#x60;page&#x60; values and unknown query parameters answer VALIDATION_ERROR (400).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [format] - Section 9.5 retrieval table: auto (default; text-safe — documents resolve to markdown, images to text_ocr), image_base64, text_ocr, markdown. Unknown values answer VALIDATION_ERROR.  * `auto` - auto * `image_base64` - image_base64 * `text_ocr` - text_ocr * `markdown` - markdown
+  /// * [page] - One-based page for paginated formats (markdown; auto on documents — Section 9.5 pagination clause, the pagination.md content exception). Defaults to 1; out-of-range and non-integer values answer VALIDATION_ERROR. Ignored by the non-paginated formats.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AttachmentContent] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AttachmentContent>> retrieveAttachmentContent({
+    required String id,
+    String? format = 'auto',
+    int? page = 1,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/attachments/{id}/content'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (format != null)
+        r'format':
+            encodeQueryParameter(_serializers, format, const FullType(String)),
+      if (page != null)
+        r'page': encodeQueryParameter(_serializers, page, const FullType(int)),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AttachmentContent? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AttachmentContent),
+            ) as AttachmentContent;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AttachmentContent>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// retrieveDashboardSummary
   /// Per-project Overview cards for the Home / Overview surfaces (Section 14.1; FR-MOB-01). Every registered project appears once, ordered by project id. &#x60;state_counts&#x60; carries all six canonical G-01 states (ADR-010), zero-filled, over the project&#39;s non-archived tasks (T19 default visibility). &#x60;velocity&#x60; counts the project&#39;s completions in the trailing 7-day window on the server clock (conservative documented default — the plan states no definition; this payload is authoritative and clients never recompute it). &#x60;active_agents&#x60; counts AgentSession rows with &#x60;ended_at&#x60; null. Single-resource GET — no pagination (pagination.md). Caller: Owner only (Section 9.2); agents and devices answer ROLE_NOT_PERMITTED, anonymous callers AUTH_REQUIRED.
   ///
@@ -3628,6 +3841,122 @@ class ApiApi {
     }
 
     return Response<Task>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// submitAuditVerdict
+  /// Store the auditor&#39;s proposal and delegate the outcome to the Policy Engine seam (Section 9.2 Audit row; caller: Auditor, current lease owner — §12.2). One transaction: verify the fencing pair (&#x60;session_id&#x60; + &#x60;lease_generation&#x60;) against the locked &#x60;to_be_audited&#x60; row, re-prove independence (&#x60;AUDITOR_SAME_AS_CODER&#x60;, G-20), persist the Audit Report (§7.2: evidence verbatim, confidence 1-5, proposed verdict), then dispatch exactly one row: T14 &#x60;audit_verdict_escalated&#x60; → &#x60;in_human_review&#x60; with an enumerated §8.4 reason (the fail-closed default until MT-3.4-07 installs the engine) or T13 &#x60;audit_verdict_pass&#x60; → &#x60;merge_status &#x3D; pending&#x60; (engine approval only — invariant 8.3.4: this endpoint never approves). 201 returns the report, the post-transition task identity, the trigger and the decision. &#x60;Idempotency-Key&#x60; replays a retried verdict with no second report and no second transition. Rejections: VALIDATION_ERROR (400), LEASE_NOT_OWNED (403), ROLE_NOT_PERMITTED (403), TASK_STATE_CONFLICT / LEASE_EXPIRED / AUDITOR_SAME_AS_CODER (409), TASK_NOT_FOUND (404).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [auditVerdictRequest]
+  /// * [idempotencyKey] - Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second Audit Report or firing a second transition.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AuditVerdictResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AuditVerdictResponse>> submitAuditVerdict({
+    required String id,
+    required AuditVerdictRequest auditVerdictRequest,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/tasks/{id}/audit-verdict'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(AuditVerdictRequest);
+      _bodyData =
+          _serializers.serialize(auditVerdictRequest, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AuditVerdictResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AuditVerdictResponse),
+            ) as AuditVerdictResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AuditVerdictResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

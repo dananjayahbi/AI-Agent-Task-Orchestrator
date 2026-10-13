@@ -4,7 +4,8 @@ Every run mode builds its server here — one implementation, no per-mode drift,
 official MCP Python SDK (Section 6.6 technology decisions).
 
 With a bound session ``runtime`` (Section 10.3 steps 4–5, MT-2.2-04) the
-server advertises the WP-2.4 **five core tools** (MT-2.4-01; registration is
+server advertises the Section 10.5 tool catalog (WP-2.4's core tools plus
+WP-2.6's ``log_task_checkpoint``/``submit_task_resolution``; registration is
 the only seam that adds tools, so the inspector check stays honest) and
 carries the Section 10.6 **rules block as the initialize-time server
 instructions** (MT-2.7-03; gap G-08 channel one) — rendered from the same
@@ -63,7 +64,7 @@ def create_server(settings: Settings, *, runtime: ToolRuntime | None = None) -> 
     ``settings.log_level`` is mirrored into the SDK so its internal logging
     agrees with the bridge's structured logs. ``runtime`` is the bound
     session: present in the stdio run mode after Section 10.3's five startup
-    steps, so the five core tools are registered against it and the initialize
+    steps, so the registered tools are bound against it and the initialize
     response carries the Section 10.6 rules; ``None`` keeps the pre-WP-2.4
     empty tool set and no instructions.
     """

@@ -56,13 +56,14 @@ class Endpoint:
 
 #: Section 9.2 endpoints the bridge speaks (WP-2.4 onward consumes this table).
 BRIDGE_ENDPOINTS: Final[tuple[Endpoint, ...]] = (
-    # --- not yet in the generated document: pending, provenance recorded ------
-    Endpoint("checkpoint_create", "POST", "/api/v1/tasks/{id}/checkpoints"),
-    Endpoint("attachment_content", "GET", "/api/v1/attachments/{id}/content"),
     # --- declared in the current document -------------------------------------
     # (WP-3.2's resolution_submit entry retired at convergence: the
     # submission route is in the document and the contract test validates
-    # its request sample.)
+    # its request sample. WP-1.14's attachment_content entry retired the
+    # same way — the content route landed and this catalog lost the flag
+    # in the same change, per this file's documented stale-flag rule.)
+    Endpoint("attachment_content", "GET", "/api/v1/attachments/{id}/content"),
+    Endpoint("checkpoint_create", "POST", "/api/v1/tasks/{id}/checkpoints"),
     Endpoint("resolution_submit", "POST", "/api/v1/tasks/{id}/resolution"),
     Endpoint("attachment_list", "GET", "/api/v1/tasks/{id}/attachments"),
     Endpoint("attachment_get", "GET", "/api/v1/attachments/{id}"),
@@ -100,7 +101,7 @@ def endpoint(endpoint_id: str) -> Endpoint:
 #: route is in the document and the contract test validates its sample.
 #: WP-3.2's ``resolution_submit`` entry retired the same way — the
 #: submission route landed and this map lost the flag in the same change,
-#: per this file's documented stale-flag rule.)
-PENDING_BACKEND: Final[dict[str, str]] = {
-    "attachment_content": "WP-1.14 (attachment retrieval API)",
-}
+#: per this file's documented stale-flag rule. WP-1.14's
+#: ``attachment_content`` entry retired the same way — the content route
+#: landed and this map lost the flag in the same change.)
+PENDING_BACKEND: Final[dict[str, str]] = {}

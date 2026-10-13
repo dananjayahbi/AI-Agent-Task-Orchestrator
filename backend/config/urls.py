@@ -72,6 +72,9 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # WP-1.11 attachment surface (MT-1.11-03/04/05 — the Section 9.2
     # Attachments row: upload, list, detail, delete).
     path("api/v1/", include("apps.attachments.urls")),
+    # WP-3.3 audit surface (MT-3.3-04/05 — the Section 9.2 Audit row:
+    # verdict POST and audit-reports GET).
+    path("api/v1/", include("apps.audit.urls")),
     # Section 9.2 Dashboard row (MT-1.15-06): the Owner-facing summary the
     # mobile Overview consumes (FR-MOB-01). Mounted directly because it is
     # a cross-cutting roll-up, not a /projects/{pid} sub-resource.

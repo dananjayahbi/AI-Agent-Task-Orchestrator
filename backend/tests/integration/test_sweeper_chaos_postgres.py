@@ -33,113 +33,46 @@ unreachable — the skip reason carries the exact command:
 
 Every test marks ``transaction=True`` so racing threads see committed
 rows on their own connections.
+
+WP-1.15 (MT-1.15-02) adopts this suite rather than duplicating it: the
+race runner, the skip probe and the publisher recorder live once in
+``tests.integration.race_harness`` (Section 19.6 — the shared-runner
+follow-up MT-1.7-05 flagged), and this module carries the
+consolidation's closures — the double-sweeper listener-noise check and
+the ``LS-SHORT`` floor-lease scenario with both catalog codes.
 """
 
 from __future__ import annotations
 
-import threading
-from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
-import psycopg
 import pytest
-from django.conf import settings
-from django.db import connection
 from django.utils import timezone
 
-from apps.core.errors import LEASE_EXPIRED
+from apps.core.errors import LEASE_EXPIRED, LEASE_NOT_OWNED
+from apps.events import publisher
 from apps.events.models import Event, EventType
 from apps.leases.claim import claim_task
-from apps.leases.exceptions import LeaseExpired, TaskAlreadyClaimed
+from apps.leases.exceptions import LeaseExpired, LeaseNotOwned, TaskAlreadyClaimed
 from apps.leases.extension import extend_lease
 from apps.leases.sweeper import sweep_expired_leases
 from apps.tasks.exceptions import TaskStateConflict
 from apps.tasks.models import ReviewReason, Task, TaskState, TaskTransition
+from tests.integration.race_harness import PublishRecorder, race, skip_reason
 from tests.wp16_helpers import (  # noqa: F401  (restore_lease_registry is autouse)
     active_policy_project,
     make_pending_task,
     restore_lease_registry,
 )
 
-_RUN_COMMAND = "uv run --directory backend pytest tests/integration --ds apps.core.settings.dev"
-
-
-def _skip_reason() -> str | None:
-    """``None`` when this is the reachable-Postgres integration layer."""
-    if "postgresql" not in str(settings.DATABASES["default"]["ENGINE"]):
-        return (
-            "Section 18 integration layer only: run the sweeper chaos twin with "
-            f"`{_RUN_COMMAND}` (unit layer stays on SQLite)"
-        )
-    if not _postgres_reachable():
-        return (
-            "Postgres not reachable with the configured "
-            "ORCHESTRATOR_DATABASE_URL — start the stack or CI services "
-            f"(command: `{_RUN_COMMAND}`)"
-        )
-    return None
-
-
-def _postgres_reachable() -> bool:
-    database: dict[str, Any] = settings.DATABASES["default"]
-    connect_kwargs: dict[str, Any] = {
-        "host": database.get("HOST") or None,
-        "port": database.get("PORT") or None,
-        "dbname": database.get("NAME"),
-        "user": database.get("USER") or None,
-        "connect_timeout": 3,
-    }
-    # The secret kwarg is spelled indirectly, the way the sibling MT-1.6-08
-    # harness stores it — read-only probe of the test database, no secret
-    # ever leaves the process.
-    connect_kwargs["pass" + "word"] = database.get("PASSWORD") or None
-    try:
-        with psycopg.connect(**connect_kwargs) as probe:
-            with probe.cursor() as cursor:
-                cursor.execute("SELECT 1")
-        return True
-    except Exception:  # noqa: BLE001 - any driver failure means "not reachable"
-        return False
-
-
 pytestmark = [
     pytest.mark.django_db(transaction=True),
-    pytest.mark.skipif(_skip_reason() is not None, reason=_skip_reason() or "unreachable"),
+    pytest.mark.skipif(skip_reason() is not None, reason=skip_reason() or "unreachable"),
 ]
 
 
-# --- shared chaos plumbing ---------------------------------------------------
-
-
-def _race(count: int, run: Callable[[int], Any], *, join_timeout: int = 120) -> list[Any]:
-    """Barrier-synchronized workers; exceptions fail loudly (MT-1.6-08 shape)."""
-    barrier = threading.Barrier(count, timeout=min(join_timeout, 60))
-    results: list[Any] = []
-    failures: list[str] = []
-    lock = threading.Lock()
-
-    def worker(index: int) -> None:
-        try:
-            barrier.wait()
-            outcome = run(index)
-            with lock:
-                results.append(outcome)
-        except Exception as exc:  # noqa: BLE001 - surfaced to the main thread
-            with lock:
-                failures.append(repr(exc))
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i,)) for i in range(count)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(timeout=join_timeout)
-        assert not thread.is_alive(), "race worker hung"
-    assert not failures, failures
-    assert len(results) == count, (len(results), count)
-    return results
+# --- scenario plumbing -------------------------------------------------------
 
 
 def _held_expired_task(project: Any, index: int) -> tuple[Task, str]:
@@ -210,11 +143,23 @@ def test_dead_worker_reclaim_within_lease_plus_60_seconds() -> None:
     _assert_scenario_invariants(task)
 
 
-def test_two_concurrent_sweepers_produce_one_transition_per_expired_task() -> None:
+def test_two_concurrent_sweepers_produce_one_transition_per_expired_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One T5 per task, and the listener channel mirrors it exactly.
+
+    MT-1.15-02's no-listener-noise closure: setup's five claims already
+    published (before the recorder arms), then the racing sweepers must
+    publish exactly five ``task.lease_expired`` envelopes — one per
+    reclaimed task, none duplicated by the loser sweeper.
+    """
     project = active_policy_project(max_concurrent_tasks=10)
     tasks = [_held_expired_task(project, index)[0] for index in range(1, 6)]
 
-    reports = _race(2, lambda _index: sweep_expired_leases(batch_size=2))
+    recorder = PublishRecorder()
+    monkeypatch.setattr(publisher, "_client", recorder)
+
+    reports = race(2, lambda _index: sweep_expired_leases(batch_size=2))
 
     assert sum(r.reclaimed for r in reports) == 5
     assert sum(r.escalated + r.skipped for r in reports) == 0
@@ -229,6 +174,12 @@ def test_two_concurrent_sweepers_produce_one_transition_per_expired_task() -> No
             == 1
         )
         assert Event.objects.filter(type=EventType.TASK_LEASE_EXPIRED, task_id=task.pk).count() == 1
+    published = recorder.envelopes()
+    assert [envelope["type"] for envelope in published] == [EventType.TASK_LEASE_EXPIRED] * 5
+    assert {envelope["task_id"] for envelope in published} == {task.pk for task in tasks}
+    assert {envelope["id"] for envelope in published} == set(
+        Event.objects.filter(type=EventType.TASK_LEASE_EXPIRED).values_list("pk", flat=True)
+    )
     _assert_scenario_invariants(*tasks)
 
 
@@ -290,7 +241,7 @@ def test_claim_vs_sweeper_race_has_one_coherent_outcome() -> None:
         except TaskAlreadyClaimed:
             return "refused"
 
-    outcomes = _race(2, run)
+    outcomes = race(2, run)
     task.refresh_from_db()
 
     if "claimed" in outcomes:
@@ -332,7 +283,7 @@ def test_checkpoint_vs_expiry_race_late_extension_is_rejected() -> None:
         except LeaseExpired:
             return "refused"
 
-    outcomes = _race(2, run)
+    outcomes = race(2, run)
     # If the sweeper's SKIP LOCKED deferred the row while the (refused)
     # extension briefly held it, the next beat pass reclaims it — assert the
     # cadence, never the wall-clock interleaving.
@@ -350,4 +301,90 @@ def test_checkpoint_vs_expiry_race_late_extension_is_rejected() -> None:
     with pytest.raises(LeaseExpired) as excinfo:
         extend_lease(task_id=task.pk, session_id=dead_session, lease_generation=generation)
     assert excinfo.value.default_code == LEASE_EXPIRED
+    _assert_scenario_invariants(task)
+
+
+# --- MT-1.15-02: the LS-SHORT follow-up --------------------------------------
+
+
+def test_ls_short_1_minute_floor_lease_reclaims_once_with_both_catalog_codes() -> None:
+    """`LS-SHORT` — the shortest expressible lease, asserted end to end.
+
+    The sweep interval is plan-fixed at 60 s (Section 9.9;
+    ``config/celery.py``: "not env-tunable") and the policy floor is
+    ``lease_duration_minutes=1``, so the *shortest* policy lease equals
+    the scan interval — a lease strictly shorter than the sweep interval
+    is **not configurable** without changing plan-fixed behavior. This
+    test pins that configurability fact as an executable assertion, then
+    proves the floor lease's contract: the live lease is never swept
+    early, both Section 9.3 catalog codes answer the ownership races
+    (``LEASE_NOT_OWNED`` for a foreign session on the live lease,
+    ``LEASE_EXPIRED`` for the dead lease's own owner), and the scan
+    after expiry reclaims exactly once — the scan after that does
+    nothing. The non-tunability limitation itself is recorded in the
+    WP-1.15 changelog with this rationale (MT-1.15-02 acceptance: closed
+    *or* recorded, no silent drops).
+    """
+    from config.celery import app as celery_app
+
+    schedule = celery_app.conf.beat_schedule
+    interval = schedule["lease-sweeper"]["schedule"]
+    assert interval == 60.0, "the plan-fixed scan interval (Section 9.9)"
+    project = active_policy_project(lease_duration_minutes=1)
+    floor = timedelta(minutes=project.agent_policy.lease_duration_minutes)
+    assert floor.total_seconds() == interval, (
+        "the shortest policy lease equals the fixed scan interval — a lease "
+        "strictly shorter than the sweep interval is not expressible"
+    )
+
+    task = make_pending_task(project, 1)
+    claim_task(
+        task_id=task.pk,
+        session_id="sess_ls_short",
+        worker_agent_id="floor-worker",
+        caller_project_id=project.pk,
+    )
+    task.refresh_from_db()
+    assert task.lease_acquired_at is not None
+    assert task.lease_expires_at is not None
+    assert task.lease_expires_at - task.lease_acquired_at == floor, (
+        "the claim honored the 1-minute policy exactly"
+    )
+
+    # A live floor lease is never swept early (no false reclaim before TTL).
+    live = sweep_expired_leases()
+    assert live.reclaimed == 0
+    task.refresh_from_db()
+    assert task.state == TaskState.IN_PROGRESS
+
+    # Ownership while live: a foreign session answers LEASE_NOT_OWNED.
+    with pytest.raises(LeaseNotOwned) as ownership:
+        extend_lease(
+            task_id=task.pk,
+            session_id="sess_intruder",
+            lease_generation=task.lease_generation,
+        )
+    assert ownership.value.default_code == LEASE_NOT_OWNED
+
+    # The worker dies right after its window: the lease goes dead.
+    Task.objects.filter(pk=task.pk).update(lease_expires_at=timezone.now() - timedelta(seconds=1))
+    # The dead lease's own owner answers LEASE_EXPIRED — no resurrection.
+    with pytest.raises(LeaseExpired) as expiry:
+        extend_lease(
+            task_id=task.pk,
+            session_id="sess_ls_short",
+            lease_generation=task.lease_generation,
+        )
+    assert expiry.value.default_code == LEASE_EXPIRED
+
+    # The next scan reclaims exactly once; the scan after that is a no-op.
+    reclaimed = sweep_expired_leases()
+    settled = sweep_expired_leases()
+    assert reclaimed.reclaimed == 1
+    assert settled.reclaimed == 0
+    task.refresh_from_db()
+    assert task.state == TaskState.PENDING
+    assert task.failure_retry_count == 1
+    assert task.worker_agent_id is None
+    assert Event.objects.filter(type=EventType.TASK_LEASE_EXPIRED, task_id=task.pk).count() == 1
     _assert_scenario_invariants(task)
