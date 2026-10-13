@@ -50,3 +50,7 @@
   behind the seam).
 - OQ: the server's velocity definition/window (7-day rolling completions here)
   and the dashboard device cell — both await owner ratification.
+
+---
+
+**Thunderstorm pause:** paused at MT-1.15-01 (investigation only, no edits landed), remaining: MT-1.15-01/02/03 suites + changelog entries; MT-1.15-04/05 deferred per roadmap 4a.
