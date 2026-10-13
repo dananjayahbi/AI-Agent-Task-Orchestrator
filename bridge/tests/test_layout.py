@@ -41,9 +41,10 @@ def test_all_seams_import() -> None:
 
 
 def test_tools_registry_lists_the_catalog_tools() -> None:
-    """WP-2.4/MT-2.4-01, extended by WP-2.6: the registry is exactly Section
-    10.5's catalog as landed so far — the five core tools plus the
-    checkpoint/submission pair (read_task_attachment lands with WP-2.5).
+    """WP-2.4/MT-2.4-01, extended by WP-2.6/2.5/3.5: the registry is exactly
+    Section 10.5's catalog as landed so far — the five core tools plus the
+    checkpoint/submission pair, the attachment reader (WP-2.5) and the
+    auditor verdict tool (WP-3.5).
 
     (The WP-2.1 "empty tool set" contract survives as ``create_server``
     without a bound runtime — asserted in ``test_entrypoints.py``.)
@@ -53,9 +54,11 @@ def test_tools_registry_lists_the_catalog_tools() -> None:
         "get_available_tasks",
         "get_task_details",
         "claim_task",
+        "read_task_attachment",
         "log_task_checkpoint",
         "submit_task_resolution",
         "release_task",
+        "submit_audit_verdict",
         "get_project_context",
     }
 

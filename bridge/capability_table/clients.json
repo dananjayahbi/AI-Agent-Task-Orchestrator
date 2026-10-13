@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "updated": null,
+  "clients": [
+    {
+      "client_names": ["claude-code"],
+      "min_version": null,
+      "max_version": null,
+      "capability": "unknown",
+      "source": "Section 10.9 matrix — images 'Expected yes' (a prediction, not evidence; MT-2.5-02 keeps it unknown)",
+      "notes": "Reference client (Section 10.11). WP-2.11 must record the observed MCP clientInfo name/version after a conformance run and verify an image renders end-to-end before capability may become 'vision'."
+    },
+    {
+      "client_names": ["vscode-copilot-ide"],
+      "min_version": null,
+      "max_version": null,
+      "capability": "unknown",
+      "source": "Section 10.9 matrix — images 'To verify'",
+      "notes": "No verified claim. 'client_names' is a best-effort slug until the conformance run records the real handshake name; a name miss simply falls to the text-safe default."
+    },
+    {
+      "client_names": ["opencode"],
+      "min_version": null,
+      "max_version": null,
+      "capability": "unknown",
+      "source": "Section 10.9 matrix — images 'To verify'",
+      "notes": "No verified claim; stays text-safe until WP-2.11 confirms the handshake name and an end-to-end image render."
+    },
+    {
+      "client_names": ["aider"],
+      "min_version": null,
+      "max_version": null,
+      "capability": "unknown",
+      "source": "Section 10.9 matrix — images 'Likely text-only'",
+      "notes": "'Likely' is not verified; the table records 'unknown' (text-safe) until a conformance run records 'text_only'."
+    },
+    {
+      "client_names": ["deepseek-based-harness"],
+      "min_version": null,
+      "max_version": null,
+      "capability": "unknown",
+      "source": "Section 10.9 matrix — images 'Text-only'",
+      "notes": "The plan states text-only, but this table records only observed clientInfo values: kept 'unknown' until WP-2.11 confirms both the handshake name and the rejection behavior."
+    },
+    {
+      "client_names": ["custom-agent"],
+      "min_version": null,
+      "max_version": null,
+      "capability": "unknown",
+      "source": "Section 10.9 matrix — images 'Depends on the harness'",
+      "notes": "Per-deployment client: record each deployment's observed name with its verified capability."
+    }
+  ]
+}

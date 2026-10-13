@@ -2859,7 +2859,7 @@ components:
       - reason
     AuditReport:
       type: object
-      description: One stored report — the Section 7.2 field list, as returned.
+      description: One stored report — the §7.2 field list plus §9.4's engine version.
       properties:
         id:
           type: string
@@ -2907,6 +2907,11 @@ components:
           nullable: true
           description: Section 7.2/9.4 per-rule pass/fail — null until the engine
             persists it (MT-3.4-06), never faked here.
+        policy_engine_version:
+          type: string
+          nullable: true
+          description: Section 9.4 engine version stored on each Audit Report for
+            traceability — null until the engine writes it (MT-3.4-06).
         created_at:
           type: string
           format: date-time
@@ -2919,6 +2924,7 @@ components:
       - evidence
       - id
       - policy_decision
+      - policy_engine_version
       - policy_rule_results
       - proposed_verdict
       - resolution_id

@@ -11,7 +11,7 @@ import 'package:built_value/serializer.dart';
 
 part 'audit_report.g.dart';
 
-/// One stored report — the Section 7.2 field list, as returned.
+/// One stored report — the §7.2 field list plus §9.4's engine version.
 ///
 /// Properties:
 /// * [id] - Server-generated row identity (Section 7.2).
@@ -24,6 +24,7 @@ part 'audit_report.g.dart';
 /// * [proposedVerdict] - Section 10.5 enum the auditor proposed; the engine decides.  * `pass` - pass * `flag_risk` - flag_risk * `fail` - fail
 /// * [policyDecision] - Section 9.4 engine output (approve | escalate) — null until the Policy Engine writes it (MT-3.4-06), never faked here.  * `approve` - approve * `escalate` - escalate
 /// * [policyRuleResults] - Section 7.2/9.4 per-rule pass/fail — null until the engine persists it (MT-3.4-06), never faked here.
+/// * [policyEngineVersion] - Section 9.4 engine version stored on each Audit Report for traceability — null until the engine writes it (MT-3.4-06).
 /// * [createdAt] - Server clock at insertion (P7).
 @BuiltValue()
 abstract class AuditReport implements Built<AuditReport, AuditReportBuilder> {
@@ -67,6 +68,10 @@ abstract class AuditReport implements Built<AuditReport, AuditReportBuilder> {
   /// Section 7.2/9.4 per-rule pass/fail — null until the engine persists it (MT-3.4-06), never faked here.
   @BuiltValueField(wireName: r'policy_rule_results')
   JsonObject? get policyRuleResults;
+
+  /// Section 9.4 engine version stored on each Audit Report for traceability — null until the engine writes it (MT-3.4-06).
+  @BuiltValueField(wireName: r'policy_engine_version')
+  String? get policyEngineVersion;
 
   /// Server clock at insertion (P7).
   @BuiltValueField(wireName: r'created_at')
@@ -150,6 +155,13 @@ class _$AuditReportSerializer implements PrimitiveSerializer<AuditReport> {
         : serializers.serialize(
             object.policyRuleResults,
             specifiedType: const FullType.nullable(JsonObject),
+          );
+    yield r'policy_engine_version';
+    yield object.policyEngineVersion == null
+        ? null
+        : serializers.serialize(
+            object.policyEngineVersion,
+            specifiedType: const FullType.nullable(String),
           );
     yield r'created_at';
     yield serializers.serialize(
@@ -253,6 +265,14 @@ class _$AuditReportSerializer implements PrimitiveSerializer<AuditReport> {
           ) as JsonObject?;
           if (valueDes == null) continue;
           result.policyRuleResults = valueDes;
+          break;
+        case r'policy_engine_version':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.policyEngineVersion = valueDes;
           break;
         case r'created_at':
           final valueDes = serializers.deserialize(

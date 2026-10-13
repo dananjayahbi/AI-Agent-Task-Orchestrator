@@ -7,6 +7,11 @@ venv/
 .ruff_cache/
 .pytest_cache/
 *.egg-info/
+# Coverage artifacts (WP-1.15 coverage gate; MT-1.15-05): the data file the
+# runner writes and the JSON report scripts/coverage_gate.py consumes.
+.coverage
+.coverage.*
+coverage-report.json
 
 # --- Node.js (web) ---
 node_modules/

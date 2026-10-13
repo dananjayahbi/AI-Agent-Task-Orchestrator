@@ -29,7 +29,17 @@ from mcp.server.mcpserver.tools import Tool
 
 from ..api_errors import ApiError
 from ..error_translation import translate_error
-from . import available_tasks, checkpoint, claim, context, release, submit, task_details
+from . import (
+    attachment,
+    audit_verdict,
+    available_tasks,
+    checkpoint,
+    claim,
+    context,
+    release,
+    submit,
+    task_details,
+)
 from .errors import ToolFailure, payload_text
 from .runtime import ToolRuntime
 from .schemas import TOOL_SPECS, ToolSpec
@@ -38,14 +48,17 @@ from .validation import validate_tool_input
 __all__ = ["BridgeTool", "build_tools"]
 
 #: One handler factory per tool — the registry of MT-2.4-01's wiring layer
-#: (WP-2.6 appends the checkpoint/submission pair).
+#: (WP-2.6 appends the checkpoint/submission pair; WP-2.5 the attachment
+#: reader).
 _HANDLER_FACTORIES = {
     "get_available_tasks": available_tasks.make_handler,
     "get_task_details": task_details.make_handler,
     "claim_task": claim.make_handler,
+    "read_task_attachment": attachment.make_handler,
     "log_task_checkpoint": checkpoint.make_handler,
     "submit_task_resolution": submit.make_handler,
     "release_task": release.make_handler,
+    "submit_audit_verdict": audit_verdict.make_handler,
     "get_project_context": context.make_handler,
 }
 

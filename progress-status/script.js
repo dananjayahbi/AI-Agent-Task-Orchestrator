@@ -14,10 +14,10 @@ const waves = [
   { id: 2, name: "Backend foundation",     total: 23, done: 23, status: "done" },
   { id: 3, name: "State machine & leases", total: 28, done: 28, status: "done" },
   { id: 4, name: "Events, attachments",    total: 32, done: 32, status: "done" },
-  { id: 5, name: "Bridge skeleton & web",  total: 32, done: 18, status: "active" },
+  { id: 5, name: "Bridge skeleton & web",  total: 33, done: 31, status: "active" },
   { id: 6, name: "Bridge core tools",      total: 36, done: 36, status: "done" },
-  { id: 7, name: "Policy core & Kanban",   total: 34, done: 10, status: "active" },
-  { id: 8, name: "Agent loop completion",  total: 42, done: 0,  status: "pending" },
+  { id: 7, name: "Policy core & Kanban",   total: 34, done: 15, status: "active" },
+  { id: 8, name: "Agent loop completion",  total: 42, done: 12, status: "active" },
   { id: 9, name: "Merge & review UIs",     total: 40, done: 0,  status: "pending" },
   { id: 10, name: "Release & hardening",   total: 40, done: 0,  status: "pending" },
 ];
@@ -52,14 +52,13 @@ const timeline = [
   {
     date: "2026-10-13",
     status: "active",
-    event: "Batch 5 complete via finishers — 169/330 micro-docs (51%); Waves 1-4 + 6 DONE",
+    event: "Batch 6 complete (post-storm recovery) — 199/330 micro-docs (60%)",
     detail:
-      "Network outage killed all 6 agents at their final reports after 2.8h of work; verification " +
-      "finishers recovered everything: wp-1.12 attachment pipeline (8, real-worker E2E with Tesseract), " +
-      "wp-3.2 submission artifacts (5, server-derived patch stats + T7/T8/T10), wp-2.9 HTTP transport + " +
-      "wp-2.10 git helper (10, never-push proven), wp-4.4 DnD MT-01/02 (03/04 deferred to WP-3.6), " +
-      "wp-5.2 edge policies (4, local checklist 96/96), dashboard MT-1.15-06 authored (series 329→330). " +
-      "Convergence gate batch 5 running.",
+      "Storm pause #2 recovered via fresh agents with embedded pause state. Landed: wp-1.13+1.14 " +
+      "descriptions/retrieval (10), wp-3.3 auditor API (5, AUDITOR_SAME_AS_CODER independence), " +
+      "wp-1.15 hardening MT-01..03 (3, shared race harness; OQ-17/18 recorded), wp-2.6 submit tools " +
+      "(6, persist-before-network spool; inspector = 7 tools), wp-4.5 task modal (6, web 197 tests). " +
+      "Gate: backend 1326, bridge 626+live, flutter 165, clients byte-stable via new schema hook.",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

@@ -130,6 +130,50 @@ _CLAIM_TASK_SCHEMA: Final[dict[str, Any]] = {
     "required": ["task_id", "agent_identifier"],
 }
 
+_READ_TASK_ATTACHMENT_SCHEMA: Final[dict[str, Any]] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task id whose attachment is read (Section 10.5).",
+        },
+        "attachment_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attachment id from the task's descriptor (Section 9.5).",
+        },
+        "format_preference": {
+            "type": "string",
+            "enum": ["auto", "image_base64", "text_ocr", "markdown"],
+            "default": "auto",
+            "description": (
+                "auto resolves per Section 10.4 (explicit values win over the session "
+                "capability, client table and text-safe default)."
+            ),
+        },
+        "page_number": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": (
+                "One-based page for paginated documents (Section 9.5); a documented "
+                "no-op on the image/OCR paths."
+            ),
+        },
+        "force": {
+            "type": "boolean",
+            "default": False,
+            "description": (
+                "Override the text-only gate for an explicit image_base64 request "
+                "(Section 9.5 'unless forced'); never needed for auto/text_ocr/markdown."
+            ),
+        },
+    },
+    "required": ["task_id", "attachment_id"],
+}
+
 _RELEASE_TASK_SCHEMA: Final[dict[str, Any]] = {
     "type": "object",
     "additionalProperties": False,
@@ -147,6 +191,82 @@ _RELEASE_TASK_SCHEMA: Final[dict[str, Any]] = {
         },
     },
     "required": ["task_id"],
+}
+
+_SUBMIT_AUDIT_VERDICT_COMMAND_SCHEMA: Final[dict[str, Any]] = {
+    "type": "object",
+    # Open (FR-AUD-02): the backend stores evidence entries as supplied —
+    # extra keys (durations, diff stats) pass through verbatim.
+    "additionalProperties": True,
+    "properties": {
+        "label": {"type": "string"},
+        "command": {"type": "string"},
+        "exit_code": {"type": "integer"},
+        "summary": {"type": "string"},
+    },
+    "required": ["label", "command", "exit_code"],
+}
+
+_SUBMIT_AUDIT_VERDICT_CRITERION_SCHEMA: Final[dict[str, Any]] = {
+    "type": "object",
+    "additionalProperties": True,
+    "properties": {
+        "criterion": {"type": "string"},
+        "met": {"type": "boolean"},
+    },
+    "required": ["criterion", "met"],
+}
+
+#: Section 10.5's auditor verdict shape, field for field (MT-3.5-01 snapshot
+#: test). Top level is strict (tool design rule: nothing beyond the
+#: documented fields — never a project id); nested evidence stays open so
+#: auditor-supplied keys survive verbatim (FR-AUD-02).
+_SUBMIT_AUDIT_VERDICT_SCHEMA: Final[dict[str, Any]] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Audited task id (Section 10.5).",
+        },
+        "verdict": {
+            "type": "string",
+            "enum": ["pass", "flag_risk", "fail"],
+            "description": (
+                "Auditor's structured result; the Policy Engine decides the final state."
+            ),
+        },
+        "confidence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Honest confidence 1–5 (rules: report it truthfully).",
+        },
+        "notes": {
+            "type": "string",
+            "description": "Optional auditor notes alongside the structured evidence.",
+        },
+        "evidence": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "commands": {
+                    "type": "array",
+                    "items": _SUBMIT_AUDIT_VERDICT_COMMAND_SCHEMA,
+                },
+                "lint_clean": {"type": "boolean"},
+            },
+            "required": ["commands"],
+            "description": "Real command results (label/command/exit_code) plus lint state.",
+        },
+        "acceptance_criteria_results": {
+            "type": "array",
+            "items": _SUBMIT_AUDIT_VERDICT_CRITERION_SCHEMA,
+            "description": "One {criterion, met} pair per acceptance criterion reviewed.",
+        },
+    },
+    "required": ["task_id", "verdict", "confidence", "evidence"],
 }
 
 _GET_PROJECT_CONTEXT_SCHEMA: Final[dict[str, Any]] = {
@@ -278,6 +398,25 @@ TOOL_SPECS: Final[tuple[ToolSpec, ...]] = (
         ),
     ),
     ToolSpec(
+        name="read_task_attachment",
+        description=(
+            "Read one task attachment with capability negotiation (Sections 9.5, "
+            "10.4): images become MCP image blocks for vision sessions; every other "
+            "session gets OCR text plus a description with the untrusted banner. "
+            "Documents paginate one-based (page_number). Every result reports which "
+            "resolution step decided (explicit format, session config, client table "
+            "or text-safe default) — the bridge never claims vision the client "
+            "lacks (ADR-006)."
+        ),
+        input_schema=_READ_TASK_ATTACHMENT_SCHEMA,
+        errors=(
+            *READ_ERRORS,
+            ErrorCode.TASK_NOT_FOUND,
+            ErrorCode.ATTACHMENT_NOT_READY,
+            ErrorCode.ATTACHMENT_UNSUPPORTED_FORMAT,
+        ),
+    ),
+    ToolSpec(
         name="log_task_checkpoint",
         description=(
             "Report progress on a held task and extend its lease (Section 10.5; "
@@ -329,6 +468,26 @@ TOOL_SPECS: Final[tuple[ToolSpec, ...]] = (
             ErrorCode.TASK_STATE_CONFLICT,
             ErrorCode.LEASE_NOT_OWNED,
             ErrorCode.LEASE_EXPIRED,
+        ),
+    ),
+    ToolSpec(
+        name="submit_audit_verdict",
+        description=(
+            "Submit one auditor verdict for a held task (Sections 10.5, 11.2): the "
+            "structured pass/flag_risk/fail result with confidence, real command "
+            "evidence (label, command, exit_code) and per-criterion results. The "
+            "bridge validates the payload before the call and forwards evidence "
+            "verbatim; the Policy Engine decides the task's final state."
+        ),
+        input_schema=_SUBMIT_AUDIT_VERDICT_SCHEMA,
+        errors=(
+            *READ_ERRORS,
+            ErrorCode.TASK_NOT_FOUND,
+            ErrorCode.TASK_STATE_CONFLICT,
+            ErrorCode.LEASE_EXPIRED,
+            ErrorCode.LEASE_NOT_OWNED,
+            ErrorCode.ROLE_NOT_PERMITTED,
+            ErrorCode.AUDITOR_SAME_AS_CODER,
         ),
     ),
     ToolSpec(

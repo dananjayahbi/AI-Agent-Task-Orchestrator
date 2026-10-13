@@ -45,6 +45,10 @@ class ToolRuntime:
     session: AgentSession
     context: ProjectContext | None = field(default=None, repr=False)
     spool: SubmissionSpool | None = field(default=None, repr=False)
+    #: Section 10.4 step 2: the startup-configured session capability
+    #: (``vision``/``text_only``/unset = ``unknown``); read by
+    #: ``read_task_attachment``'s resolver — never inferred (ADR-006).
+    session_capability: str | None = None
     _lease_generations: dict[str, int] = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -55,10 +59,16 @@ class ToolRuntime:
         session: AgentSession,
         *,
         spool: SubmissionSpool | None = None,
+        session_capability: str | None = None,
     ) -> ToolRuntime:
         """Bind an opened session; the startup cache is already populated."""
         return cls(
-            binding=binding, client=client, session=session, context=session.context, spool=spool
+            binding=binding,
+            client=client,
+            session=session,
+            context=session.context,
+            spool=spool,
+            session_capability=session_capability,
         )
 
     @property

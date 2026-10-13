@@ -72,6 +72,7 @@ BRIDGE_ENDPOINTS: Final[tuple[Endpoint, ...]] = (
     Endpoint("work_list", "GET", "/api/v1/projects/{pid}/work"),
     Endpoint("claim", "POST", "/api/v1/tasks/{id}/claim"),
     Endpoint("release", "POST", "/api/v1/tasks/{id}/release"),
+    Endpoint("audit_verdict", "POST", "/api/v1/tasks/{id}/audit-verdict"),
     Endpoint("task_details", "GET", "/api/v1/tasks/{id}"),
     Endpoint("project_context", "GET", "/api/v1/projects/{pid}"),
     Endpoint("project_policy", "GET", "/api/v1/projects/{pid}/policy"),

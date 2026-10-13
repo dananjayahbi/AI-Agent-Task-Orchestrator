@@ -94,18 +94,27 @@ def restore_audit_registry() -> Iterator[None]:
     """Snapshot the registry + hooks; restore stubs and the fail-closed seam.
 
     Autouse in every WP-3.3 module that imports it (each suite's
-    namespace picks it up — the same promotion trick wp16 uses).
+    namespace picks it up — the same promotion trick wp16 uses). Both
+    decision seams are pinned fail-closed **before** the test as well
+    as after: WP-3.4's engine installs itself in ``AuditConfig.ready()``,
+    so an ambient engine must never leak into a suite asserting the
+    documented fail-closed defaults (the seams still fail closed the
+    moment a fixture removes the hooks).
     """
     from apps.audit.decision import set_audit_decision_hook
+    from apps.tasks.state_machine.transitions_submission import set_policy_decision_hook
 
     ensure_registered()
     snapshot = DEFAULT_REGISTRY.specs()
+    set_audit_decision_hook(None)
+    set_policy_decision_hook(None)
     try:
         yield
     finally:
         DEFAULT_REGISTRY.replace_all(snapshot)
         reset_hooks()
         set_audit_decision_hook(None)  # fail-closed default must be ambient
+        set_policy_decision_hook(None)
 
 
 def login_owner_client() -> JsonAPIClient:

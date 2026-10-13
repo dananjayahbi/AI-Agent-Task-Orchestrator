@@ -376,6 +376,29 @@ REQUEST_SAMPLES: dict[str, Any] = {
         "changed_files": ["src/billing/invoice.py"],
         "diff_summary": {"files": 1, "insertions": 1, "deletions": 1},
     },
+    # WP-3.5's verdict payload (Section 10.5 auditor verdict shape + the
+    # ADR-012 fencing pair; AuditVerdictRequest requires both halves plus
+    # the Section 10.5 required fields).
+    "audit_verdict": {
+        "session_id": "sess-bridge-0001",
+        "lease_generation": 1,
+        "task_id": "PID00007-T004",
+        "verdict": "pass",
+        "confidence": 4,
+        "notes": "Export works and the tests are green.",
+        "evidence": {
+            "commands": [
+                {
+                    "label": "tests",
+                    "command": "uv run pytest -q",
+                    "exit_code": 0,
+                    "summary": "42 passed",
+                },
+            ],
+            "lint_clean": True,
+        },
+        "acceptance_criteria_results": [{"criterion": "Export runs green", "met": True}],
+    },
 }
 
 #: Non-2xx samples (AC 2): three catalog codes against the wire envelope.

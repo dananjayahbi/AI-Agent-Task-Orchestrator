@@ -222,7 +222,7 @@ export type AuditDecision = {
 };
 
 /**
- * One stored report — the Section 7.2 field list, as returned.
+ * One stored report — the §7.2 field list plus §9.4's engine version.
  */
 export type AuditReport = {
     /**
@@ -269,6 +269,10 @@ export type AuditReport = {
      * Section 7.2/9.4 per-rule pass/fail — null until the engine persists it (MT-3.4-06), never faked here.
      */
     policy_rule_results: unknown;
+    /**
+     * Section 9.4 engine version stored on each Audit Report for traceability — null until the engine writes it (MT-3.4-06).
+     */
+    policy_engine_version: string | null;
     /**
      * Server clock at insertion (P7).
      */

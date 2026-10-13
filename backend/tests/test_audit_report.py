@@ -56,7 +56,10 @@ def owner_client() -> APIClient:
     return login_owner_client()
 
 
-# Section 7.2 "Audit Report", verbatim — the literal field-set assertion.
+# Section 7.2 "Audit Report" + Section 9.4's engine version, verbatim —
+# the literal field-set assertion (the version column is MT-3.4-06's
+# plan-mandated addition: §9.4 "the version is stored on each Audit
+# Report"; MT-3.3-04 predates it).
 PLAN_7_2_AUDIT_REPORT_FIELDS: tuple[str, ...] = (
     "id",
     "task",  # Section 7.2 spells it task_id (column + attname)
@@ -68,6 +71,7 @@ PLAN_7_2_AUDIT_REPORT_FIELDS: tuple[str, ...] = (
     "proposed_verdict",
     "policy_decision",
     "policy_rule_results",
+    "policy_engine_version",  # Section 9.4 traceability (MT-3.4-06)
     "created_at",
 )
 
@@ -130,7 +134,7 @@ def _report(task: Task, resolution: TaskResolution, **overrides: Any) -> AuditRe
 
 
 def test_model_field_set_matches_section_7_2_exactly() -> None:
-    """Eleven fields, none added, none dropped, none renamed (20.5)."""
+    """Twelve fields: §7.2's eleven + §9.4's engine version (MT-3.4-06)."""
     names = tuple(field.name for field in AuditReport._meta.get_fields() if field.concrete)
     assert names == PLAN_7_2_AUDIT_REPORT_FIELDS, set(names) ^ set(PLAN_7_2_AUDIT_REPORT_FIELDS)
 
@@ -170,24 +174,47 @@ def test_proposed_verdict_is_the_section_10_5_enum(project: Project) -> None:
 def test_policy_fields_stay_null_until_the_engine_writes_them(
     project: Project,
 ) -> None:
-    """Nullable on creation; exactly the later engine write is permitted."""
+    """Nullable on creation; exactly the engine write is permitted."""
+    from apps.audit.models import PolicyFieldsImmutable
+    from apps.audit.policy.engine import EvaluationResult, RuleOutcome
+    from apps.audit.policy.persist import persist_evaluation
+
     task = auditable_task(project, 1)
     resolution = TaskResolution.objects.get(task=task)
     report = _report(task, resolution)
 
     assert report.policy_decision is None, "never faked (Section 9.4; invariant 8.3.4)"
     assert report.policy_rule_results is None
+    assert report.policy_engine_version is None
 
-    # MT-3.4-06's write path: the row is not insert-only (unlike
-    # TaskResolution) precisely so the engine can fill these two columns.
+    # MT-3.4-06's guard: a direct write outside the engine path is
+    # refused — the row is not insert-only, but its policy columns are.
     report.policy_decision = "escalate"
     report.policy_rule_results = [{"rule": "R1", "passed": False, "review_reason": "test_failure"}]
-    report.save()
+    with pytest.raises(PolicyFieldsImmutable):
+        report.save()
+    report.refresh_from_db()
+    assert report.policy_decision is None
+
+    # The engine's own persistence writes all three columns together.
+    evaluation = EvaluationResult(
+        decision="escalate",
+        engine_version="1.0.0",
+        rule_results=(
+            RuleOutcome("R1", False, "test_failure"),
+            *(RuleOutcome(f"R{i}", True, None) for i in range(2, 10)),
+        ),
+    )
+    persist_evaluation(report, evaluation)
     report.refresh_from_db()
     assert report.policy_decision == "escalate"
-    assert report.policy_rule_results == [
-        {"rule": "R1", "passed": False, "review_reason": "test_failure"}
-    ]
+    assert report.policy_engine_version == "1.0.0"
+    assert report.policy_rule_results[0] == {
+        "rule": "R1",
+        "passed": False,
+        "review_reason": "test_failure",
+    }
+    assert len(report.policy_rule_results) == 9
 
 
 def test_report_accumulates_per_resolution_across_audit_retries(
@@ -230,7 +257,7 @@ def test_evidence_round_trips_the_10_5_shape(owner_client: APIClient, project: P
     assert report.proposed_verdict == "pass"
     assert report.auditor_session_id == "sess_wp33_auditor"
     assert report.resolution_id == TaskResolution.objects.get(task=task).pk
-    # The response echoes the same §7.2 field set.
+    # The response echoes the same §7.2 field set + §9.4's version.
     assert set(response.json()["report"]) == {
         "id",
         "task_id",
@@ -242,6 +269,7 @@ def test_evidence_round_trips_the_10_5_shape(owner_client: APIClient, project: P
         "proposed_verdict",
         "policy_decision",
         "policy_rule_results",
+        "policy_engine_version",
         "created_at",
     }
 

@@ -128,6 +128,7 @@ def create_connection(
         opened.client,
         opened.session,
         spool=SubmissionSpool.default(),
+        session_capability=settings.session_capability,
     )
     server = create_server(settings, runtime=runtime)
     project_id = opened.binding.project_id

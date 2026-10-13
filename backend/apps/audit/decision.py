@@ -32,11 +32,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from apps.tasks.models import ReviewReason, Task, TaskResolution
 
 from .models import AuditReport, VerdictChoice
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from .policy.engine import EvaluationResult
 
 #: The hook signature MT-3.4-07 installs (audit inputs: the report's
 #: evidence, confidence and proposed verdict ride the row).
@@ -50,10 +53,18 @@ class AuditDecision:
     ``approve`` selects T13; an escalation carries exactly one
     enumerated Section 8.4 reason (validated by
     :func:`resolve_audit_decision` before it leaves this module).
+    ``evaluation`` rides the engine's own decisions so the T13/T14
+    side effects can persist every rule's outcome and the engine
+    version (MT-3.4-06); the fail-closed default and ad-hoc test
+    hooks carry ``None`` — nothing is persisted for them, never
+    faked (invariant 8.3.4).
     """
 
     approve: bool
     reason: str | None = None
+    #: The full Section 9.4 evaluation behind this decision, when the
+    #: engine produced it (MT-3.4-06's persistence source).
+    evaluation: EvaluationResult | None = None
 
 
 #: Fail-closed default (MT-3.3-05): with no engine the only honest

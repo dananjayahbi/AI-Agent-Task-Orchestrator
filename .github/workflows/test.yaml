@@ -194,3 +194,87 @@ jobs:
         # resolve to bridge/bridge/tests/integration and exit 4 (WP-2.4
         # recorded follow-up, fixed at convergence).
         run: uv run --directory bridge pytest tests/integration
+
+  # Section 18 coverage target, enforced per gated module (MT-1.15-05,
+  # WP-1.15): >= 85% line coverage on the state machine
+  # (apps/tasks/state_machine) and the lease/sweeper logic (apps/leases).
+  # The per-module split matters: coverage.py's --fail-under guards one
+  # total, while the plan's target is per named module — so an unrelated
+  # low-coverage utility can never mask a regression in either, and the
+  # Policy Engine portion (85% line, 100% branch on token validation)
+  # stays enforceable only when WP-3.4 lands it (recorded in the WP-1.15
+  # changelog, not silently dropped here).
+  #
+  # One gate, one measurement (Section 19.6): the coverage data file is
+  # produced by two pytest invocations — the Section 18 unit layer (SQLite,
+  # hermetic; the same suite the unit-tests job runs, which OWNS the
+  # transition-row proofs of WP-1.5/3.2/3.3) appended with the four WP-1.15
+  # hardening suites on Postgres (claim races, sweeper races, idempotency,
+  # authorization: tests/integration/test_{claim_race,sweeper_chaos,
+  # idempotency}_postgres.py + tests/auth + the adopted
+  # tests/test_authorization_matrix.py). No single settings layer can host
+  # both: the PG race suites skip on SQLite and the unit suite breaks on
+  # Postgres (the Section 18 layering), and the four suites alone cannot
+  # reach the Section 18 number on the state machine without duplicating
+  # WP-3.2/3.3's proofs (Section 19.6 forbids that copy) — deviation
+  # recorded with numbers in the WP-1.15 changelog.
+  #
+  # Section 20.4 item 3: same trust-auth, runner-local service containers
+  # as integration-tests above — no passwords in the workflow or caches.
+  coverage-gate:
+    name: coverage-gate
+    runs-on: ubuntu-latest
+    env:
+      ORCHESTRATOR_DATABASE_URL: postgres://orchestrator@127.0.0.1:5432/orchestrator
+      ORCHESTRATOR_CACHE_URL: redis://127.0.0.1:6379/0
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: orchestrator
+          POSTGRES_DB: orchestrator
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U orchestrator -d orchestrator"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7.4-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.10"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+      # Invocation 1 — the Section 18 unit layer (hermetic SQLite, no --ds).
+      - name: "backend: coverage run, unit layer (state machine + leases)"
+        run: >-
+          uv run --directory backend pytest
+          --cov=apps.tasks.state_machine --cov=apps.leases --cov-append -q
+      # Invocation 2 — the four WP-1.15 hardening suites on Postgres.
+      - name: "backend: coverage run, WP-1.15 suites (claim/sweeper/idempotency/auth)"
+        run: >-
+          uv run --directory backend pytest --ds apps.core.settings.dev
+          tests/integration/test_claim_race_postgres.py
+          tests/integration/test_sweeper_chaos_postgres.py
+          tests/integration/test_idempotency_postgres.py
+          tests/auth tests/test_authorization_matrix.py
+          --cov=apps.tasks.state_machine --cov=apps.leases --cov-append
+          --cov-report=term-missing --cov-report=json:coverage-report.json -q
+      - name: "backend: coverage gate (>=85% per gated module)"
+        # Reproduced verbatim in CONTRIBUTING.md (change it there first).
+        run: >-
+          uv run --directory backend python scripts/coverage_gate.py
+          coverage-report.json apps.tasks.state_machine apps.leases
+          --fail-under 85

@@ -34,6 +34,7 @@ _VALID_FIXTURES: dict[str, dict[str, Any]] = {
     "get_available_tasks": {},
     "get_task_details": {"task_id": "PID00007-T004"},
     "claim_task": {"task_id": "PID00007-T004", "agent_identifier": "coder-1"},
+    "read_task_attachment": {"task_id": "PID00007-T004", "attachment_id": "att-0001"},
     "log_task_checkpoint": {"task_id": "PID00007-T004", "message": "halfway", "percentage": 50},
     "submit_task_resolution": {
         "task_id": "PID00007-T004",
@@ -42,6 +43,18 @@ _VALID_FIXTURES: dict[str, dict[str, Any]] = {
         "execution_summary": "Ran the tests; all green.",
     },
     "release_task": {"task_id": "PID00007-T004", "reason": "scope expansion needed"},
+    "submit_audit_verdict": {
+        "task_id": "PID00007-T004",
+        "verdict": "pass",
+        "confidence": 4,
+        "evidence": {
+            "commands": [
+                {"label": "tests", "command": "uv run pytest -q", "exit_code": 0},
+            ],
+            "lint_clean": True,
+        },
+        "acceptance_criteria_results": [{"criterion": "Export runs green", "met": True}],
+    },
     "get_project_context": {},
 }
 
@@ -58,9 +71,11 @@ def test_exact_tools_in_plan_catalog_order() -> None:
         "get_available_tasks",
         "get_task_details",
         "claim_task",
+        "read_task_attachment",
         "log_task_checkpoint",
         "submit_task_resolution",
         "release_task",
+        "submit_audit_verdict",
         "get_project_context",
     )
 
@@ -70,6 +85,13 @@ def test_key_inputs_match_the_section_10_5_table() -> None:
     assert properties["get_available_tasks"] == {"priority_filter", "limit", "role"}
     assert properties["get_task_details"] == {"task_id"}
     assert properties["claim_task"] == {"task_id", "agent_identifier", "role"}
+    assert properties["read_task_attachment"] == {
+        "task_id",
+        "attachment_id",
+        "format_preference",
+        "page_number",
+        "force",
+    }
     assert properties["log_task_checkpoint"] == {"task_id", "message", "percentage"}
     assert properties["submit_task_resolution"] == {
         "task_id",
@@ -80,6 +102,14 @@ def test_key_inputs_match_the_section_10_5_table() -> None:
         "risk_justification",
     }
     assert properties["release_task"] == {"task_id", "reason"}
+    assert properties["submit_audit_verdict"] == {
+        "task_id",
+        "verdict",
+        "confidence",
+        "notes",
+        "evidence",
+        "acceptance_criteria_results",
+    }
     assert properties["get_project_context"] == set()
 
 

@@ -175,7 +175,7 @@ def submit_audit_verdict(
 
 # --- reading the stored reports (Section 9.2 GET /tasks/{id}/audit-reports) ---
 
-# The canonical five-field §7.2 shape the API returns (field for field).
+# The canonical §7.2 shape + the Section 9.4 engine version the API returns.
 REPORT_FIELDS: frozenset[str] = frozenset(
     {
         "id",
@@ -188,13 +188,14 @@ REPORT_FIELDS: frozenset[str] = frozenset(
         "proposed_verdict",
         "policy_decision",
         "policy_rule_results",
+        "policy_engine_version",
         "created_at",
     }
 )
 
 
 def report_payload(report: AuditReport) -> dict[str, Any]:
-    """Build the API shape of one stored row (§7.2, field for field)."""
+    """Build the API shape of one stored row (§7.2 + §9.4 version)."""
     return {
         "id": report.pk,
         "task_id": report.task_id,
@@ -206,6 +207,7 @@ def report_payload(report: AuditReport) -> dict[str, Any]:
         "proposed_verdict": report.proposed_verdict,
         "policy_decision": report.policy_decision,
         "policy_rule_results": report.policy_rule_results,
+        "policy_engine_version": report.policy_engine_version,
         "created_at": report.created_at,
     }
 

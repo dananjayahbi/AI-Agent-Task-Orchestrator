@@ -275,6 +275,7 @@ def build_settings(**overrides: Any) -> Settings:
         http_port=0,
         http_max_connections=16,
         http_idle_timeout_seconds=900.0,
+        session_capability=None,
     )
     if not overrides:
         return base
@@ -293,12 +294,14 @@ def build_runtime(
     settings: Settings | None = None,
     spool: SubmissionSpool | None = None,
     binding: StartupBinding | None = None,
+    session_capability: str | None = None,
 ) -> ToolRuntime:
     """A runtime bound to the fixture project over the fake transport.
 
     ``spool``/``binding`` exist for the WP-2.6 tools: submission tests inject
     a tmp-path spool (never a real user profile), and git tests bind a real
-    fixture repository's manifest.
+    fixture repository's manifest. ``session_capability`` is WP-2.5's
+    Section 10.4 step-2 input (``None`` = unknown = text-safe).
     """
     backend = fake if fake is not None else FakeBackend()
     bound = binding if binding is not None else build_binding()
@@ -314,7 +317,9 @@ def build_runtime(
             policy_summary={"max_concurrent_tasks": 1, "lease_duration_minutes": 45},
         ),
     )
-    return ToolRuntime.from_session(bound, client, session, spool=spool)
+    return ToolRuntime.from_session(
+        bound, client, session, spool=spool, session_capability=session_capability
+    )
 
 
 @pytest.fixture

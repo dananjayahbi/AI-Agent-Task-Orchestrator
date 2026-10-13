@@ -1,8 +1,11 @@
-import { PagePlaceholder } from '@/components/layout/page-placeholder';
+import { TaskDetail } from '@/components/task/detail/task-detail';
 
 /**
- * Task detail (Section 13.1 — drawer or page: description, criteria, scope,
- * attachments, checkpoint feed, resolutions, audit reports, history; WP-4.6).
+ * Task detail route (Section 13.1 "Task detail (drawer or page)";
+ * WP-4.6 — MT-4.6-01 chose the **page** form: the route already exists,
+ * deep links stay stable for WP-4.8, and the app-layout query cache
+ * survives board ↔ detail navigation (Section 13.3). Recorded in the WP
+ * changelog).
  */
 export default async function TaskDetailPage({
   params,
@@ -10,10 +13,5 @@ export default async function TaskDetailPage({
   params: Promise<{ pid: string; taskId: string }>;
 }) {
   const { pid, taskId } = await params;
-  return (
-    <PagePlaceholder
-      title={`Task ${taskId} — ${pid}`}
-      description="Description, acceptance criteria, scope, attachments, checkpoint feed, resolutions, audit reports, and transition history."
-    />
-  );
+  return <TaskDetail pid={pid} taskId={taskId} />;
 }

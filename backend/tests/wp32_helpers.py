@@ -102,10 +102,15 @@ SAMPLE_SHA = "0123456789abcdef0123456789abcdef01234567"  # pragma: allowlist sec
 
 @pytest.fixture(autouse=True)
 def restore_submission_registry() -> Iterator[None]:
-    """Snapshot the registry; restore the stubs and the default seam.
+    """Snapshot the registry; pin the seam fail-closed; restore both after.
 
     Autouse in every WP-3.2 module that imports it (each suite's
-    namespace picks it up — the same promotion trick wp16 uses).
+    namespace picks it up — the same promotion trick wp16 uses). The
+    seam is pinned to ``None`` **before** the test as well as after:
+    WP-3.4's engine installs itself in ``AuditConfig.ready()``, so an
+    ambient engine must never leak into a suite asserting the
+    documented fail-closed default (the seam still fails closed the
+    moment a fixture removes the hook).
     """
     ensure_registered()
     snapshot = DEFAULT_REGISTRY.specs()

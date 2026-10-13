@@ -46,6 +46,41 @@ export const queryKeys = {
    */
   taskAttachments: (pid: string, taskId: string) =>
     ['projects', pid, 'tasks', taskId, 'attachments'] as const,
+  /**
+   * Task detail row (MT-4.6-01; Section 13.1 task-detail route): one
+   * `GET /tasks/{id}` result. Sibling of the per-task blocks below so a
+   * single-task refetch (targeted-refetch policy) never collides with
+   * the board list or the block caches.
+   */
+  taskDetail: (pid: string, taskId: string) =>
+    ['projects', pid, 'tasks', taskId, 'detail'] as const,
+  /**
+   * Checkpoint feed history (MT-4.6-02): initial load is
+   * `GET /tasks/{id}/checkpoints` (cursor-gated older pages); live rows
+   * arrive via `task.checkpoint` events patched into this entry.
+   */
+  taskCheckpoints: (pid: string, taskId: string) =>
+    ['projects', pid, 'tasks', taskId, 'checkpoints'] as const,
+  /**
+   * Resolutions list (MT-4.6-03 partial): fetch-on-expand per Section
+   * 13.3/13.4 — the entry is created only when the section first opens.
+   */
+  taskResolutions: (pid: string, taskId: string) =>
+    ['projects', pid, 'tasks', taskId, 'resolutions'] as const,
+  /**
+   * Audit-report rows for a task (MT-4.6-03 partial): fetched alongside
+   * the resolutions (WP-1.8) so each resolution's audit trail can be
+   * linked. Also fetch-on-expand.
+   */
+  taskAuditReports: (pid: string, taskId: string) =>
+    ['projects', pid, 'tasks', taskId, 'audit-reports'] as const,
+  /**
+   * Attachment content pages (MT-4.6-04; Section 9.5): one cache entry
+   * per attachment × format × page — never preloaded, fetched when the
+   * viewer addresses the page (RISK-13: one page per request).
+   */
+  attachmentContent: (attachmentId: string, format: string, page: number | null) =>
+    ['attachments', attachmentId, 'content', format, page] as const,
   /** Latest checkpoint percent per task, populated from `task.checkpoint` events (MT-4.3-05). */
   boardCheckpointProgress: (pid: string) =>
     ['projects', pid, 'tasks', 'checkpoint-progress'] as const,

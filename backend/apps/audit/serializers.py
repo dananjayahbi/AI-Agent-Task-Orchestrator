@@ -10,8 +10,9 @@
   catalog ``VALIDATION_ERROR`` with field details (Section 20.4 item 5);
   deep evidence-schema guidance stays WP-3.5's bridge step (MT-3.3-04
   risk note) — this layer checks only the §10.5 *required* structure.
-* ``AuditReportSerializer`` — one stored row, the Section 7.2 field list
-  as returned (MT-3.3-04 field parity).
+* ``AuditReportSerializer`` — one stored row, the Section 7.2 field
+  list plus Section 9.4's ``policy_engine_version`` (MT-3.3-04 field
+  parity, extended by MT-3.4-06).
 * ``AuditVerdictResponse`` — the frozen 201 body: report, post-
   transition task identity, the row that fired, and the seam's decision
   (Section 10.5: "Policy Engine decides final state").
@@ -144,7 +145,7 @@ class AuditVerdictRequestSerializer(StrictSerializerMixin, serializers.Serialize
 
 
 class AuditReportSerializer(serializers.Serializer[Any]):
-    """One stored report — the Section 7.2 field list, as returned."""
+    """One stored report — the §7.2 field list plus §9.4's engine version."""
 
     id = serializers.UUIDField(help_text="Server-generated row identity (Section 7.2).")
     task_id = serializers.CharField(help_text="The audited task (Section 7.2).")
@@ -176,6 +177,11 @@ class AuditReportSerializer(serializers.Serializer[Any]):
         allow_null=True,
         help_text="Section 7.2/9.4 per-rule pass/fail — null until the engine "
         "persists it (MT-3.4-06), never faked here.",
+    )
+    policy_engine_version = serializers.CharField(
+        allow_null=True,
+        help_text="Section 9.4 engine version stored on each Audit Report for "
+        "traceability — null until the engine writes it (MT-3.4-06).",
     )
     created_at = serializers.DateTimeField(help_text="Server clock at insertion (P7).")
 

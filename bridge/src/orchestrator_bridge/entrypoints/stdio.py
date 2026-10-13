@@ -64,7 +64,9 @@ def run(settings: Settings) -> int:
         print(f"bridge startup error: {scrub_text(str(exc))}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
     spool = SubmissionSpool.default()
-    runtime = ToolRuntime.from_session(binding, client, session, spool=spool)
+    runtime = ToolRuntime.from_session(
+        binding, client, session, spool=spool, session_capability=settings.session_capability
+    )
     # MT-2.6-05 restart recovery: replay this project's unacknowledged
     # submissions (stored payload, stored idempotency key) before serving.
     # Best-effort by contract — the spool never raises and startup never dies

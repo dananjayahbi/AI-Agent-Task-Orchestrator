@@ -109,6 +109,12 @@ DEFAULT_HTTP_IDLE_TIMEOUT_SECONDS: Final = 900.0
 _LOG_LEVELS: Final[frozenset[str]] = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 _LOG_FORMATS: Final[frozenset[str]] = frozenset({"json", "text"})
 
+#: Section 10.4 step 2 vocabulary (WP-2.5 / MT-2.5-01; mirrors
+#: ``capabilities.CAPABILITIES`` minus ``unknown`` — unset *is* unknown, so
+#: an explicit unknown is rejected with guidance. Kept local so config.py
+#: stays a stdlib-only leaf module.)
+_SESSION_CAPABILITIES: Final[frozenset[str]] = frozenset({"vision", "text_only"})
+
 # Settings attribute -> canonical environment variable (configuration.md: one
 # canonical spelling, no aliases). The file key is the attribute name itself.
 _ENV_KEYS: Final[Mapping[str, str]] = {
@@ -127,6 +133,7 @@ _ENV_KEYS: Final[Mapping[str, str]] = {
     "http_port": "ORCHESTRATOR_BRIDGE_HTTP_PORT",
     "http_max_connections": "ORCHESTRATOR_BRIDGE_HTTP_MAX_CONNECTIONS",
     "http_idle_timeout_seconds": "ORCHESTRATOR_BRIDGE_HTTP_IDLE_TIMEOUT_SECONDS",
+    "session_capability": "ORCHESTRATOR_BRIDGE_SESSION_CAPABILITY",
 }
 _FILE_KEYS: Final[frozenset[str]] = frozenset(_ENV_KEYS)
 
@@ -150,6 +157,9 @@ class Settings:
     http_port: int
     http_max_connections: int
     http_idle_timeout_seconds: float
+    #: Section 10.4 step 2 / MT-2.5-01: the session's declared image
+    #: capability (``vision``/``text_only``); unset = ``unknown`` (text-safe).
+    session_capability: str | None
 
     def __repr__(self) -> str:
         """Debug-safe view — the token renders as [REDACTED] (FR-SEC-04)."""
@@ -165,7 +175,8 @@ class Settings:
             f"merge_repo_paths={self.merge_repo_paths!r}, "
             f"http_host={self.http_host!r}, http_port={self.http_port!r}, "
             f"http_max_connections={self.http_max_connections!r}, "
-            f"http_idle_timeout_seconds={self.http_idle_timeout_seconds!r})"
+            f"http_idle_timeout_seconds={self.http_idle_timeout_seconds!r}, "
+            f"session_capability={self.session_capability!r})"
         )
 
 
@@ -394,6 +405,23 @@ def load_settings(
             "http_idle_timeout_seconds", value, unit="seconds"
         )
 
+    # --- Section 10.4 step 2: the session's declared image capability ------
+    # (WP-2.5 / MT-2.5-01). Unset = unknown = text-safe; only the two
+    # declared capabilities are accepted — the bridge never infers vision
+    # (ADR-006). Kept out of REQUIRED_KEYS_BY_MODE: every mode runs fine
+    # with the honest text-safe default.
+    value = _pick("session_capability", file_values, environ)
+    session_capability: str | None = None
+    if value is not None:
+        raw_capability = _as_text("session_capability", value).strip().lower()
+        if raw_capability and raw_capability not in _SESSION_CAPABILITIES:
+            raise ConfigError(
+                f"{_ENV_KEYS['session_capability']} (session_capability) must be one of "
+                f"{', '.join(sorted(_SESSION_CAPABILITIES))} (or unset for the text-safe "
+                f"default); got {value!r}"
+            ) from None
+        session_capability = raw_capability or None
+
     return Settings(
         api_base_url=api_base_url,
         agent_token=agent_token,
@@ -410,6 +438,7 @@ def load_settings(
         http_port=http_port,
         http_max_connections=http_max_connections,
         http_idle_timeout_seconds=http_idle_timeout_seconds,
+        session_capability=session_capability,
     )
 
 

@@ -28,6 +28,8 @@ class _$AuditReport extends AuditReport {
   @override
   final JsonObject? policyRuleResults;
   @override
+  final String? policyEngineVersion;
+  @override
   final DateTime createdAt;
 
   factory _$AuditReport([void Function(AuditReportBuilder)? updates]) =>
@@ -44,6 +46,7 @@ class _$AuditReport extends AuditReport {
       required this.proposedVerdict,
       this.policyDecision,
       this.policyRuleResults,
+      this.policyEngineVersion,
       required this.createdAt})
       : super._();
   @override
@@ -67,6 +70,7 @@ class _$AuditReport extends AuditReport {
         proposedVerdict == other.proposedVerdict &&
         policyDecision == other.policyDecision &&
         policyRuleResults == other.policyRuleResults &&
+        policyEngineVersion == other.policyEngineVersion &&
         createdAt == other.createdAt;
   }
 
@@ -83,6 +87,7 @@ class _$AuditReport extends AuditReport {
     _$hash = $jc(_$hash, proposedVerdict.hashCode);
     _$hash = $jc(_$hash, policyDecision.hashCode);
     _$hash = $jc(_$hash, policyRuleResults.hashCode);
+    _$hash = $jc(_$hash, policyEngineVersion.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -101,6 +106,7 @@ class _$AuditReport extends AuditReport {
           ..add('proposedVerdict', proposedVerdict)
           ..add('policyDecision', policyDecision)
           ..add('policyRuleResults', policyRuleResults)
+          ..add('policyEngineVersion', policyEngineVersion)
           ..add('createdAt', createdAt))
         .toString();
   }
@@ -153,6 +159,11 @@ class AuditReportBuilder implements Builder<AuditReport, AuditReportBuilder> {
   set policyRuleResults(JsonObject? policyRuleResults) =>
       _$this._policyRuleResults = policyRuleResults;
 
+  String? _policyEngineVersion;
+  String? get policyEngineVersion => _$this._policyEngineVersion;
+  set policyEngineVersion(String? policyEngineVersion) =>
+      _$this._policyEngineVersion = policyEngineVersion;
+
   DateTime? _createdAt;
   DateTime? get createdAt => _$this._createdAt;
   set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
@@ -174,6 +185,7 @@ class AuditReportBuilder implements Builder<AuditReport, AuditReportBuilder> {
       _proposedVerdict = $v.proposedVerdict;
       _policyDecision = $v.policyDecision;
       _policyRuleResults = $v.policyRuleResults;
+      _policyEngineVersion = $v.policyEngineVersion;
       _createdAt = $v.createdAt;
       _$v = null;
     }
@@ -212,6 +224,7 @@ class AuditReportBuilder implements Builder<AuditReport, AuditReportBuilder> {
               proposedVerdict, r'AuditReport', 'proposedVerdict'),
           policyDecision: policyDecision,
           policyRuleResults: policyRuleResults,
+          policyEngineVersion: policyEngineVersion,
           createdAt: BuiltValueNullFieldError.checkNotNull(
               createdAt, r'AuditReport', 'createdAt'),
         );

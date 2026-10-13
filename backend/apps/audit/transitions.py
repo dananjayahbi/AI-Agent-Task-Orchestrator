@@ -89,6 +89,7 @@ from apps.tasks.state_machine.registry import DEFAULT_REGISTRY, TransitionContex
 from .decision import resolve_audit_decision
 from .independence import assert_auditor_independent
 from .models import AuditReport
+from .policy.persist import persist_evaluation
 
 # The worker/lease columns of Section 7.2 — cleared by the shared helper
 # (named for T5's coder path; the five columns hold the auditor's identity
@@ -252,7 +253,10 @@ def _side_effect_verdict_pass(task: Task, context: TransitionContext) -> Task | 
     Re-consults the decision seam (pure evaluator — same answer the
     service's trigger choice saw): an engine that did *not* approve
     refuses this branch (``TASK_STATE_CONFLICT``), so approval is
-    reachable only through WP-3.4's hook (invariant 8.3.4). Then the
+    reachable only through WP-3.4's hook (invariant 8.3.4). With the
+    engine's decision in hand the report's policy fields persist in
+    this same transaction (MT-3.4-06 — decision, every rule's outcome
+    and the engine version land together or not at all). Then the
     merge-pending sub-status lands and the audit lease releases — the
     verdict concludes the claim (recorded reading: without the clear a
     dead lease would later fire T12 *after* a pass, bumping the audit
@@ -266,6 +270,7 @@ def _side_effect_verdict_pass(task: Task, context: TransitionContext) -> Task | 
             task.pk,
             reason="policy engine has not approved (auto-approve is forbidden)",
         )
+    persist_evaluation(report, decision.evaluation)
     task.merge_status = MergeStatus.PENDING
     clear_worker_lease(task)
     return None
@@ -277,9 +282,11 @@ def _side_effect_verdict_escalated(task: Task, context: TransitionContext) -> Ta
     The seam re-consult mirrors T10's escalation branch: an approving
     engine refuses this row, and an escalation writes the validated
     Section 8.4 reason on the task before it lands in
-    ``in_human_review`` (the dispatcher's §9.8 push fires on entry). The
-    audit lease releases with the row — the task no longer answers to
-    any agent lease.
+    ``in_human_review`` (the dispatcher's §9.8 push fires on entry).
+    The engine's rule results and version persist here too
+    (MT-3.4-06) — the reviewer sees exactly why the task escalated.
+    The audit lease releases with the row — the task no longer answers
+    to any agent lease.
     """
     resolution = _extra_resolution(context, task)
     report = _extra_report(context, task)
@@ -289,6 +296,7 @@ def _side_effect_verdict_escalated(task: Task, context: TransitionContext) -> Ta
             task.pk,
             reason="policy engine approved — the T13 merge-pending row applies",
         )
+    persist_evaluation(report, decision.evaluation)
     task.review_reason = decision.reason  # validated as a Section 8.4 member
     clear_worker_lease(task)
     return None

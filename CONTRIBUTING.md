@@ -210,7 +210,7 @@ plan does not name a CI platform; MT-0.3-01 risk note). Workflows live in
 | Workflow | Jobs (status-check names) | Section 18 gates covered |
 |---|---|---|
 | `lint-type.yaml` | `lint`, `type-check`, `migration-schema-diff` | lint + format checks, type checks, migration/schema-diff placeholder |
-| `test.yaml` | `unit-tests`, `integration-tests` | unit tests, integration tests (against Postgres + Redis) |
+| `test.yaml` | `unit-tests`, `integration-tests`, `coverage-gate` | unit tests, integration tests (against Postgres + Redis), Section 18 coverage target (85% on the state machine and lease/sweeper logic — MT-1.15-05) |
 | `container-build.yaml` | `container-build` | container build |
 | `security.yaml` | `dependency-scan`, `secret-scan` | dependency scanning, secrets scanning |
 
@@ -223,10 +223,10 @@ in the table above first, then mirror it in `.pre-commit-config.yaml` and the wo
 
 ### Required status checks (merge gate)
 
-Parent plan 19.1 (WP-0.3): a failing gate blocks merge. The eight check names listed
+Parent plan 19.1 (WP-0.3): a failing gate blocks merge. The nine check names listed
 in the table above are the required status checks for `main`. Configure them once in
 the GitHub UI (**Settings → Branches →** add a branch protection rule for `main`,
-enable *Require status checks to pass before merging*, tick all eight contexts, enable
+enable *Require status checks to pass before merging*, tick all nine contexts, enable
 *Include administrators*), or with the GitHub CLI as a repository admin — run after
 the workflows have run at least once so every check name exists:
 
@@ -237,7 +237,7 @@ gh api -X PUT "repos/<owner>/<repo>/branches/main/protection" --input - <<'JSON'
     "strict": true,
     "contexts": [
       "lint", "type-check", "migration-schema-diff",
-      "unit-tests", "integration-tests",
+      "unit-tests", "integration-tests", "coverage-gate",
       "container-build",
       "dependency-scan", "secret-scan"
     ]
@@ -269,6 +269,7 @@ tooling tables above — the CI jobs copy it verbatim:
 | Unit — mobile | `flutter test` (run from `mobile/`) | CI skips explicitly while no `mobile/test/*_test.dart` exists |
 | Integration — backend | `uv run --directory backend pytest tests/integration --ds apps.core.settings.dev` | CI skips explicitly while no `test_*.py` exists under `backend/tests/integration/`; the path is relative to `--directory`'s cwd and `--ds` selects the Postgres/Redis settings module (without it the unit SQLite settings skip the layer — MT-1.4-02) |
 | Integration — bridge | `uv run --directory bridge pytest bridge/tests/integration` | same, for `bridge/tests/integration/` |
+| Coverage gate — backend | `uv run --directory backend pytest --cov=apps.tasks.state_machine --cov=apps.leases --cov-append -q` then `uv run --directory backend pytest --ds apps.core.settings.dev tests/integration/test_claim_race_postgres.py tests/integration/test_sweeper_chaos_postgres.py tests/integration/test_idempotency_postgres.py tests/auth tests/test_authorization_matrix.py --cov=apps.tasks.state_machine --cov=apps.leases --cov-append --cov-report=term-missing --cov-report=json:coverage-report.json -q` then `uv run --directory backend python scripts/coverage_gate.py coverage-report.json apps.tasks.state_machine apps.leases --fail-under 85` | The two pytest invocations share one coverage data file (Section 18's unit layer, then the four WP-1.15 suites on Postgres); only the third command is the gate. The Postgres invocation needs `ORCHESTRATOR_DATABASE_URL` pointed at a disposable database locally (pytest-django creates `test_<name>` itself). Section 18 target: >= 85% line coverage **per gated module**; the gate fails when either module drops below (MT-1.15-05) |
 
 - **Allow-empty is explicit, never silent:** the `unit-tests` / `integration-tests`
   jobs detect each suite, print an `allow-empty` notice for every empty one, and run

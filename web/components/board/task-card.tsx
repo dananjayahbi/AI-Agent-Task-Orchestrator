@@ -11,6 +11,12 @@
  * button opening the destination picker. Outside a Board (`move === null`)
  * it renders exactly as before — no draggable, no button.
  *
+ * WP-4.6 (MT-4.6-01) makes the title a link into the task detail page
+ * (`/projects/{pid}/tasks/{taskId}`) — a real anchor, so keyboard
+ * navigation and deep links work (Section 13.4); the detail page links
+ * back to the board, and the shared app-layout query cache keeps the
+ * board's state across the round trip (Section 13.3).
+ *
  * Data discipline (Section 13.3 / MT-4.3-02 out of scope): the card
  * renders exactly what its props carry — the board cache (task row +
  * stream-fed checkpoint percent). No network call ever originates here.
@@ -22,6 +28,7 @@
  *    (OQ-4.3-01), so the card shows "–" until the field exists in the
  *    contract (or WP-4.6's detail view).
  */
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { MoveDestinationDialog } from '@/components/board/move-destination-dialog';
@@ -134,7 +141,12 @@ export function TaskCard({
       )}
 
       <h3 data-testid="task-card-title" className="line-clamp-2 text-sm font-medium">
-        {task.title}
+        <Link
+          href={`/projects/${task.project_id}/tasks/${task.id}`}
+          className="hover:underline focus-visible:underline"
+        >
+          {task.title}
+        </Link>
       </h3>
 
       {task.worker_agent_id !== null && remainingMs !== null && (

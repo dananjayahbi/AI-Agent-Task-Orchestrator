@@ -187,16 +187,118 @@
 - Tests: `backend/tests/integration/test_idempotency_postgres.py` (4 passed
   on PG).
 
-## MT-1.15-04 / MT-1.15-05 — deferred (roadmap 4a)
+## MT-1.15-04 — Consolidate the authorization test suite (done)
 
-- **MT-1.15-04 (authorization suite)** — DEFERRED: depends on MT-1.13-05
-  (attachments authorization rows) and MT-1.14-05 (audit authorization
-  rows), neither landed. No edits made; `test_authorization_matrix.py` keeps
-  its existing coverage and deferred-endpoint drift guard.
-- **MT-1.15-05 (coverage gates)** — DEFERRED: needs all four WP-1.15 suites
-  (01–03 now done; 04 deferred) and owns the `.github` coverage-gate wiring,
-  which is explicitly out of bounds for this pass.
-- **Convergence gate:** OQ-17 (sub-interval `LS-SHORT` leases) and OQ-18
-  (idempotency-cache linearization) were added to parent plan Section 22's
-  table as OPEN rows following OQ-16's format; backend full suite green
-  (1326 passed, 26 skipped).
+- **Adopted, not duplicated (Section 19.6):** MT-1.2-07's
+  `tests/test_authorization_matrix.py` stays the behavioral matrix and the
+  WP-1.15 suite **entry points at it** — `tests/auth/` imports its `PROBES`
+  data, `ACTORS`/`AGENT_ROLES` and the `DEFERRED_ENDPOINTS` drift guard by
+  reference, and the file itself runs in the same `coverage-gate` job. No
+  probe view, fixture or per-cell case was copied.
+- **The missing enumeration contract, now executable**
+  (`tests/auth/test_section_9_2_authorization.py`): the parent plan's
+  Section 9.2 endpoint table is **parsed at test time** (46 operations, the
+  caller column mapped onto the §12.2 actor kinds with roles taken from the
+  adopted file), and three drift guards compose around it: (1) every
+  operation in the generated OpenAPI document must carry a Section 9.2 row —
+  a new endpoint without a permission row fails the suite (the MT risk note,
+  tied to MT-1-1-04's schema); (2) every row either resolves in the
+  production URLConf or is a named member of the adopted
+  `DEFERRED_ENDPOINTS`, asserted **both ways** (a deferred entry that starts
+  resolving, or a live row that stops, fails); (3) every live row links to
+  the test that behaviorally proves its caller cells — a renamed or deleted
+  proof orphans its row loudly.
+- **Attachment access paths (the MT's named gap):** the adopted suites
+  covered anonymous, cross-project and device denials on the five
+  WP-1.11/1.13/1.14 routes; `tests/auth/test_attachment_access_paths.py`
+  adds the rest of MT-1.2-07's negative-path quartet — **malformed, unknown
+  (wrong-key) and expired** tokens, all 401 `AUTH_REQUIRED` on every route —
+  plus the §9.2 "Agent (read)" cell for **every** role (auditor and
+  merge-executor included; the content route answers its catalog
+  `ATTACHMENT_NOT_READY` 409, so admission is visible without the pipeline)
+  and the directional check that an admitted-read role is still refused on
+  the upload/delete halves.
+- **MT-1.2-01 follow-up closed** (`tests/auth/test_feature_flag_token_behavior.py`):
+  the only auth-adjacent flag seam that exists at M1 is WP-0.5's
+  `ORCHESTRATOR_FEATURE_FLAGS` (`settings.FEATURE_FLAGS`); issuance and
+  verification of agent tokens are pinned invariant across flag
+  (re)configurations — empty, unrelated entry, and an `AUTH_MODE=oidc`
+  value. The **live** `AUTH_MODE=oidc` matrix is explicitly deferred to
+  WP-1.3: constructing it needs a real OIDC issuer and this MT's risk note
+  forbids stubbing fake OIDC behavior. No silent scope reduction.
+- **Documented plan gap, never a silent allowance:** `GET /api/v1/devices`
+  is served but Section 9.2's Devices row prints only POST/DELETE (the
+  omission flagged when the plan-doc series transcribed the table). It sits
+  in the suite's `GAPS` list with its case pointer
+  (`test_device_list.py::test_list_requires_an_owner_session`); the plan
+  gains the row → the gap entry must be deleted (a staleness assertion
+  enforces that).
+- **Target-path deviation, recorded:** the MT names
+  `backend/tests/auth/test_authorization_matrix.py`; that basename is the
+  adopted file's (owned elsewhere), so the WP-1.15 entry point lives at
+  `backend/tests/auth/test_section_9_2_authorization.py` (+ the two sibling
+  modules) — same directory the MT prescribes, no same-basename collision,
+  nothing copied. The doc-command path mapping follows MT-1.15-03's
+  precedent: `tests/concurrency`/`tests/idsempotency` resolve onto
+  `tests/integration`'s three PG suites; the combined gate command is the
+  one in CONTRIBUTING.md (unit layer + PG four-suite layer + gate script).
+- Tests: `backend/tests/auth/` — 12 passed (unit layer) and green inside
+  the `coverage-gate` job's Postgres run.
+
+## MT-1.15-05 — Coverage gates (done)
+
+- **The gate is live:** `.github/workflows/test.yaml` gains the
+  `coverage-gate` job (the ninth status check; CONTRIBUTING.md's CI map,
+  required-checks list and test-command table updated in step). Section 18's
+  target is enforced **per gated module** — `apps.tasks.state_machine`
+  97.1%, `apps.leases` 94.3% at enablement, threshold 85% — so an unrelated
+  low-coverage utility can never mask a regression in either module.
+- **Per-module enforcement needs a checker, not `--cov-fail-under`:**
+  coverage.py's `--fail-under` guards a single *total*; the plan's "state
+  machine **or** leases" is two numbers. `backend/scripts/coverage_gate.py`
+  reads the JSON report and fails on **any** module below threshold (its
+  failure mode was exercised at 99% during bring-up; exit 1 with the
+  owning-suite pointer). pytest-cov was added to the backend dev group —
+  the repo had no coverage tool; one tool, configured, not a second stack.
+- **Measurement design — recorded deviation with numbers:** the MT's four
+  suites alone measure state machine **74.3%** / leases **79.7%** — below
+  target, because the state machine's transition rows are proven by
+  WP-1.5/3.2/3.3's *unit* suites and re-proving them here would violate
+  Section 19.6. No single settings layer can host both kinds (the PG race
+  suites skip on SQLite; the unit suite fails on Postgres — the Section 18
+  layering, verified: 77 failures), so the gate measures **one shared
+  coverage data file across the two layer runs** — the hermetic unit
+  invocation appended (`--cov-append`) with the four-hardening-suite PG
+  invocation (`tests/integration/test_{claim_race,sweeper_chaos,
+  idempotency}_postgres.py` + `tests/auth` + the adopted matrix). One
+  measurement, one gate, no parallel coverage-only test set; the four
+  suites remain a named, measured part of the run.
+- **Boundary note (the MT risk note's "define it once"):** the gated set is
+  the **whole** `apps/tasks/state_machine/` package and the **whole**
+  `apps/leases/` package — no cherry-picked files. One file is called out
+  because it reads as a surprise: `apps/leases/tasks.py` (the 12-statement
+  Celery beat entry) is 0% in every lens; the beat wiring it exposes is
+  pinned executably by `test_sweeper_chaos_postgres.py`'s schedule
+  assertions (`schedule["lease-sweeper"]["task"]`), so the gate tolerates
+  it and later WPs should not re-scope around it. `notifier.py` — the other
+  candidate for exclusion — is covered by its own unit suite (92%) and
+  stays inside the gate.
+- **Policy Engine portion explicitly deferred (Section 18, no silent
+  reduction):** the 85% line target (and the MT's 100%-branch clause on
+  token-validation paths) becomes enforceable when WP-3.4 lands the Policy
+  Engine — at that point add its module to the `coverage_gate.py`
+  invocation; until then the gate measures only modules that exist at M1.
+- **Guidance recorded (MT risk note):** any future test added to move these
+  numbers must exercise real transitions — no broad, low-value assertions;
+  a persistent gap belongs to the suite that owns it, never to a lowered
+  threshold.
+- **Local reproduction** (documented in CONTRIBUTING.md "Test commands"):
+  the two pytest invocations share `.coverage`, then
+  `python scripts/coverage_gate.py coverage-report.json
+  apps.tasks.state_machine apps.leases --fail-under 85`. The Postgres
+  invocation needs `ORCHESTRATOR_DATABASE_URL` pointed at a disposable
+  database (this pass used `orchestrator_wp115` on the wp16-pg container).
+
+### Convergence gate (2026-10-14)
+
+- Re-ran the documented two-layer gate verbatim: unit layer **1388 passed, 26 skipped**, PG layer **52 passed** → `apps.tasks.state_machine` **97.1%**, `apps.leases` **94.3%** — gate passed (≥85 per module; unchanged numbers).
