@@ -15,7 +15,10 @@ one recorded choice (WP changelog, Section 20.1 item 5) is
 ``objects/<aa>/<full-sha256-hex>`` — a two-level fan-out so the local
 volume never holds a single flat directory of millions of entries. The
 format is an implementation detail behind :func:`content_key`; callers
-never parse it (pagination.md-style opacity, one level up).
+never parse it (pagination.md-style opacity, one level up). WP-1.12
+adds the sibling :func:`derived_key` namespace (``derived/...``) for
+re-creatable pipeline artifacts (Section 9.5) — same guard rules, no
+cross-record sharing.
 
 **Security** (Section 12.3): the local backend treats keys as untrusted
 and refuses anything that could escape the media root (traversal,
@@ -38,6 +41,7 @@ import hashlib
 import os
 import re
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Final, Protocol, runtime_checkable
 
@@ -46,8 +50,14 @@ from django.core.exceptions import ImproperlyConfigured
 
 # Key format (recorded choice, module docstring): lowercase hex sha256
 # behind a two-level fan-out. The strict matcher doubles as the local
-# backend's traversal guard — nothing else can name a file.
+# backend's traversal guard — nothing else can name a file. Derived
+# (re-creatable, Section 9.5) artifacts live in their own namespace so
+# they can never collide with, or be mistaken for, stored originals.
 _KEY_PATTERN: Final = re.compile(r"\Aobjects/[0-9a-f]{2}/[0-9a-f]{64}\Z")
+_DERIVED_KEY_PATTERN: Final = re.compile(
+    r"\Aderived/[0-9a-f]{2}/[0-9a-f]{32}/[a-z0-9][a-z0-9._-]{0,63}\Z"
+)
+_DERIVED_NAME_PATTERN: Final = re.compile(r"\A[a-z0-9][a-z0-9._-]{0,63}\Z")
 _SHA256_PATTERN: Final = re.compile(r"\A[0-9a-f]{64}\Z")
 
 
@@ -61,6 +71,24 @@ def content_key(sha256_hex: str) -> str:
     if not _SHA256_PATTERN.match(sha256_hex):
         raise ValueError(f"sha256 digest must be 64 lowercase hex chars, got {sha256_hex!r}")
     return f"objects/{sha256_hex[:2]}/{sha256_hex}"
+
+
+def derived_key(attachment_id: str, artifact: str) -> str:
+    """The storage key for one derived artifact of *attachment_id*.
+
+    Format ``derived/<aa>/<attachment-uuid-hex>/<artifact>`` — a
+    **per-attachment** namespace (MT-1.12-02: the normalized image is
+    derived data). Unlike content keys, derived keys are shared with no
+    other record, so their cleanup needs no reference counting: the
+    deletion/retention paths and ``drop_derived_data`` remove them by
+    name (Section 9.5: originals retained, derived re-creatable).
+    ``artifact`` is restricted to a safe lowercase slug — it is part of
+    a filesystem path (Section 12.3 traversal guard).
+    """
+    hex_id = uuid.UUID(str(attachment_id)).hex
+    if not _DERIVED_NAME_PATTERN.match(artifact):
+        raise ValueError(f"invalid derived artifact name {artifact!r}")
+    return f"derived/{hex_id[:2]}/{hex_id}/{artifact}"
 
 
 def hash_bytes(data: bytes) -> str:
@@ -108,9 +136,10 @@ class LocalStorageBackend:
 
     def _path_for(self, key: str) -> Path:
         """Resolve *key* inside the root, refusing anything that escapes."""
-        # _KEY_PATTERN is the traversal guard (module docstring): only the
-        # exact content-key shape passes, so the join cannot leave the root.
-        if not _KEY_PATTERN.match(key):
+        # The two key patterns are the traversal guard (module docstring):
+        # only the exact content or derived shape passes, so the join can
+        # never leave the root.
+        if not _KEY_PATTERN.match(key) and not _DERIVED_KEY_PATTERN.match(key):
             raise ValueError(f"invalid storage key {key!r}")
         return self._root / key
 
@@ -220,6 +249,7 @@ __all__ = [
     "S3StorageBackend",
     "StorageBackend",
     "content_key",
+    "derived_key",
     "get_storage",
     "hash_bytes",
 ]

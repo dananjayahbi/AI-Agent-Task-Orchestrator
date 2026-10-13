@@ -174,3 +174,70 @@ class TaskAttachment(models.Model):
     def __str__(self) -> str:
         """Identify the row as task, filename and status."""
         return f"{self.task_id}: {self.filename} ({self.processing_status})"
+
+
+class AttachmentChunk(models.Model):
+    """One derived page/chunk of extracted text (Section 19 WP-1.12 deliverable).
+
+    Exactly the MT-1.12-05 field list — sequence position, page number
+    (when page-based), text, estimated token count — plus the two
+    constraints that make the derived data trustworthy:
+
+    * ``unique (attachment, sequence)`` — the ordering key is a
+      per-attachment dense position, so a re-run replaces the derived
+      set (delete + insert, Section 9.5 "re-creatable") and a
+      concurrent duplicate run cannot interleave two half-sets silently
+      (the loser's insert hits the constraint and retries as
+      transient);
+    * ``page_number ≥ 1`` when present — pages are 1-based, so
+      ``page_number``/``total_pages`` derivability (Section 9.5
+      pagination data, MT-1.12-05 acceptance) holds by construction.
+
+    ``page_number`` is ``NULL`` for the token-bounded path (DOCX,
+    Markdown, plain text — Section 9.5 "pages **or** token-bounded
+    chunks") and set for the page-oriented path (PDF, image OCR).
+    """
+
+    attachment = models.ForeignKey(
+        TaskAttachment,
+        on_delete=models.CASCADE,  # derived data dies with its record (Section 9.5)
+        related_name="chunks",
+        help_text="Owning attachment; chunks are derived, re-creatable data.",
+    )
+    sequence = models.PositiveIntegerField(
+        help_text="Dense 0-based position across the attachment's whole extraction."
+    )
+    page_number = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="1-based page number for page-oriented outputs; null for "
+        "token-bounded-only documents (Section 9.5).",
+    )
+    text = models.TextField(
+        help_text="The chunk's extracted text (sensitive content — Section 12.4; never logged).",
+    )
+    token_estimate = models.PositiveIntegerField(
+        help_text="Deterministic token estimate for this chunk (Section 9.5; "
+        "MT-1.12-05's documented estimator).",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["attachment", "sequence"],
+                name="attachment_chunk_sequence_unique",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(page_number__isnull=True) | models.Q(page_number__gte=1),
+                name="attachment_chunk_page_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(token_estimate__gte=0),
+                name="attachment_chunk_tokens_nonnegative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        """Identify the row as attachment, sequence and page."""
+        page = f" p{self.page_number}" if self.page_number is not None else ""
+        return f"{self.attachment_id} #{self.sequence}{page}"

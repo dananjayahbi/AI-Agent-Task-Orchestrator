@@ -7,16 +7,16 @@
  * of the plan is lost, re-read it before editing this data.
  */
 
-const TOTAL_DOCS = 329; // series grew by MT-1.6-09 (agent-sessions, roadmap rule 4)
+const TOTAL_DOCS = 330; // +MT-1.6-09 (sessions), +MT-1.15-06 (dashboard endpoint)
 
 const waves = [
   { id: 1, name: "Foundations",            total: 22, done: 22, status: "done" },
   { id: 2, name: "Backend foundation",     total: 23, done: 23, status: "done" },
   { id: 3, name: "State machine & leases", total: 28, done: 28, status: "done" },
-  { id: 4, name: "Events, attachments",    total: 32, done: 16, status: "active" },
-  { id: 5, name: "Bridge skeleton & web",  total: 32, done: 17, status: "active" },
-  { id: 6, name: "Bridge core tools",      total: 36, done: 26, status: "active" },
-  { id: 7, name: "Policy core & Kanban",   total: 34, done: 3,  status: "active" },
+  { id: 4, name: "Events, attachments",    total: 32, done: 32, status: "done" },
+  { id: 5, name: "Bridge skeleton & web",  total: 32, done: 18, status: "active" },
+  { id: 6, name: "Bridge core tools",      total: 36, done: 36, status: "done" },
+  { id: 7, name: "Policy core & Kanban",   total: 34, done: 10, status: "active" },
   { id: 8, name: "Agent loop completion",  total: 42, done: 0,  status: "pending" },
   { id: 9, name: "Merge & review UIs",     total: 40, done: 0,  status: "pending" },
   { id: 10, name: "Release & hardening",   total: 40, done: 0,  status: "pending" },
@@ -52,14 +52,14 @@ const timeline = [
   {
     date: "2026-10-13",
     status: "active",
-    event: "Batches 3+4 complete — 135/329 micro-docs (41%)",
+    event: "Batch 5 complete via finishers — 169/330 micro-docs (51%); Waves 1-4 + 6 DONE",
     detail:
-      "Batch 3 (0576dcf): wp-1.7 sweeper, wp-1.8 checkpoints, wp-1.10 SSE (p95 76ms), " +
-      "wp-2.2 finish, wp-2.4 core tools (NFR-01 live), wp-5.5 finish — Wave 3 COMPLETE (28/28). " +
-      "Batch 4: wp-5.1-04 tunnel soak, wp-4.3 web Kanban (141 tests), wp-3.1 policy presets, " +
-      "wp-1.11 attachments (+PG race tests), wp-2.7 rules + wp-2.12 init (bridge 415, init timed 1.11s), " +
-      "wp-5.6 mobile board (165 tests). Three agents died on 502s mid-batch; verification finishers " +
-      "recovered all three. Convergence gate batch 4 running.",
+      "Network outage killed all 6 agents at their final reports after 2.8h of work; verification " +
+      "finishers recovered everything: wp-1.12 attachment pipeline (8, real-worker E2E with Tesseract), " +
+      "wp-3.2 submission artifacts (5, server-derived patch stats + T7/T8/T10), wp-2.9 HTTP transport + " +
+      "wp-2.10 git helper (10, never-push proven), wp-4.4 DnD MT-01/02 (03/04 deferred to WP-3.6), " +
+      "wp-5.2 edge policies (4, local checklist 96/96), dashboard MT-1.15-06 authored (series 329→330). " +
+      "Convergence gate batch 5 running.",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

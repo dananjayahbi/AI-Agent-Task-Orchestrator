@@ -24,6 +24,7 @@ import 'package:orchestrator_mobile/src/model/checkpoint_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_write_response.dart';
 import 'package:orchestrator_mobile/src/model/claim_request.dart';
 import 'package:orchestrator_mobile/src/model/claim_response.dart';
+import 'package:orchestrator_mobile/src/model/dashboard_summary.dart';
 import 'package:orchestrator_mobile/src/model/device_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/device_register_request.dart';
 import 'package:orchestrator_mobile/src/model/device_register_response.dart';
@@ -41,6 +42,10 @@ import 'package:orchestrator_mobile/src/model/project_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/project_policy.dart';
 import 'package:orchestrator_mobile/src/model/refreshed.dart';
 import 'package:orchestrator_mobile/src/model/release_request.dart';
+import 'package:orchestrator_mobile/src/model/resolution_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/resolution_patch.dart';
+import 'package:orchestrator_mobile/src/model/resolution_submit.dart';
+import 'package:orchestrator_mobile/src/model/resolution_write_response.dart';
 import 'package:orchestrator_mobile/src/model/revoked.dart';
 import 'package:orchestrator_mobile/src/model/task.dart';
 import 'package:orchestrator_mobile/src/model/task_create.dart';
@@ -1775,6 +1780,97 @@ class ApiApi {
     );
   }
 
+  /// getResolutionPatch
+  /// The stored unified patch for one resolution (Section 9.2 Submission row; caller: Agent / Owner). One response shape covers both Section 9.7 paths: patches up to the 5 MB inclusive cap serve their body (&#x60;diff_too_large&#x60; false), oversize patches serve the stats-and-file-list-only marker (&#x60;diff_too_large&#x60; true, &#x60;marker&#x60; &#x3D; \&quot;diff too large\&quot;) — a degraded path, never an error. sha256/size_bytes are the server-computed values from Section 7.2. The route embeds no PID, so the addressed project is checked against the token after role admission (ADR-004 zero-bleed): a foreign-project agent answers AUTH_FORBIDDEN_PROJECT (403); unknown resolution ids answer VALIDATION_ERROR (400) via the documented generic-NotFound mapping (no new codes).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ResolutionPatch] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ResolutionPatch>> getResolutionPatch({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/resolutions/{id}/patch'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ResolutionPatch? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ResolutionPatch),
+            ) as ResolutionPatch;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ResolutionPatch>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// listCheckpoints
   /// One task&#39;s checkpoint history, newest first (Section 9.2 Progress row; caller: Agent / Owner). Cursor pagination per WP-0.5-04: &#x60;page_size&#x60; (default 25, maximum 100), the opaque &#x60;cursor&#x60; from the previous page&#39;s &#x60;next_cursor&#x60;, stable (timestamp, id) ordering so inserts during paging never shift or duplicate rows. Empty tasks return an empty page, not an error. Cross-project agent tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown tasks TASK_NOT_FOUND (404). History/backfill only — live updates are the WP-1.10 &#x60;task.checkpoint&#x60; event stream.
   ///
@@ -1969,6 +2065,111 @@ class ApiApi {
     }
 
     return Response<ProjectListEnvelope>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// listResolutions
+  /// One task&#39;s resolutions, newest first (Section 9.2 Submission row; caller: Agent / Owner — the FR-AUD-01 input the auditor flow reads). Cursor pagination per pagination.md: &#x60;page_size&#x60; (default 25, maximum 100), the opaque &#x60;cursor&#x60; from the previous page&#39;s &#x60;next_cursor&#x60;, stable (submitted_at, id) ordering so inserts during paging never shift or duplicate rows. Empty tasks return an empty page. Cross-project agent tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown tasks TASK_NOT_FOUND (404).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cursor] - Opaque cursor from the previous page's next_cursor; valid only for this task's listing (pagination.md rule 1).
+  /// * [pageSize] - Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults, same per-endpoint choice as the other list routes).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ResolutionListEnvelope] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ResolutionListEnvelope>> listResolutions({
+    required String id,
+    String? cursor,
+    int? pageSize,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/tasks/{id}/resolutions'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor':
+            encodeQueryParameter(_serializers, cursor, const FullType(String)),
+      if (pageSize != null)
+        r'page_size':
+            encodeQueryParameter(_serializers, pageSize, const FullType(int)),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ResolutionListEnvelope? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ResolutionListEnvelope),
+            ) as ResolutionListEnvelope;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ResolutionListEnvelope>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -2988,6 +3189,92 @@ class ApiApi {
     );
   }
 
+  /// retrieveDashboardSummary
+  /// Per-project Overview cards for the Home / Overview surfaces (Section 14.1; FR-MOB-01). Every registered project appears once, ordered by project id. &#x60;state_counts&#x60; carries all six canonical G-01 states (ADR-010), zero-filled, over the project&#39;s non-archived tasks (T19 default visibility). &#x60;velocity&#x60; counts the project&#39;s completions in the trailing 7-day window on the server clock (conservative documented default — the plan states no definition; this payload is authoritative and clients never recompute it). &#x60;active_agents&#x60; counts AgentSession rows with &#x60;ended_at&#x60; null. Single-resource GET — no pagination (pagination.md). Caller: Owner only (Section 9.2); agents and devices answer ROLE_NOT_PERMITTED, anonymous callers AUTH_REQUIRED.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [DashboardSummary] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<DashboardSummary>> retrieveDashboardSummary({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/dashboard/summary';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    DashboardSummary? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(DashboardSummary),
+            ) as DashboardSummary;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<DashboardSummary>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// retrieveProject
   /// Read one project. Caller: Owner or an agent token scoped to this project (Section 9.2: agents read-only for own project); other agent tokens answer AUTH_FORBIDDEN_PROJECT (403) and devices ROLE_NOT_PERMITTED. A malformed or unknown pid answers VALIDATION_ERROR (400): the catalog has no PROJECT_NOT_FOUND.
   ///
@@ -3352,8 +3639,124 @@ class ApiApi {
     );
   }
 
+  /// submitResolution
+  /// Store the lease-owner agent&#39;s submission and fire exactly one Section 8.2 row (Section 9.2 Submission row; caller: Agent, lease owner — §12.2). One transaction: verify the fencing pair (&#x60;session_id&#x60; + &#x60;lease_generation&#x60;) against the locked row, parse the uploaded unified patch into the authoritative &#x60;changed_files&#x60;/&#x60;diff_summary&#x60; (bridge claims are provisional and replaced — Section 9.7), store the Task Resolution (one per attempt, Section 7.2) and its patch artifact (5 MB cap with the Section 9.7 stats-only degraded path), evaluate scope against &#x60;target_scope&#x60; through the single shared glob matcher (Section 12.3), then dispatch: out-of-scope → T8 &#x60;in_human_review&#x60; + &#x60;scope_violation&#x60;, self-flag → T8 + &#x60;self_flagged&#x60; (scope wins when both hold), clean + &#x60;audit_required&#x60; → T7 &#x60;to_be_audited&#x60;, &#x60;audit_required&#x60; false → the T10 policy seam (fail-closed escalate; approve only via the Policy Engine — Section 8.5). &#x60;Idempotency-Key&#x60; replays a retried submission with no second row and no second transition (NFR-12). Rejections: LEASE_NOT_OWNED (403), LEASE_EXPIRED/TASK_STATE_CONFLICT/SCOPE_VIOLATION (409), TASK_NOT_FOUND (404), AUTH_FORBIDDEN_PROJECT (403).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [resolutionSubmit]
+  /// * [idempotencyKey] - Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second resolution or firing a second transition.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ResolutionWriteResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ResolutionWriteResponse>> submitResolution({
+    required String id,
+    required ResolutionSubmit resolutionSubmit,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/tasks/{id}/resolution'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(ResolutionSubmit);
+      _bodyData =
+          _serializers.serialize(resolutionSubmit, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ResolutionWriteResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ResolutionWriteResponse),
+            ) as ResolutionWriteResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ResolutionWriteResponse>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// uploadAttachment
-  /// Upload one attachment (Section 9.2; caller: Owner only — agents read, never upload). The multipart body carries the file part &#x60;file&#x60;; limits and the allowlist are Section 9.5&#39;s (25 MB per file, 10 per task, 100 MB total — configurable defaults), the MIME type is **sniffed from the content**, never taken from the extension or the declared type, and a mismatch is rejected (415 ATTACHMENT_UNSUPPORTED_FORMAT; oversize/over-count/over-total answer 400 VALIDATION_ERROR). Identical bytes already attached to the task de-duplicate onto the existing record (200 instead of 201 — one record, one stored object). The response is the FR-ATT-03 descriptor with processing_status &#x60;uploaded&#x60; (FR-ATT-07); &#x60;token_count&#x60; and &#x60;short_description&#x60; are null until the WP-1.12 pipeline fills them. &#x60;Idempotency-Key&#x60; replays a retried upload without duplicating (ADR-012). The pipeline enqueue hook exists and is a documented no-op until MT-1.12-01 wires the worker job.
+  /// Upload one attachment (Section 9.2; caller: Owner only — agents read, never upload). The multipart body carries the file part &#x60;file&#x60;; limits and the allowlist are Section 9.5&#39;s (25 MB per file, 10 per task, 100 MB total — configurable defaults), the MIME type is **sniffed from the content**, never taken from the extension or the declared type, and a mismatch is rejected (415 ATTACHMENT_UNSUPPORTED_FORMAT; oversize/over-count/over-total answer 400 VALIDATION_ERROR). Identical bytes already attached to the task de-duplicate onto the existing record (200 instead of 201 — one record, one stored object). The response is the FR-ATT-03 descriptor with processing_status &#x60;uploaded&#x60; (FR-ATT-07); &#x60;token_count&#x60; and &#x60;short_description&#x60; are null until the WP-1.12 pipeline fills them. &#x60;Idempotency-Key&#x60; replays a retried upload without duplicating (ADR-012). The pipeline enqueue hook hands the job to the Celery worker after commit (Section 9.9 \&quot;on upload\&quot;; MT-1.12-01 — the unit layer keeps a documented no-op seam).
   ///
   /// Parameters:
   /// * [id]
@@ -3364,6 +3767,7 @@ class ApiApi {
   /// * [size] - Stored size in bytes (Section 7.2 ``size_bytes``).
   /// * [isImage] - Whether the sniffed type is an image — drives the pipeline split (9.5).
   /// * [processingStatus] - FR-ATT-07 enum: uploaded | processing | ready | failed.
+  /// * [failureReason] - Human-readable reason when processing_status is failed (FR-ATT-07 visible; Section 9.5 stage 5; null otherwise).
   /// * [tokenCount] - FR-ATT-03 token count — null until the WP-1.12 pipeline computes it.
   /// * [shortDescription] - FR-ATT-03 short description — null until the WP-1.12 pipeline produces it.
   /// * [createdAt] - Server upload time (P7).
@@ -3386,6 +3790,7 @@ class ApiApi {
     required int size,
     required bool isImage,
     required String processingStatus,
+    String? failureReason,
     int? tokenCount,
     String? shortDescription,
     required DateTime createdAt,
@@ -3443,6 +3848,8 @@ class ApiApi {
             encodeFormParameter(_serializers, isImage, const FullType(bool)),
         r'processing_status': encodeFormParameter(
             _serializers, processingStatus, const FullType(String)),
+        r'failure_reason': encodeFormParameter(
+            _serializers, failureReason, const FullType(String)),
         r'token_count':
             encodeFormParameter(_serializers, tokenCount, const FullType(int)),
         r'short_description': encodeFormParameter(

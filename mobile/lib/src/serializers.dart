@@ -32,6 +32,7 @@ import 'package:orchestrator_mobile/src/model/checkpoint_write_response.dart';
 import 'package:orchestrator_mobile/src/model/claim_request.dart';
 import 'package:orchestrator_mobile/src/model/claim_response.dart';
 import 'package:orchestrator_mobile/src/model/code_enum.dart';
+import 'package:orchestrator_mobile/src/model/dashboard_summary.dart';
 import 'package:orchestrator_mobile/src/model/device_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/device_register_request.dart';
 import 'package:orchestrator_mobile/src/model/device_register_response.dart';
@@ -60,12 +61,20 @@ import 'package:orchestrator_mobile/src/model/policy_preset_enum.dart';
 import 'package:orchestrator_mobile/src/model/priority_enum.dart';
 import 'package:orchestrator_mobile/src/model/project.dart';
 import 'package:orchestrator_mobile/src/model/project_create.dart';
+import 'package:orchestrator_mobile/src/model/project_dashboard_card.dart';
 import 'package:orchestrator_mobile/src/model/project_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/project_policy.dart';
 import 'package:orchestrator_mobile/src/model/refreshed.dart';
 import 'package:orchestrator_mobile/src/model/release_request.dart';
+import 'package:orchestrator_mobile/src/model/resolution.dart';
+import 'package:orchestrator_mobile/src/model/resolution_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/resolution_patch.dart';
+import 'package:orchestrator_mobile/src/model/resolution_submit.dart';
+import 'package:orchestrator_mobile/src/model/resolution_task_state.dart';
+import 'package:orchestrator_mobile/src/model/resolution_write_response.dart';
 import 'package:orchestrator_mobile/src/model/revoked.dart';
 import 'package:orchestrator_mobile/src/model/rules_block.dart';
+import 'package:orchestrator_mobile/src/model/state_counts.dart';
 import 'package:orchestrator_mobile/src/model/state_enum.dart';
 import 'package:orchestrator_mobile/src/model/task.dart';
 import 'package:orchestrator_mobile/src/model/task_create.dart';
@@ -96,6 +105,7 @@ part 'serializers.g.dart';
   ClaimRequest,
   ClaimResponse,
   CodeEnum,
+  DashboardSummary,
   DeviceListEnvelope,
   DeviceRegisterRequest,
   DeviceRegisterResponse,
@@ -124,12 +134,20 @@ part 'serializers.g.dart';
   PriorityEnum,
   Project,
   ProjectCreate,
+  ProjectDashboardCard,
   ProjectListEnvelope,
   ProjectPolicy,
   Refreshed,
   ReleaseRequest,
+  Resolution,
+  ResolutionListEnvelope,
+  ResolutionPatch,
+  ResolutionSubmit,
+  ResolutionTaskState,
+  ResolutionWriteResponse,
   Revoked,
   RulesBlock,
+  StateCounts,
   StateEnum,
   Task,
   TaskCreate,
@@ -145,8 +163,16 @@ Serializers serializers = (_$serializers.toBuilder()
         () => MapBuilder<String, String>(),
       )
       ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(ProjectDashboardCard)]),
+        () => ListBuilder<ProjectDashboardCard>(),
+      )
+      ..addBuilderFactory(
         const FullType(BuiltList, [FullType(EventEnvelope)]),
         () => ListBuilder<EventEnvelope>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Resolution)]),
+        () => ListBuilder<Resolution>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(TokenSummary)]),

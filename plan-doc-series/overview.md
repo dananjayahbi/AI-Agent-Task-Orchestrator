@@ -310,6 +310,7 @@ Goal: Consolidated concurrency, race, and authorization tests promoted to CI (NF
 | MT-1.15-03 | Build the idempotency test suite for claim/checkpoint/submit/decision |
 | MT-1.15-04 | Build the authorization test suite covering the full matrix |
 | MT-1.15-05 | Add coverage gates (85% target on state machine, leases, policy engine) |
+| MT-1.15-06 | Implement the dashboard summary endpoint (`GET /dashboard/summary`) |
 
 ### Milestone M2 — Universal MCP Bridge (`m2-mcp-bridge/`)
 

@@ -20,6 +20,11 @@ import { useMemo, useState } from 'react';
 
 import { BoardColumn } from '@/components/board/board-column';
 import { BoardFiltersBar } from '@/components/board/board-filters';
+import {
+  BoardMoveContext,
+  type BoardDragSession,
+  type BoardMoveController,
+} from '@/components/board/move-context';
 import { StreamStatusIndicator } from '@/components/board/stream-status';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/errors/error-state';
@@ -32,6 +37,11 @@ import {
   serverFiltersOf,
   type BoardFilters,
 } from '@/lib/board/filters';
+import {
+  routeMove,
+  type MoveDialogHandler,
+  type MoveActionHandler,
+} from '@/lib/board/move-routing';
 import { BOARD_STATES, groupTasksByState } from '@/lib/board/states';
 import { DEFAULT_STALLED_AFTER_MINUTES } from '@/lib/board/stalled';
 import { useNow } from '@/lib/board/use-now';
@@ -49,8 +59,27 @@ function defaultFilters(): BoardFilters {
   return { ...DEFAULT_BOARD_FILTERS, states: [...DEFAULT_BOARD_FILTERS.states] };
 }
 
-export function Board({ pid }: { pid: string }) {
+type BoardProps = {
+  pid: string;
+  /**
+   * MT-4.4-04 seam (`allowed` verdicts): sends the documented Section 9.2
+   * `POST /tasks/{id}/transition`. Deferred with the endpoint — until it
+   * lands, allowed drops route to an explicit notice instead (WP-4.4
+   * changelog "endpoint gap").
+   */
+  onMove?: MoveActionHandler;
+  /**
+   * MT-4.4-03 seam (`dialog` verdicts): opens the approve-and-merge /
+   * request-changes layer (Section 9.2 `POST /tasks/{id}/review`).
+   * Deferred with WP-3.6 — the verdicts never become plain moves.
+   */
+  onDialog?: MoveDialogHandler;
+};
+
+export function Board({ pid, onMove, onDialog }: BoardProps) {
   const [filters, setFilters] = useState<BoardFilters>(defaultFilters);
+  const [drag, setDrag] = useState<BoardDragSession | null>(null);
+  const [moveNotice, setMoveNotice] = useState<{ message: string; rejected: boolean } | null>(null);
   const serverFilters = useMemo(() => serverFiltersOf(filters), [filters]);
 
   const tasksQuery = useBoardTasksQuery(pid, serverFilters);
@@ -73,6 +102,29 @@ export function Board({ pid }: { pid: string }) {
   const progress = progressQuery.data ?? {};
   const percentFor = (task: Task): number | null => progress[task.id]?.percent ?? null;
 
+  // MT-4.4-02: one controller serves drag and keyboard/touch — every move
+  // interaction consults the MT-4.4-01 map through this single route.
+  const moveController = useMemo<BoardMoveController>(
+    () => ({
+      drag,
+      route: (task, target) => {
+        routeMove(task, target, {
+          onMove,
+          onDialog,
+          announce: (message, verdict) =>
+            setMoveNotice({ message, rejected: verdict.kind === 'rejected' }),
+        });
+      },
+      beginDrag: (task) => setDrag({ task, over: null }),
+      dragOver: (target) =>
+        setDrag((current) =>
+          current === null || current.over === target ? current : { ...current, over: target },
+        ),
+      endDrag: () => setDrag(null),
+    }),
+    [drag, onMove, onDialog],
+  );
+
   if (tasksQuery.isPending) {
     return <LoadingState label="Loading board…" />;
   }
@@ -92,50 +144,68 @@ export function Board({ pid }: { pid: string }) {
   const filteredView = visible.length === 0 && !isDefaultBoardFilters(filters);
 
   return (
-    <div data-testid="board" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold text-foreground">Board — {pid}</h1>
-        <StreamStatusIndicator status={status} />
-      </div>
-
-      <BoardFiltersBar filters={filters} onChange={setFilters} />
-
-      {visible.length === 0 ? (
-        <EmptyState
-          title={
-            filteredView ? 'No tasks match the current filters' : 'No tasks in this project yet'
-          }
-          description={
-            filteredView
-              ? 'Adjust or clear the filters to see more of the board.'
-              : 'Tasks appear here once they are created and published for this project.'
-          }
-          action={
-            filteredView ? (
-              <Button
-                data-testid="board-empty-clear-filters"
-                variant="outline"
-                onClick={() => setFilters(defaultFilters())}
-              >
-                Clear filters
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : (
-        <div data-testid="board-columns" className="flex snap-x gap-3 overflow-x-auto pb-2">
-          {BOARD_STATES.map((state) => (
-            <BoardColumn
-              key={state}
-              state={state}
-              tasks={grouped[state]}
-              percentFor={percentFor}
-              stalledAfterMinutes={stalledAfterMinutes}
-              nowMs={nowMs}
-            />
-          ))}
+    <BoardMoveContext.Provider value={moveController}>
+      <div data-testid="board" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-lg font-semibold text-foreground">Board — {pid}</h1>
+          <StreamStatusIndicator status={status} />
         </div>
-      )}
-    </div>
+
+        {/* Section 13.4: outcomes are announced as text (never color alone). */}
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="board-move-notice"
+          className={
+            moveNotice === null
+              ? 'text-sm text-muted-foreground'
+              : moveNotice.rejected
+                ? 'text-sm font-medium text-destructive'
+                : 'text-sm text-muted-foreground'
+          }
+        >
+          {moveNotice?.message ?? ''}
+        </div>
+
+        <BoardFiltersBar filters={filters} onChange={setFilters} />
+
+        {visible.length === 0 ? (
+          <EmptyState
+            title={
+              filteredView ? 'No tasks match the current filters' : 'No tasks in this project yet'
+            }
+            description={
+              filteredView
+                ? 'Adjust or clear the filters to see more of the board.'
+                : 'Tasks appear here once they are created and published for this project.'
+            }
+            action={
+              filteredView ? (
+                <Button
+                  data-testid="board-empty-clear-filters"
+                  variant="outline"
+                  onClick={() => setFilters(defaultFilters())}
+                >
+                  Clear filters
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div data-testid="board-columns" className="flex snap-x gap-3 overflow-x-auto pb-2">
+            {BOARD_STATES.map((state) => (
+              <BoardColumn
+                key={state}
+                state={state}
+                tasks={grouped[state]}
+                percentFor={percentFor}
+                stalledAfterMinutes={stalledAfterMinutes}
+                nowMs={nowMs}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </BoardMoveContext.Provider>
   );
 }

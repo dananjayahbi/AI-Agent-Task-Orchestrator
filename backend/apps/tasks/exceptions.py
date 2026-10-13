@@ -25,6 +25,7 @@ from rest_framework.exceptions import APIException
 from apps.core.errors import (
     DEPENDENCY_UNMET,
     ROLE_NOT_PERMITTED,
+    SCOPE_VIOLATION,
     SERVER_ERROR,
     TASK_NOT_FOUND,
     TASK_STATE_CONFLICT,
@@ -129,6 +130,43 @@ class DependencyUnmet(APIException):
         super().__init__(message)
         self.task_id = task_id
         self.unmet = unmet
+
+
+class ScopeViolation(APIException):
+    """A submission/guard refusal: changed files outside ``target_scope``.
+
+    The catalog code Section 9.2 reserves for exactly this condition
+    (MT-3.2-04 acceptance: surfaced errors are ``SCOPE_VIOLATION``, no
+    new codes). The *normal* path does not raise — the submission
+    service routes an out-of-scope patch through T8 into
+    ``in_human_review`` with ``review_reason = scope_violation``
+    (Section 19 WP-3.2 acceptance). This class is the error shape for
+    callers that arrive at a scope-guarded write directly (the T7 guard
+    re-checking an escalated submission).
+
+    Status decision (recorded in the WP changelog): **409** — a
+    resource-condition refusal in the ``TASK_STATE_CONFLICT`` family
+    (the payload is valid; the *patch content* refuses T7), not 400
+    (nothing about the request is malformed) and not 403 (the caller's
+    role is right).
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = SCOPE_VIOLATION
+    default_detail = "Changed files lie outside the task's target scope."
+
+    def __init__(
+        self,
+        task_id: str,
+        *,
+        violations: str = "",
+        detail: str | None = None,
+    ) -> None:
+        """Name the task and the offending paths (message only; scrubbed)."""
+        suffix = f": {violations}" if violations else ""
+        super().__init__(detail or f"Task {task_id} changed files outside target_scope{suffix}.")
+        self.task_id = task_id
+        self.violations = violations
 
 
 class TransitionActorForbidden(APIException):

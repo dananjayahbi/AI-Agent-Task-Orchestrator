@@ -40,6 +40,10 @@ from typing import Final, Literal, cast
 __all__ = [
     "ConfigError",
     "DEFAULT_API_BASE_URL",
+    "DEFAULT_HTTP_HOST",
+    "DEFAULT_HTTP_IDLE_TIMEOUT_SECONDS",
+    "DEFAULT_HTTP_MAX_CONNECTIONS",
+    "DEFAULT_HTTP_PORT",
     "DEFAULT_LOG_FORMAT",
     "DEFAULT_LOG_LEVEL",
     "DEFAULT_MAX_RESPONSE_MB",
@@ -85,6 +89,22 @@ DEFAULT_MAX_RESPONSE_MB: Final = 64.0
 DEFAULT_RETRY_MAX_ATTEMPTS: Final = 3
 #: First backoff delay (MT-2.3-02; Section 10.10): doubles each retry.
 DEFAULT_RETRY_BASE_DELAY_SECONDS: Final = 1.0
+#: HTTP/SSE run mode (WP-2.9; Section 10.2) — all four defaults are flagged
+#: for review in the WP changelog: the plan fixes no numbers for them
+#: (MT-2.9-03 risk note). Loopback-only bind by default (Section 12.4 accepts
+#: local HTTP, and a wider bind is an explicit opt-in).
+DEFAULT_HTTP_HOST: Final = "127.0.0.1"
+#: Port 8765 avoids the backend's 8000 (DEFAULT_API_BASE_URL) — one default
+#: never shadows the other stack component. ``0`` asks the OS for an ephemeral
+#: port (tests; the bound address is logged at startup).
+DEFAULT_HTTP_PORT: Final = 8765
+#: Documented maximum concurrent connections (MT-2.9-03); conservative, so a
+#: runaway client cannot grow the process unbounded.
+DEFAULT_HTTP_MAX_CONNECTIONS: Final = 16
+#: Documented idle-connection timeout in seconds (MT-2.9-03): no request and
+#: no open SSE stream for this long and the connection is closed (best-effort
+#: session end; the lease sweeper, Section 9.9, is the backend backstop).
+DEFAULT_HTTP_IDLE_TIMEOUT_SECONDS: Final = 900.0
 
 _LOG_LEVELS: Final[frozenset[str]] = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 _LOG_FORMATS: Final[frozenset[str]] = frozenset({"json", "text"})
@@ -103,6 +123,10 @@ _ENV_KEYS: Final[Mapping[str, str]] = {
     "retry_max_attempts": "ORCHESTRATOR_BRIDGE_RETRY_MAX_ATTEMPTS",
     "retry_base_delay_seconds": "ORCHESTRATOR_BRIDGE_RETRY_BASE_DELAY_SECONDS",
     "merge_repo_paths": "ORCHESTRATOR_MERGE_REPO_PATHS",
+    "http_host": "ORCHESTRATOR_BRIDGE_HTTP_HOST",
+    "http_port": "ORCHESTRATOR_BRIDGE_HTTP_PORT",
+    "http_max_connections": "ORCHESTRATOR_BRIDGE_HTTP_MAX_CONNECTIONS",
+    "http_idle_timeout_seconds": "ORCHESTRATOR_BRIDGE_HTTP_IDLE_TIMEOUT_SECONDS",
 }
 _FILE_KEYS: Final[frozenset[str]] = frozenset(_ENV_KEYS)
 
@@ -122,6 +146,10 @@ class Settings:
     retry_max_attempts: int
     retry_base_delay_seconds: float
     merge_repo_paths: tuple[str, ...]
+    http_host: str
+    http_port: int
+    http_max_connections: int
+    http_idle_timeout_seconds: float
 
     def __repr__(self) -> str:
         """Debug-safe view — the token renders as [REDACTED] (FR-SEC-04)."""
@@ -134,7 +162,10 @@ class Settings:
             f"max_response_mb={self.max_response_mb!r}, "
             f"retry_max_attempts={self.retry_max_attempts!r}, "
             f"retry_base_delay_seconds={self.retry_base_delay_seconds!r}, "
-            f"merge_repo_paths={self.merge_repo_paths!r})"
+            f"merge_repo_paths={self.merge_repo_paths!r}, "
+            f"http_host={self.http_host!r}, http_port={self.http_port!r}, "
+            f"http_max_connections={self.http_max_connections!r}, "
+            f"http_idle_timeout_seconds={self.http_idle_timeout_seconds!r})"
         )
 
 
@@ -325,6 +356,44 @@ def load_settings(
             f"(env: comma-separated); got {value!r}"
         ) from None
 
+    # --- HTTP/SSE run mode listen + connection bounds (WP-2.9; Section 10.2) --
+    value = _pick("http_host", file_values, environ)
+    http_host = DEFAULT_HTTP_HOST if value is None else _as_text("http_host", value).strip()
+    if not http_host or any(ch.isspace() for ch in http_host) or "://" in http_host:
+        raise ConfigError(
+            f"{_ENV_KEYS['http_host']} (http_host) must be a bare host or IP "
+            f"(default {DEFAULT_HTTP_HOST}); got {http_host!r}"
+        ) from None
+
+    value = _pick("http_port", file_values, environ)
+    http_port = DEFAULT_HTTP_PORT
+    if value is not None:
+        raw_port = _as_text("http_port", value).strip()
+        try:
+            http_port = int(raw_port)
+        except ValueError:
+            raise ConfigError(
+                f"{_ENV_KEYS['http_port']} (http_port) must be a whole number "
+                f"0-65535 (0 = ephemeral); got {raw_port!r}"
+            ) from None
+        if not 0 <= http_port <= 65535:
+            raise ConfigError(
+                f"{_ENV_KEYS['http_port']} (http_port) must be 0-65535 "
+                f"(0 = ephemeral); got {http_port}"
+            ) from None
+
+    value = _pick("http_max_connections", file_values, environ)
+    http_max_connections = DEFAULT_HTTP_MAX_CONNECTIONS
+    if value is not None:
+        http_max_connections = _positive_int("http_max_connections", value)
+
+    value = _pick("http_idle_timeout_seconds", file_values, environ)
+    http_idle_timeout_seconds = DEFAULT_HTTP_IDLE_TIMEOUT_SECONDS
+    if value is not None:
+        http_idle_timeout_seconds = _positive_float(
+            "http_idle_timeout_seconds", value, unit="seconds"
+        )
+
     return Settings(
         api_base_url=api_base_url,
         agent_token=agent_token,
@@ -337,6 +406,10 @@ def load_settings(
         retry_max_attempts=retry_max_attempts,
         retry_base_delay_seconds=retry_base_delay_seconds,
         merge_repo_paths=merge_repo_paths,
+        http_host=http_host,
+        http_port=http_port,
+        http_max_connections=http_max_connections,
+        http_idle_timeout_seconds=http_idle_timeout_seconds,
     )
 
 

@@ -1,42 +1,57 @@
-"""HTTP/SSE run mode stub (parent plan Section 10.2; MT-2.1-04).
+"""HTTP/SSE run mode (parent plan Section 10.2; FR-MCP-01; WP-2.9).
 
-The real mode is a long-running local service with per-connection binding
-(project id in the URL path plus a project-scoped token) — implemented by
-WP-2.9 (HTTP/SSE transport with per-connection binding). This stub loads the
-layered config, confirms the mode selection, logs the attempt with MT-2.1-03
-structured logging, and exits non-zero with a clear message: no half-built
-server may look healthy (MT-2.1-04 risk note).
+The long-running local service: one process, one listen address, MCP over
+HTTP with SSE for server-to-client messages, every connection bound to a
+project from its URL path plus a project-scoped token (Section 10.2's
+per-connection binding source — the reason this mode consults **no**
+manifest). The mode replaced WP-2.1's exit-2 stub at MT-2.9-01; the shared
+bootstrap (config layering, structured logging, correlation scope, mode
+precedence) still runs in :func:`orchestrator_bridge.entrypoints.cli`.
 
-Note: MT-2.1-04's context text cites "WP-2.10" for HTTP mode; the parent plan
-(Section 19.1) and plan-doc-series/overview.md make HTTP transport WP-2.9 and
-WP-2.10 the Local Git helper — the plan wins, so this stub names WP-2.9.
+Lifecycle: uvicorn binds the configured address (documented defaults in
+``bridge/.env.example``; loopback-only unless explicitly reconfigured —
+Section 12.4), the runner logs one clean startup line with the **bound**
+address, and a clean shutdown finalizes every connection best-effort
+(Section 10.10) before the process exits ``0``. A bind failure exits ``1``
+with one scrubbed line and no traceback (NFR-10).
 """
 
 from __future__ import annotations
 
-import sys
+from collections.abc import Callable
+from typing import Any
 
-from ..config import RunMode, Settings, validate_for_mode
-from ..logging import get_logger
-from . import EXIT_NOT_IMPLEMENTED, cli
+from ..config import RunMode, Settings
+from ..http_service.registry import SWEEP_TICK_SECONDS
+from ..http_service.runner import run as run_server
+from ..transport import SendFn
+from . import cli
 
-__all__ = ["main", "run", "NOT_IMPLEMENTED_MESSAGE"]
-
-NOT_IMPLEMENTED_MESSAGE = (
-    "HTTP/SSE run mode is not yet implemented (tracked by WP-2.9 — HTTP/SSE "
-    "transport with per-connection binding); no server was started."
-)
+__all__ = ["main", "run"]
 
 
-def run(settings: Settings) -> int:
-    """Confirm config and mode selection, then fail fast at the WP-2.9 boundary."""
-    validate_for_mode(settings, RunMode.HTTP)
-    get_logger("http").info(
-        "run mode requested before implementation",
-        extra={"event": "mode_not_implemented", "mode": RunMode.HTTP.value},
-    )
-    print(NOT_IMPLEMENTED_MESSAGE, file=sys.stderr)
-    return EXIT_NOT_IMPLEMENTED
+def run(
+    settings: Settings,
+    *,
+    on_server: Callable[[Any], None] | None = None,
+    send: SendFn | None = None,
+    time_func: Callable[[], float] | None = None,
+    sweep_tick_seconds: float = SWEEP_TICK_SECONDS,
+) -> int:
+    """Serve until interrupted; returns the process exit code.
+
+    The keyword seams (``on_server``/``send``/``time_func``/
+    ``sweep_tick_seconds``) forward to the runner — the production path adds
+    nothing of its own, so tests that drive them exercise the real entry.
+    """
+    kwargs: dict[str, Any] = {"sweep_tick_seconds": sweep_tick_seconds}
+    if on_server is not None:
+        kwargs["on_server"] = on_server
+    if send is not None:
+        kwargs["send"] = send
+    if time_func is not None:
+        kwargs["time_func"] = time_func
+    return run_server(settings, **kwargs)
 
 
 def main() -> int:

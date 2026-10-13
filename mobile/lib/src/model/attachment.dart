@@ -8,7 +8,7 @@ import 'package:built_value/serializer.dart';
 
 part 'attachment.g.dart';
 
-/// One attachment descriptor — FR-ATT-03's field shape, locked here.
+/// One attachment descriptor — FR-ATT-03's field shape, locked here.  One documented addition by WP-1.12 (MT-1.12-07, FR-ATT-07 \"visible\"): ``failure_reason`` carries the human-readable permanent- failure reason when ``processing_status`` is ``failed``, null otherwise — schema follow-up flagged for the OpenAPI owner.
 ///
 /// Properties:
 /// * [id] - Server-generated row identity (Section 7.2).
@@ -18,6 +18,7 @@ part 'attachment.g.dart';
 /// * [size] - Stored size in bytes (Section 7.2 ``size_bytes``).
 /// * [isImage] - Whether the sniffed type is an image — drives the pipeline split (9.5).
 /// * [processingStatus] - FR-ATT-07 enum: uploaded | processing | ready | failed.
+/// * [failureReason] - Human-readable reason when processing_status is failed (FR-ATT-07 visible; Section 9.5 stage 5; null otherwise).
 /// * [tokenCount] - FR-ATT-03 token count — null until the WP-1.12 pipeline computes it.
 /// * [shortDescription] - FR-ATT-03 short description — null until the WP-1.12 pipeline produces it.
 /// * [createdAt] - Server upload time (P7).
@@ -50,6 +51,10 @@ abstract class Attachment implements Built<Attachment, AttachmentBuilder> {
   /// FR-ATT-07 enum: uploaded | processing | ready | failed.
   @BuiltValueField(wireName: r'processing_status')
   String get processingStatus;
+
+  /// Human-readable reason when processing_status is failed (FR-ATT-07 visible; Section 9.5 stage 5; null otherwise).
+  @BuiltValueField(wireName: r'failure_reason')
+  String? get failureReason;
 
   /// FR-ATT-03 token count — null until the WP-1.12 pipeline computes it.
   @BuiltValueField(wireName: r'token_count')
@@ -121,6 +126,13 @@ class _$AttachmentSerializer implements PrimitiveSerializer<Attachment> {
       object.processingStatus,
       specifiedType: const FullType(String),
     );
+    yield r'failure_reason';
+    yield object.failureReason == null
+        ? null
+        : serializers.serialize(
+            object.failureReason,
+            specifiedType: const FullType.nullable(String),
+          );
     yield r'token_count';
     yield object.tokenCount == null
         ? null
@@ -213,6 +225,14 @@ class _$AttachmentSerializer implements PrimitiveSerializer<Attachment> {
             specifiedType: const FullType(String),
           ) as String;
           result.processingStatus = valueDes;
+          break;
+        case r'failure_reason':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.failureReason = valueDes;
           break;
         case r'token_count':
           final valueDes = serializers.deserialize(

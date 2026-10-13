@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiV1AuthLoginCreateData, ApiV1AuthLoginCreateErrors, ApiV1AuthLoginCreateResponses, ApiV1AuthLogoutCreateData, ApiV1AuthLogoutCreateErrors, ApiV1AuthLogoutCreateResponses, ApiV1AuthRefreshCreateData, ApiV1AuthRefreshCreateErrors, ApiV1AuthRefreshCreateResponses, ApiV1DevicesCreateData, ApiV1DevicesCreateErrors, ApiV1DevicesCreateResponses, ApiV1DevicesDestroyData, ApiV1DevicesDestroyErrors, ApiV1DevicesDestroyResponses, ApiV1DevicesRetrieveData, ApiV1DevicesRetrieveErrors, ApiV1DevicesRetrieveResponses, ApiV1EventsRetrieveData, ApiV1EventsRetrieveErrors, ApiV1EventsRetrieveResponses, ApiV1EventsStreamRetrieveData, ApiV1EventsStreamRetrieveErrors, ApiV1EventsStreamRetrieveResponse, ApiV1EventsStreamRetrieveResponses, ApiV1TokensAgentCreateData, ApiV1TokensAgentCreateErrors, ApiV1TokensAgentCreateResponses, ApiV1TokensDestroyData, ApiV1TokensDestroyErrors, ApiV1TokensDestroyResponses, ApiV1TokensRetrieveData, ApiV1TokensRetrieveErrors, ApiV1TokensRetrieveResponses, ClaimTaskData, ClaimTaskErrors, ClaimTaskResponses, CreateCheckpointData, CreateCheckpointErrors, CreateCheckpointResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateTaskData, CreateTaskErrors, CreateTaskResponses, DeleteAttachmentData, DeleteAttachmentErrors, DeleteAttachmentResponses, EndAgentSessionData, EndAgentSessionErrors, EndAgentSessionResponses, HealthLiveRetrieveData, HealthLiveRetrieveResponses, HealthReadyRetrieveData, HealthReadyRetrieveErrors, HealthReadyRetrieveResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListTaskAttachmentsData, ListTaskAttachmentsErrors, ListTaskAttachmentsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListWorkData, ListWorkErrors, ListWorkResponses, OpenAgentSessionData, OpenAgentSessionErrors, OpenAgentSessionResponses, PartialUpdateProjectData, PartialUpdateProjectErrors, PartialUpdateProjectPolicyData, PartialUpdateProjectPolicyErrors, PartialUpdateProjectPolicyResponses, PartialUpdateProjectResponses, PartialUpdateTaskData, PartialUpdateTaskErrors, PartialUpdateTaskResponses, ReleaseTaskData, ReleaseTaskErrors, ReleaseTaskResponses, RetrieveAttachmentData, RetrieveAttachmentErrors, RetrieveAttachmentResponses, RetrieveProjectData, RetrieveProjectErrors, RetrieveProjectManifestData, RetrieveProjectManifestErrors, RetrieveProjectManifestResponses, RetrieveProjectPolicyData, RetrieveProjectPolicyErrors, RetrieveProjectPolicyResponses, RetrieveProjectResponses, RetrieveTaskData, RetrieveTaskErrors, RetrieveTaskResponses, UploadAttachmentData, UploadAttachmentErrors, UploadAttachmentResponses } from './types.gen';
+import type { ApiV1AuthLoginCreateData, ApiV1AuthLoginCreateErrors, ApiV1AuthLoginCreateResponses, ApiV1AuthLogoutCreateData, ApiV1AuthLogoutCreateErrors, ApiV1AuthLogoutCreateResponses, ApiV1AuthRefreshCreateData, ApiV1AuthRefreshCreateErrors, ApiV1AuthRefreshCreateResponses, ApiV1DevicesCreateData, ApiV1DevicesCreateErrors, ApiV1DevicesCreateResponses, ApiV1DevicesDestroyData, ApiV1DevicesDestroyErrors, ApiV1DevicesDestroyResponses, ApiV1DevicesRetrieveData, ApiV1DevicesRetrieveErrors, ApiV1DevicesRetrieveResponses, ApiV1EventsRetrieveData, ApiV1EventsRetrieveErrors, ApiV1EventsRetrieveResponses, ApiV1EventsStreamRetrieveData, ApiV1EventsStreamRetrieveErrors, ApiV1EventsStreamRetrieveResponse, ApiV1EventsStreamRetrieveResponses, ApiV1TokensAgentCreateData, ApiV1TokensAgentCreateErrors, ApiV1TokensAgentCreateResponses, ApiV1TokensDestroyData, ApiV1TokensDestroyErrors, ApiV1TokensDestroyResponses, ApiV1TokensRetrieveData, ApiV1TokensRetrieveErrors, ApiV1TokensRetrieveResponses, ClaimTaskData, ClaimTaskErrors, ClaimTaskResponses, CreateCheckpointData, CreateCheckpointErrors, CreateCheckpointResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateTaskData, CreateTaskErrors, CreateTaskResponses, DeleteAttachmentData, DeleteAttachmentErrors, DeleteAttachmentResponses, EndAgentSessionData, EndAgentSessionErrors, EndAgentSessionResponses, GetResolutionPatchData, GetResolutionPatchErrors, GetResolutionPatchResponses, HealthLiveRetrieveData, HealthLiveRetrieveResponses, HealthReadyRetrieveData, HealthReadyRetrieveErrors, HealthReadyRetrieveResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListResolutionsData, ListResolutionsErrors, ListResolutionsResponses, ListTaskAttachmentsData, ListTaskAttachmentsErrors, ListTaskAttachmentsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListWorkData, ListWorkErrors, ListWorkResponses, OpenAgentSessionData, OpenAgentSessionErrors, OpenAgentSessionResponses, PartialUpdateProjectData, PartialUpdateProjectErrors, PartialUpdateProjectPolicyData, PartialUpdateProjectPolicyErrors, PartialUpdateProjectPolicyResponses, PartialUpdateProjectResponses, PartialUpdateTaskData, PartialUpdateTaskErrors, PartialUpdateTaskResponses, ReleaseTaskData, ReleaseTaskErrors, ReleaseTaskResponses, RetrieveAttachmentData, RetrieveAttachmentErrors, RetrieveAttachmentResponses, RetrieveDashboardSummaryData, RetrieveDashboardSummaryErrors, RetrieveDashboardSummaryResponses, RetrieveProjectData, RetrieveProjectErrors, RetrieveProjectManifestData, RetrieveProjectManifestErrors, RetrieveProjectManifestResponses, RetrieveProjectPolicyData, RetrieveProjectPolicyErrors, RetrieveProjectPolicyResponses, RetrieveProjectResponses, RetrieveTaskData, RetrieveTaskErrors, RetrieveTaskResponses, SubmitResolutionData, SubmitResolutionErrors, SubmitResolutionResponses, UploadAttachmentData, UploadAttachmentErrors, UploadAttachmentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -109,6 +109,19 @@ export const apiV1AuthRefreshCreate = <ThrowOnError extends boolean = false>(opt
             type: 'apiKey'
         }],
     url: '/api/v1/auth/refresh',
+    ...options
+});
+
+/**
+ * Per-project Overview cards for the Home / Overview surfaces (Section 14.1; FR-MOB-01). Every registered project appears once, ordered by project id. `state_counts` carries all six canonical G-01 states (ADR-010), zero-filled, over the project's non-archived tasks (T19 default visibility). `velocity` counts the project's completions in the trailing 7-day window on the server clock (conservative documented default — the plan states no definition; this payload is authoritative and clients never recompute it). `active_agents` counts AgentSession rows with `ended_at` null. Single-resource GET — no pagination (pagination.md). Caller: Owner only (Section 9.2); agents and devices answer ROLE_NOT_PERMITTED, anonymous callers AUTH_REQUIRED.
+ */
+export const retrieveDashboardSummary = <ThrowOnError extends boolean = false>(options?: Options<RetrieveDashboardSummaryData, ThrowOnError>): RequestResult<RetrieveDashboardSummaryResponses, RetrieveDashboardSummaryErrors, ThrowOnError> => (options?.client ?? client).get<RetrieveDashboardSummaryResponses, RetrieveDashboardSummaryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/dashboard/summary',
     ...options
 });
 
@@ -328,6 +341,19 @@ export const listWork = <ThrowOnError extends boolean = false>(options: Options<
 });
 
 /**
+ * The stored unified patch for one resolution (Section 9.2 Submission row; caller: Agent / Owner). One response shape covers both Section 9.7 paths: patches up to the 5 MB inclusive cap serve their body (`diff_too_large` false), oversize patches serve the stats-and-file-list-only marker (`diff_too_large` true, `marker` = "diff too large") — a degraded path, never an error. sha256/size_bytes are the server-computed values from Section 7.2. The route embeds no PID, so the addressed project is checked against the token after role admission (ADR-004 zero-bleed): a foreign-project agent answers AUTH_FORBIDDEN_PROJECT (403); unknown resolution ids answer VALIDATION_ERROR (400) via the documented generic-NotFound mapping (no new codes).
+ */
+export const getResolutionPatch = <ThrowOnError extends boolean = false>(options: Options<GetResolutionPatchData, ThrowOnError>): RequestResult<GetResolutionPatchResponses, GetResolutionPatchErrors, ThrowOnError> => (options.client ?? client).get<GetResolutionPatchResponses, GetResolutionPatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/resolutions/{id}/patch',
+    ...options
+});
+
+/**
  * Read one task by id (Section 9.2). Caller: Owner or an agent token scoped to the task's project — the row the bridge's `get_task_details` tool serves (Section 10.5); foreign agent tokens answer AUTH_FORBIDDEN_PROJECT (403) and devices ROLE_NOT_PERMITTED. Every Section 7.2 field is returned. A malformed id answers VALIDATION_ERROR (400) — the boundary check of Section 7.3; an unknown but well-formed id answers TASK_NOT_FOUND (404). Archived and completed tasks remain readable (MT-1.4-06).
  */
 export const retrieveTask = <ThrowOnError extends boolean = false>(options: Options<RetrieveTaskData, ThrowOnError>): RequestResult<RetrieveTaskResponses, RetrieveTaskErrors, ThrowOnError> => (options.client ?? client).get<RetrieveTaskResponses, RetrieveTaskErrors, ThrowOnError>({
@@ -371,7 +397,7 @@ export const listTaskAttachments = <ThrowOnError extends boolean = false>(option
 });
 
 /**
- * Upload one attachment (Section 9.2; caller: Owner only — agents read, never upload). The multipart body carries the file part `file`; limits and the allowlist are Section 9.5's (25 MB per file, 10 per task, 100 MB total — configurable defaults), the MIME type is **sniffed from the content**, never taken from the extension or the declared type, and a mismatch is rejected (415 ATTACHMENT_UNSUPPORTED_FORMAT; oversize/over-count/over-total answer 400 VALIDATION_ERROR). Identical bytes already attached to the task de-duplicate onto the existing record (200 instead of 201 — one record, one stored object). The response is the FR-ATT-03 descriptor with processing_status `uploaded` (FR-ATT-07); `token_count` and `short_description` are null until the WP-1.12 pipeline fills them. `Idempotency-Key` replays a retried upload without duplicating (ADR-012). The pipeline enqueue hook exists and is a documented no-op until MT-1.12-01 wires the worker job.
+ * Upload one attachment (Section 9.2; caller: Owner only — agents read, never upload). The multipart body carries the file part `file`; limits and the allowlist are Section 9.5's (25 MB per file, 10 per task, 100 MB total — configurable defaults), the MIME type is **sniffed from the content**, never taken from the extension or the declared type, and a mismatch is rejected (415 ATTACHMENT_UNSUPPORTED_FORMAT; oversize/over-count/over-total answer 400 VALIDATION_ERROR). Identical bytes already attached to the task de-duplicate onto the existing record (200 instead of 201 — one record, one stored object). The response is the FR-ATT-03 descriptor with processing_status `uploaded` (FR-ATT-07); `token_count` and `short_description` are null until the WP-1.12 pipeline fills them. `Idempotency-Key` replays a retried upload without duplicating (ADR-012). The pipeline enqueue hook hands the job to the Celery worker after commit (Section 9.9 "on upload"; MT-1.12-01 — the unit layer keeps a documented no-op seam).
  */
 export const uploadAttachment = <ThrowOnError extends boolean = false>(options: Options<UploadAttachmentData, ThrowOnError>): RequestResult<UploadAttachmentResponses, UploadAttachmentErrors, ThrowOnError> => (options.client ?? client).post<UploadAttachmentResponses, UploadAttachmentErrors, ThrowOnError>({
     ...formDataBodySerializer,
@@ -450,6 +476,36 @@ export const releaseTask = <ThrowOnError extends boolean = false>(options: Optio
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Store the lease-owner agent's submission and fire exactly one Section 8.2 row (Section 9.2 Submission row; caller: Agent, lease owner — §12.2). One transaction: verify the fencing pair (`session_id` + `lease_generation`) against the locked row, parse the uploaded unified patch into the authoritative `changed_files`/`diff_summary` (bridge claims are provisional and replaced — Section 9.7), store the Task Resolution (one per attempt, Section 7.2) and its patch artifact (5 MB cap with the Section 9.7 stats-only degraded path), evaluate scope against `target_scope` through the single shared glob matcher (Section 12.3), then dispatch: out-of-scope → T8 `in_human_review` + `scope_violation`, self-flag → T8 + `self_flagged` (scope wins when both hold), clean + `audit_required` → T7 `to_be_audited`, `audit_required` false → the T10 policy seam (fail-closed escalate; approve only via the Policy Engine — Section 8.5). `Idempotency-Key` replays a retried submission with no second row and no second transition (NFR-12). Rejections: LEASE_NOT_OWNED (403), LEASE_EXPIRED/TASK_STATE_CONFLICT/SCOPE_VIOLATION (409), TASK_NOT_FOUND (404), AUTH_FORBIDDEN_PROJECT (403).
+ */
+export const submitResolution = <ThrowOnError extends boolean = false>(options: Options<SubmitResolutionData, ThrowOnError>): RequestResult<SubmitResolutionResponses, SubmitResolutionErrors, ThrowOnError> => (options.client ?? client).post<SubmitResolutionResponses, SubmitResolutionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/tasks/{id}/resolution',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * One task's resolutions, newest first (Section 9.2 Submission row; caller: Agent / Owner — the FR-AUD-01 input the auditor flow reads). Cursor pagination per pagination.md: `page_size` (default 25, maximum 100), the opaque `cursor` from the previous page's `next_cursor`, stable (submitted_at, id) ordering so inserts during paging never shift or duplicate rows. Empty tasks return an empty page. Cross-project agent tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown tasks TASK_NOT_FOUND (404).
+ */
+export const listResolutions = <ThrowOnError extends boolean = false>(options: Options<ListResolutionsData, ThrowOnError>): RequestResult<ListResolutionsResponses, ListResolutionsErrors, ThrowOnError> => (options.client ?? client).get<ListResolutionsResponses, ListResolutionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/tasks/{id}/resolutions',
+    ...options
 });
 
 /**

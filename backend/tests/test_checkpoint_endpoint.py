@@ -144,6 +144,12 @@ def test_valid_checkpoint_returns_identity_and_new_expiry(
 ) -> None:
     """200 body: checkpoint identity + the new lease_expires_at (7.2 fields)."""
     client, task = _claimed(owner_client, project)
+    # Same Windows ~15.6 ms clock-tick caveat recorded in
+    # test_checkpoint_ownership: a claim and a checkpoint inside one tick
+    # compute the same min(now + duration, cap) and the strict comparison
+    # below would flake. Start the stored expiry short of now + duration —
+    # a correct extension must still move it strictly forward.
+    Task.objects.filter(pk=task.pk).update(lease_expires_at=timezone.now() + timedelta(minutes=1))
     task.refresh_from_db()
 
     response = client.post(

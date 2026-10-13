@@ -375,3 +375,10 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   Verified: `pytest tests/test_authorization_matrix.py -q` green; runs in
   CI's unit job (Security layer) via the existing `pytest` step. Changelog
   complete — WP-1.2 slices all delivered.
+
+### Convergence gate (2026-10-13)
+
+- The WP-3.2 *Submit resolution* probe's frozen `commit_sha` fixture
+  (`0123…4567`) drew a detect-secrets Hex-High-Entropy false positive; a
+  documented `# pragma: allowlist secret` was added (test constant, not a
+  secret) so the repo-wide secret-scan gate stays enabled and green.

@@ -122,13 +122,29 @@ def test_cli_default_dispatches_stdio(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_mode_flag_beats_config_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ORCHESTRATOR_BRIDGE_MODE", "stdio")
+    seen: list[Settings] = []
+
+    def _fake_http_run(settings: Settings, **kwargs: object) -> int:
+        seen.append(settings)
+        return EXIT_OK
+
+    monkeypatch.setattr(http_module, "run", _fake_http_run)
     code = cli(["--mode", "http"])
-    assert code == EXIT_NOT_IMPLEMENTED  # would be 0/stdio without the flag
+    assert code == EXIT_OK  # would be the stdio dispatch without the flag
+    assert len(seen) == 1  # the explicit flag routed to the HTTP entry
 
 
 def test_configured_mode_key_drives_generic_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ORCHESTRATOR_BRIDGE_MODE", "http")
-    assert cli([]) == EXIT_NOT_IMPLEMENTED
+    seen: list[Settings] = []
+
+    def _fake_http_run(settings: Settings, **kwargs: object) -> int:
+        seen.append(settings)
+        return EXIT_OK
+
+    monkeypatch.setattr(http_module, "run", _fake_http_run)
+    assert cli([]) == EXIT_OK
+    assert len(seen) == 1  # the configured key routed to the HTTP entry
 
 
 def test_mode_script_is_explicit_over_config(
@@ -148,29 +164,40 @@ def test_mode_script_is_explicit_over_config(
     assert called, "explicit stdio script must dispatch stdio, not the configured http"
 
 
-# --- stub boundaries ------------------------------------------------------------
+# --- run-mode boundaries ---------------------------------------------------------
 
 
-def test_http_stub_fails_fast_with_wp_reference(capsys: pytest.CaptureFixture[str]) -> None:
+def test_http_mode_dispatches_to_the_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    """WP-2.9 replaced the exit-2 stub: ``--mode http`` dispatches to the
+    real service runner (the stub contract lives on for the executor only).
+
+    A fake runner keeps the dispatch test serverless; the real server path
+    is exercised end-to-end in ``test_http_server.py``.
+    """
+    seen: list[Settings] = []
+
+    def _fake_http_run(settings: Settings, **kwargs: object) -> int:
+        seen.append(settings)
+        return EXIT_OK
+
+    monkeypatch.setattr(http_module, "run", _fake_http_run)
     code = cli(["--mode", "http"])
-    captured = capsys.readouterr()
-    assert code == EXIT_NOT_IMPLEMENTED == 2
-    assert "not yet implemented" in captured.err
-    assert "WP-2.9" in captured.err
-    assert "Traceback" not in captured.err
-    # the resolved mode (flag) also picks the log stream: http diagnostics on stdout
-    assert '"event": "mode_not_implemented"' in captured.out
+    assert code == EXIT_OK
+    assert len(seen) == 1  # the flag routed to the HTTP entry, not stdio
 
 
-def test_http_stub_never_builds_a_server(
+def test_http_mode_no_longer_reports_not_implemented(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    def _boom(settings: Settings) -> object:
-        raise AssertionError("the HTTP stub must not build a partial server")
-
-    monkeypatch.setattr("orchestrator_bridge.server.create_server", _boom)
-    assert http_module.run(_settings({"ORCHESTRATOR_BRIDGE_MODE": "http"})) == EXIT_NOT_IMPLEMENTED
-    assert "WP-2.9" in capsys.readouterr().err
+    """The stub's exit-2 message must be gone from the HTTP path — a
+    regression to the stub would reintroduce it (and hang every caller
+    that believed the mode was implemented)."""
+    monkeypatch.setattr(http_module, "run", lambda settings, **kwargs: EXIT_OK)
+    code = cli(["--mode", "http"])
+    captured = capsys.readouterr()
+    assert code == EXIT_OK
+    assert "not yet implemented" not in captured.err
+    assert EXIT_NOT_IMPLEMENTED != 0  # the code still exists for the executor
 
 
 def test_executor_callable_raises_wp_boundary() -> None:

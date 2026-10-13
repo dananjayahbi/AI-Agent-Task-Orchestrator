@@ -17,6 +17,8 @@ dependencies = [
     "redis>=8.1.0",
     "celery[redis]>=5.4,<6",
     "uvicorn>=0.54.0",
+    "pillow>=12.3.0",
+    "pypdf>=6.20.1",
 ]
 
 [dependency-groups]

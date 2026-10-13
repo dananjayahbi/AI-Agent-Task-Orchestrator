@@ -27,7 +27,13 @@ from .services import attachment_payload
 
 
 class AttachmentSerializer(serializers.Serializer[Any]):
-    """One attachment descriptor — FR-ATT-03's field shape, locked here."""
+    """One attachment descriptor — FR-ATT-03's field shape, locked here.
+
+    One documented addition by WP-1.12 (MT-1.12-07, FR-ATT-07
+    "visible"): ``failure_reason`` carries the human-readable permanent-
+    failure reason when ``processing_status`` is ``failed``, null
+    otherwise — schema follow-up flagged for the OpenAPI owner.
+    """
 
     id = serializers.UUIDField(help_text="Server-generated row identity (Section 7.2).")
     task_id = serializers.CharField(help_text="The owning task (Section 7.2).")
@@ -41,6 +47,11 @@ class AttachmentSerializer(serializers.Serializer[Any]):
     )
     processing_status = serializers.CharField(
         help_text="FR-ATT-07 enum: uploaded | processing | ready | failed."
+    )
+    failure_reason = serializers.CharField(
+        allow_null=True,
+        help_text="Human-readable reason when processing_status is failed "
+        "(FR-ATT-07 visible; Section 9.5 stage 5; null otherwise).",
     )
     token_count = serializers.IntegerField(
         allow_null=True,

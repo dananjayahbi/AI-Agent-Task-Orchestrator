@@ -14,7 +14,14 @@ from __future__ import annotations
 
 from django.urls import URLPattern, path
 
-from .views import CheckpointListCreateView, TaskDetailView, TaskListCreateView
+from .views import (
+    CheckpointListCreateView,
+    ResolutionListView,
+    ResolutionPatchView,
+    ResolutionSubmitView,
+    TaskDetailView,
+    TaskListCreateView,
+)
 
 urlpatterns: list[URLPattern] = [
     path(
@@ -27,5 +34,22 @@ urlpatterns: list[URLPattern] = [
         "tasks/<str:id>/checkpoints",
         CheckpointListCreateView.as_view(),
         name="task-checkpoints",
+    ),
+    # WP-3.2's Submission row (Section 9.2): the resolution POST/GET pair
+    # plus the artifact-serving GET — paths mirror the plan table verbatim.
+    path(
+        "tasks/<str:id>/resolution",
+        ResolutionSubmitView.as_view(),
+        name="resolution-submit",
+    ),
+    path(
+        "tasks/<str:id>/resolutions",
+        ResolutionListView.as_view(),
+        name="resolution-list",
+    ),
+    path(
+        "resolutions/<uuid:id>/patch",
+        ResolutionPatchView.as_view(),
+        name="resolution-patch",
     ),
 ]

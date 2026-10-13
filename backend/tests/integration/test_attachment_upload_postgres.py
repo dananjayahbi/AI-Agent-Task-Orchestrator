@@ -41,6 +41,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.attachments.models import TaskAttachment
 from apps.attachments.services import create_attachment
+from config.celery import app as celery_app  # noqa: F401 - bind the project app (else shared_task defaults to AMQP)
 from tests.attachments.helpers import make_project, make_task
 
 _RUN_COMMAND = "uv run --directory backend pytest tests/integration --ds apps.core.settings.dev"

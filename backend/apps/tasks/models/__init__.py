@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from .checkpoints import CheckpointImmutable, CheckpointKind, TaskCheckpoint
 from .dependencies import TaskDependency
+from .resolutions import ArtifactKind, TaskArtifact, TaskResolution
 from .task import (
     ClaimedRole,
     MergeStatus,
@@ -22,15 +23,18 @@ from .transitions import ActorType, TaskTransition, TransitionReason
 
 __all__ = [
     "ActorType",
+    "ArtifactKind",
     "ClaimedRole",
     "CheckpointImmutable",
     "CheckpointKind",
     "MergeStatus",
     "ReviewReason",
     "Task",
+    "TaskArtifact",
     "TaskCheckpoint",
     "TaskDependency",
     "TaskPriority",
+    "TaskResolution",
     "TaskState",
     "TaskTransition",
     "TransitionReason",

@@ -169,3 +169,16 @@ client was regenerated once against that schema via the sanctioned tool and
 no WP-5.6 model is affected. If `schemas/openapi.yaml` moves again before
 the gate, re-run `regen` from the owning backend WP rather than editing
 generated files.
+
+### Convergence gate (2026-10-13)
+
+- WP-3.2's submission-artifact schemas (plus MT-1.15-06's dashboard
+  summary endpoint) moved `schemas/openapi.yaml` again; the sanctioned
+  `dart run tool/openapi_client.dart regen` landed generated
+  `DashboardSummary` / `ProjectDashboardCard` models that now collide by
+  name with this WP's hand-authored gap-workaround models. The five files
+  importing both the barrel and the hand-written models got an explicit
+  `hide DashboardSummary, ProjectDashboardCard` on the barrel import —
+  no generated file hand-edited, no hand-written model deleted (the
+  reconciliation the docstring defers stays deferred); `flutter analyze`
+  clean, format stable, **165/165 green**, client `check` exit 0.

@@ -16,6 +16,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
+from apps.attachments.models import TaskAttachment
+from apps.attachments.services import create_attachment
 from apps.projects.models import Project, ProjectPolicy
 from apps.tasks.models import Task, TaskState
 
@@ -63,6 +65,46 @@ def upload(
     return SimpleUploadedFile(
         name, content, content_type=content_type or "application/octet-stream"
     )
+
+
+def make_attachment(
+    task: Task, data: bytes, *, name: str, mime: str | None = None
+) -> TaskAttachment:
+    """Accept one upload through the real service path (WP-1.12 suites).
+
+    Uses ``create_attachment`` — validation, content-addressed storage
+    and the record all happen exactly as on the wire; the enqueue seam
+    is the unit layer's documented no-op unless a test installs one.
+    """
+    outcome = create_attachment(
+        task_id=task.pk,
+        filename=name,
+        declared_mime=mime,
+        data=data,
+        uploaded_by="wp12-tests",
+    )
+    assert not outcome.deduplicated, "fixture bytes collided with an existing upload"
+    return outcome.attachment
+
+
+class StubOcrEngine:
+    """Hermetic :class:`apps.attachments.ocr.OcrEngine` for the WP suites.
+
+    Records every invocation (mime types) so tests can assert OCR was —
+    or was *not* — invoked, and returns a deterministic transcript.
+    Real-recognition tests use Tesseract directly and skip honestly
+    when the binary is absent (MT-1.12-02/08 marking rule).
+    """
+
+    name = "stub"
+
+    def __init__(self, text: str = "stub transcript") -> None:
+        self.text = text
+        self.calls: list[str] = []
+
+    def recognize(self, image: bytes, *, mime_type: str) -> str:
+        self.calls.append(mime_type)
+        return self.text
 
 
 # --- rows and clients --------------------------------------------------------

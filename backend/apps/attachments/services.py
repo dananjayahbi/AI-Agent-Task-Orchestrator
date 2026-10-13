@@ -12,9 +12,11 @@ One transaction, one lock, documented order:
 4. store the bytes through the MT-1.11-01 abstraction under the
    content-addressed key;
 5. create the record with ``processing_status = uploaded`` (FR-ATT-07);
-6. after commit, invoke the pipeline enqueue seam (MT-1.12-01 completes
-   it; today a documented no-op — MT-1.11-03 acceptance asks only that
-   the seam exists and is exercised).
+6. after commit, invoke the pipeline enqueue seam (MT-1.12-01 wired it
+   to the real Celery job via ``AttachmentsConfig.ready()`` — the
+   unit layer keeps the documented no-op default because it runs with
+   no broker, Section 18; MT-1.11-03 acceptance asked only that the
+   seam exists and is exercised).
 
 Recorded readings (Section 20.1 item 5):
 
@@ -53,12 +55,13 @@ from .validation import (
 )
 
 
-# The MT-1.11-03 pipeline hook: MT-1.12-01 replaces the process-wide
-# implementation with a real Celery ``delay`` call. Invoked **after**
-# the upload transaction commits (module docstring); always with the
-# stored row's id.
+# The MT-1.11-03 pipeline hook: completed by MT-1.12-01, which wires
+# it to the real Celery job in ``AttachmentsConfig.ready()`` outside
+# the unit layer (Section 18: no broker in the hermetic suite, so the
+# no-op stays the default there). Invoked **after** the upload
+# transaction commits (module docstring); always with the stored row's id.
 def _default_enqueue(attachment_id: str) -> None:
-    """The documented no-op seam body (MT-1.12-01 replaces it)."""
+    """The documented no-op seam body (the unit layer's default)."""
 
 
 _enqueue_seam: Callable[[str], None] = _default_enqueue
@@ -67,15 +70,16 @@ _enqueue_seam: Callable[[str], None] = _default_enqueue
 def set_enqueue_seam(function: Callable[[str], None] | None) -> None:
     """Install (or reset with ``None``) the pipeline enqueue seam.
 
-    Tests use this to exercise the seam (MT-1.11-03 acceptance);
-    MT-1.12-01 uses it to wire the real worker job.
+    MT-1.12-01 installed the real worker job process-wide (outside the
+    unit layer); tests use this to capture the seam explicitly (the
+    MT-1.11-03 acceptance) or to run the task synchronously.
     """
     global _enqueue_seam
     _enqueue_seam = function if function is not None else _default_enqueue
 
 
 def enqueue_processing(attachment_id: str) -> None:
-    """Run the pipeline enqueue seam (today: documented no-op)."""
+    """Run the pipeline enqueue seam (no-op in the unit layer)."""
     _enqueue_seam(attachment_id)
 
 
@@ -160,6 +164,7 @@ def attachment_payload(attachment: TaskAttachment) -> dict[str, Any]:
         "size": attachment.size_bytes,
         "is_image": attachment.is_image,
         "processing_status": attachment.processing_status,
+        "failure_reason": attachment.failure_detail or None,
         "token_count": attachment.token_estimate,
         "short_description": attachment.description or None,
         "created_at": attachment.created_at,

@@ -10,8 +10,9 @@ templates as drf-spectacular writes them), so the contract test compares them
 
 Provenance discipline: an endpoint may be absent from the OpenAPI document
 **only** while it is listed in :data:`PENDING_BACKEND` with the backend work
-package that has yet to implement it (e.g. claim/release land with WP-1.6,
-checkpoints with WP-1.8, resolution with WP-3.2). Any other catalog entry
+package that has yet to implement it (e.g. claim/release landed with WP-1.6,
+checkpoints with WP-1.8, resolution with WP-3.2 — each retired its flag as it
+declared). Any other catalog entry
 missing from the document fails the contract test by name, and a pending
 entry that *appears* in the document is validated immediately — the pending
 flag then goes stale and is cleaned up in the same change. The catalog paths
@@ -57,9 +58,12 @@ class Endpoint:
 BRIDGE_ENDPOINTS: Final[tuple[Endpoint, ...]] = (
     # --- not yet in the generated document: pending, provenance recorded ------
     Endpoint("checkpoint_create", "POST", "/api/v1/tasks/{id}/checkpoints"),
-    Endpoint("resolution_submit", "POST", "/api/v1/tasks/{id}/resolution"),
     Endpoint("attachment_content", "GET", "/api/v1/attachments/{id}/content"),
     # --- declared in the current document -------------------------------------
+    # (WP-3.2's resolution_submit entry retired at convergence: the
+    # submission route is in the document and the contract test validates
+    # its request sample.)
+    Endpoint("resolution_submit", "POST", "/api/v1/tasks/{id}/resolution"),
     Endpoint("attachment_list", "GET", "/api/v1/tasks/{id}/attachments"),
     Endpoint("attachment_get", "GET", "/api/v1/attachments/{id}"),
     Endpoint("session_open", "POST", "/api/v1/agent-sessions"),
@@ -93,8 +97,10 @@ def endpoint(endpoint_id: str) -> Endpoint:
 #: Only these may be absent from ``schemas/openapi.yaml``; absence anywhere
 #: else fails the contract test with the endpoint named. (WP-1.8's
 #: ``checkpoint_create`` entry retired at convergence: the checkpoint
-#: route is in the document and the contract test validates its sample.)
+#: route is in the document and the contract test validates its sample.
+#: WP-3.2's ``resolution_submit`` entry retired the same way — the
+#: submission route landed and this map lost the flag in the same change,
+#: per this file's documented stale-flag rule.)
 PENDING_BACKEND: Final[dict[str, str]] = {
-    "resolution_submit": "WP-3.2 (backend submission endpoints)",
     "attachment_content": "WP-1.14 (attachment retrieval API)",
 }

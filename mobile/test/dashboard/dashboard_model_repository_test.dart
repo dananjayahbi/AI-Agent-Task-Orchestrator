@@ -9,7 +9,8 @@ import 'package:orchestrator_mobile/features/dashboard/dashboard_providers.dart'
 import 'package:orchestrator_mobile/features/dashboard/dashboard_repository.dart';
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary.dart';
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary_source.dart';
-import 'package:orchestrator_mobile/orchestrator_mobile.dart';
+import 'package:orchestrator_mobile/orchestrator_mobile.dart'
+    hide DashboardSummary, ProjectDashboardCard;
 
 import 'dashboard_test_support.dart';
 

@@ -1,0 +1,980 @@
+{
+  "recorded_at": "2026-10-13T07:12:40Z",
+  "checklist": "infra\\cloudflare\\route-verification-checklist.md",
+  "vantages": {
+    "lan": "http://192.168.1.244:8030",
+    "public": null,
+    "ingress": true,
+    "rate_probe": true,
+    "service_token_headers": false
+  },
+  "summary": {
+    "pass": 96,
+    "fail": 0,
+    "skip": 0,
+    "executed": 96
+  },
+  "pass": true,
+  "checks": [
+    {
+      "kind": "ingress",
+      "sample": "validate",
+      "expected": "exit 0",
+      "observed": "exit 0",
+      "status": "pass",
+      "detail": "Validating rules from /etc/cloudflared/config.yaml\nOK"
+    },
+    {
+      "kind": "ingress",
+      "row": "auth-devices",
+      "sample": "/api/v1/auth/login",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "auth-devices",
+      "sample": "/api/v1/auth/logout",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "auth-devices",
+      "sample": "/api/v1/auth/refresh",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "auth-devices",
+      "sample": "/api/v1/devices",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "auth-devices",
+      "sample": "/api/v1/devices",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "auth-devices",
+      "sample": "/api/v1/devices/1",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007/manifest",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007/tasks",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/tasks/PID00007-T004",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/tasks/PID00007-T004",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/tasks/PID00007-T004/review",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/dashboard/summary",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/events",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/events/stream",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "task-create-publish",
+      "sample": "/api/v1/projects/PID00007/tasks",
+      "expected": "http://backend:8000",
+      "observed": "http://backend:8000",
+      "status": "pass",
+      "detail": "\tservice: http://backend:8000"
+    },
+    {
+      "kind": "ingress",
+      "row": "task-create-publish",
+      "sample": "/api/v1/tasks/PID00007-T004/transition",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/tokens/agent",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/tokens",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/tokens/42",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/projects/PID00007/policy",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "tokens-policy-admin",
+      "sample": "/admin/",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/projects/PID00007/work",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/claim",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/release",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/checkpoints",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/resolution",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/resolutions",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/resolutions/1/patch",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/audit-verdict",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/audit-reports",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/agent-sessions",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "agent-work",
+      "sample": "/api/v1/agent-sessions/sess-1/end",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "merge-queue",
+      "sample": "/api/v1/merge/pending",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "merge-queue",
+      "sample": "/api/v1/merge/PID00007-T004/start",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "merge-queue",
+      "sample": "/api/v1/merge/PID00007-T004/result",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "health",
+      "sample": "/health/live",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "health",
+      "sample": "/health/ready",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/tasks/PID00007-T004/attachments",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/attachments/1",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/attachments/1/content",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "ingress",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/schema",
+      "expected": "http_status:403",
+      "observed": "http_status:403",
+      "status": "pass",
+      "detail": "\tservice: http_status:403"
+    },
+    {
+      "kind": "lan",
+      "row": "auth-devices",
+      "sample": "/api/v1/auth/login",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 400,
+      "envelope": "VALIDATION_ERROR"
+    },
+    {
+      "kind": "lan",
+      "row": "auth-devices",
+      "sample": "/api/v1/auth/logout",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "auth-devices",
+      "sample": "/api/v1/auth/refresh",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "auth-devices",
+      "sample": "/api/v1/devices",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "auth-devices",
+      "sample": "/api/v1/devices",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "auth-devices",
+      "sample": "/api/v1/devices/1",
+      "method": "DELETE",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007",
+      "method": "PATCH",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007/manifest",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/projects/PID00007/tasks",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/tasks/PID00007-T004",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/tasks/PID00007-T004",
+      "method": "PATCH",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/tasks/PID00007-T004/review",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/dashboard/summary",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/events",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "reads-review-dashboard-events",
+      "sample": "/api/v1/events/stream",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "task-create-publish",
+      "sample": "/api/v1/projects/PID00007/tasks",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "task-create-publish",
+      "sample": "/api/v1/tasks/PID00007-T004/transition",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/tokens/agent",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/tokens",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/tokens/42",
+      "method": "DELETE",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/projects/PID00007/policy",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "tokens-policy-admin",
+      "sample": "/api/v1/projects/PID00007/policy",
+      "method": "PATCH",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "tokens-policy-admin",
+      "sample": "/admin/",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/projects/PID00007/work",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/claim",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/release",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/checkpoints",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/checkpoints",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/resolution",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/resolutions",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/resolutions/1/patch",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/audit-verdict",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/tasks/PID00007-T004/audit-reports",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/agent-sessions",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "agent-work",
+      "sample": "/api/v1/agent-sessions/sess-1/end",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "merge-queue",
+      "sample": "/api/v1/merge/pending",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "merge-queue",
+      "sample": "/api/v1/merge/PID00007-T004/start",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "merge-queue",
+      "sample": "/api/v1/merge/PID00007-T004/result",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "health",
+      "sample": "/health/live",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 200,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "health",
+      "sample": "/health/ready",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 200,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/tasks/PID00007-T004/attachments",
+      "method": "POST",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/tasks/PID00007-T004/attachments",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/attachments/1",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/attachments/1",
+      "method": "DELETE",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 401,
+      "envelope": "AUTH_REQUIRED"
+    },
+    {
+      "kind": "lan",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/attachments/1/content",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 404,
+      "envelope": ""
+    },
+    {
+      "kind": "lan",
+      "row": "unnamed-default-deny",
+      "sample": "/api/v1/schema",
+      "method": "GET",
+      "expected": "app-response",
+      "observed": "app-response",
+      "status": "pass",
+      "http_status": 200,
+      "envelope": ""
+    },
+    {
+      "kind": "rate-probe",
+      "sample": "/api/v1/devices",
+      "expected": "app-response:RATE_LIMITED",
+      "observed": "app-response:RATE_LIMITED",
+      "status": "pass",
+      "detail": "61 posts against device budget 60"
+    }
+  ]
+}

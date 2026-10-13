@@ -27,12 +27,22 @@ from __future__ import annotations
 from .config import _ENV_KEYS, Settings, default_user_config_path
 from .errors import INIT_COMMAND, TokenError
 
-__all__ = ["require_agent_token"]
+__all__ = ["header_safe", "require_agent_token"]
 
 
 def _header_safe(token: str) -> bool:
     """Plausible bearer value: no whitespace and no ASCII control characters."""
     return not any(ch.isspace() or ord(ch) < 0x20 or ord(ch) == 0x7F for ch in token)
+
+
+def header_safe(token: str) -> bool:
+    """Public spelling of the header-safety gate (WP-2.9 connection binding).
+
+    The HTTP/SSE run mode validates the *per-connection* bearer presented in
+    the request's ``Authorization`` header with exactly the stdio path's rule
+    (Section 10.3 step 3) — one safety check, two entry points.
+    """
+    return _header_safe(token)
 
 
 def require_agent_token(settings: Settings) -> str:

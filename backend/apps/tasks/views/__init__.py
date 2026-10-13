@@ -9,6 +9,14 @@ never lives here (MT-1.4-03).
 from __future__ import annotations
 
 from .checkpoints import CheckpointListCreateView
+from .resolutions import ResolutionListView, ResolutionPatchView, ResolutionSubmitView
 from .tasks import TaskDetailView, TaskListCreateView
 
-__all__ = ["CheckpointListCreateView", "TaskDetailView", "TaskListCreateView"]
+__all__ = [
+    "CheckpointListCreateView",
+    "ResolutionListView",
+    "ResolutionPatchView",
+    "ResolutionSubmitView",
+    "TaskDetailView",
+    "TaskListCreateView",
+]

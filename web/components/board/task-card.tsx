@@ -5,6 +5,12 @@
  * show id, title, priority chip, worker badge with lease countdown,
  * percent bar, attachment count, and a stalled/escalation marker."
  *
+ * MT-4.4-02 adds the move affordances: inside a Board the card is
+ * draggable (the drop decides via the allowed-move map — this component
+ * never evaluates rules itself) and exposes a keyboard/touch "Move"
+ * button opening the destination picker. Outside a Board (`move === null`)
+ * it renders exactly as before — no draggable, no button.
+ *
  * Data discipline (Section 13.3 / MT-4.3-02 out of scope): the card
  * renders exactly what its props carry — the board cache (task row +
  * stream-fed checkpoint percent). No network call ever originates here.
@@ -16,7 +22,11 @@
  *    (OQ-4.3-01), so the card shows "–" until the field exists in the
  *    contract (or WP-4.6's detail view).
  */
+import { useState } from 'react';
+
+import { MoveDestinationDialog } from '@/components/board/move-destination-dialog';
 import { PriorityChip } from '@/components/board/priority-chip';
+import { useBoardMove } from '@/components/board/move-context';
 import type { Task } from '@/lib/api/generated/types.gen';
 import { formatLeaseRemaining, leaseRemainingMs } from '@/lib/board/lease';
 import { DEFAULT_STALLED_AFTER_MINUTES, isTaskStalled } from '@/lib/board/stalled';
@@ -45,6 +55,8 @@ export function TaskCard({
   nowMs,
   attachmentCount = null,
 }: TaskCardProps) {
+  const move = useBoardMove();
+  const [moveOpen, setMoveOpen] = useState(false);
   const remainingMs = leaseRemainingMs(task, nowMs);
   const stalled = isTaskStalled(task, stalledAfterMinutes, nowMs);
   const escalated = task.state === 'in_human_review';
@@ -55,14 +67,56 @@ export function TaskCard({
     <article
       data-testid="task-card"
       aria-label={task.id}
+      draggable={move !== null}
+      onDragStart={
+        move === null
+          ? undefined
+          : (event) => {
+              move.beginDrag(task);
+              const transfer = event.dataTransfer as DataTransfer | undefined;
+              if (transfer !== undefined) {
+                // Firefox refuses to start a drag without setData.
+                transfer.effectAllowed = 'move';
+                transfer.setData('text/plain', task.id);
+              }
+            }
+      }
+      onDragEnd={move === null ? undefined : () => move.endDrag()}
       className="flex h-full flex-col gap-1.5 overflow-hidden rounded-lg border border-border bg-card p-2.5 text-card-foreground"
     >
       <div className="flex items-start justify-between gap-2">
         <span data-testid="task-card-id" className="font-mono text-[11px] text-muted-foreground">
           {task.id}
         </span>
-        <PriorityChip priority={task.priority} />
+        <div className="flex items-center gap-1">
+          <PriorityChip priority={task.priority} />
+          {move !== null && (
+            <button
+              type="button"
+              data-testid="task-card-move"
+              aria-label={`Move task ${task.id}`}
+              title={`Move ${task.id} to another column`}
+              onClick={() => setMoveOpen(true)}
+              className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              Move
+            </button>
+          )}
+        </div>
       </div>
+
+      {move !== null && (
+        <MoveDestinationDialog
+          task={task}
+          open={moveOpen}
+          onOpenChange={setMoveOpen}
+          onPick={(target) => {
+            // Same route as a drop — the map decides, never this component.
+            move.route(task, target);
+            setMoveOpen(false);
+          }}
+        />
+      )}
 
       <h3 data-testid="task-card-title" className="line-clamp-2 text-sm font-medium">
         {task.title}

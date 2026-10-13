@@ -50,8 +50,9 @@ from django.utils import timezone
 
 from apps.tasks.models import Task, TaskState
 
+from .derived import delete_derived_artifacts
 from .exceptions import AttachmentOnImmutableTask
-from .models import TaskAttachment
+from .models import AttachmentChunk, TaskAttachment
 from .storage import get_storage
 
 
@@ -103,6 +104,11 @@ def delete_attachment(attachment: TaskAttachment) -> DeletionOutcome:
         still_referenced = _key_still_referenced(locked.storage_key, exclude=locked)
         locked.deleted_at = timezone.now()
         locked.save(update_fields=["deleted_at"])
+
+        # Derived artifacts are per-attachment (storage.py's recorded
+        # design — no sharing, no refcount) and re-creatable (9.5), so
+        # they are always removed with the soft delete (MT-1.12-02).
+        delete_derived_artifacts(locked)
 
         if still_referenced:
             return DeletionOutcome(attachment=locked, object_removed=False)
@@ -160,9 +166,14 @@ def purge_archived_attachments(*, now: datetime | None = None) -> RetentionOutco
     for task in archived.iterator():
         live = TaskAttachment.objects.filter(task=task, deleted_at__isnull=True)
         keys = list(live.values_list("storage_key", flat=True).distinct())
+        attachments = list(TaskAttachment.objects.filter(task=task))
         deleted, _ = TaskAttachment.objects.filter(task=task).delete()
         records_deleted += deleted
         tasks_processed += 1
+        # Per-attachment derived artifacts (normalized images — WP-1.12)
+        # die with their records: no refcount, by construction.
+        for attachment in attachments:
+            objects_removed += delete_derived_artifacts(attachment)
         for key in keys:
             # Reference counting after the purge: a key shared with a
             # record outside this task (or a not-yet-purged soft delete
@@ -198,21 +209,24 @@ _DERIVED_FIELDS: tuple[str, ...] = _DERIVED_TEXT_FIELDS + _DERIVED_NULLABLE_FIEL
 
 
 def drop_derived_data(attachment: TaskAttachment) -> TaskAttachment:
-    """Clear every derived column, keeping the original intact (9.5).
+    """Clear every derived artefact, keeping the original intact (9.5).
 
-    Derived data (chunks live in their own table — WP-1.12; the columns
-    here) is re-creatable by the pipeline, so it may be dropped even
-    when the original is retained — MT-1.11-05's acceptance, proven
-    standalone here for the future storage-pressure/reprocessing paths.
-    The record returns to a "re-creatable" shape: status is *not*
-    touched (only the WP-1.12 pipeline owns ``processing_status``
-    transitions — Section 9.1 ownership).
+    Derived data — the chunk rows (WP-1.12's table), the derived storage
+    artifacts (normalized images, MT-1.12-02) and the Section 7.2
+    derived columns — is re-creatable by the pipeline, so it may be
+    dropped even when the original is retained — MT-1.11-05's
+    acceptance, proven standalone here for the future storage-pressure/
+    reprocessing paths. The record returns to a "re-creatable" shape:
+    status is *not* touched (only the WP-1.12 pipeline owns
+    ``processing_status`` transitions — Section 9.1 ownership).
     """
     for field in _DERIVED_TEXT_FIELDS:
         setattr(attachment, field, "")
     for field in _DERIVED_NULLABLE_FIELDS:
         setattr(attachment, field, None)
     attachment.save(update_fields=list(_DERIVED_FIELDS))
+    AttachmentChunk.objects.filter(attachment=attachment).delete()
+    delete_derived_artifacts(attachment)
     return attachment
 
 

@@ -330,6 +330,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/dashboard/summary:
+    get:
+      operationId: retrieve_dashboard_summary
+      description: 'Per-project Overview cards for the Home / Overview surfaces (Section
+        14.1; FR-MOB-01). Every registered project appears once, ordered by project
+        id. `state_counts` carries all six canonical G-01 states (ADR-010), zero-filled,
+        over the project''s non-archived tasks (T19 default visibility). `velocity`
+        counts the project''s completions in the trailing 7-day window on the server
+        clock (conservative documented default — the plan states no definition; this
+        payload is authoritative and clients never recompute it). `active_agents`
+        counts AgentSession rows with `ended_at` null. Single-resource GET — no pagination
+        (pagination.md). Caller: Owner only (Section 9.2); agents and devices answer
+        ROLE_NOT_PERMITTED, anonymous callers AUTH_REQUIRED.'
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/devices:
     get:
       operationId: api_v1_devices_retrieve
@@ -1241,6 +1278,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/resolutions/{id}/patch:
+    get:
+      operationId: get_resolution_patch
+      description: 'The stored unified patch for one resolution (Section 9.2 Submission
+        row; caller: Agent / Owner). One response shape covers both Section 9.7 paths:
+        patches up to the 5 MB inclusive cap serve their body (`diff_too_large` false),
+        oversize patches serve the stats-and-file-list-only marker (`diff_too_large`
+        true, `marker` = "diff too large") — a degraded path, never an error. sha256/size_bytes
+        are the server-computed values from Section 7.2. The route embeds no PID,
+        so the addressed project is checked against the token after role admission
+        (ADR-004 zero-bleed): a foreign-project agent answers AUTH_FORBIDDEN_PROJECT
+        (403); unknown resolution ids answer VALIDATION_ERROR (400) via the documented
+        generic-NotFound mapping (no new codes).'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolutionPatch'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/tasks/{id}:
     get:
       operationId: retrieve_task
@@ -1451,8 +1544,9 @@ paths:
         The response is the FR-ATT-03 descriptor with processing_status `uploaded`
         (FR-ATT-07); `token_count` and `short_description` are null until the WP-1.12
         pipeline fills them. `Idempotency-Key` replays a retried upload without duplicating
-        (ADR-012). The pipeline enqueue hook exists and is a documented no-op until
-        MT-1.12-01 wires the worker job.'
+        (ADR-012). The pipeline enqueue hook hands the job to the Celery worker after
+        commit (Section 9.9 "on upload"; MT-1.12-01 — the unit layer keeps a documented
+        no-op seam).'
       parameters:
       - in: header
         name: Idempotency-Key
@@ -1843,6 +1937,163 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/tasks/{id}/resolution:
+    post:
+      operationId: submit_resolution
+      description: 'Store the lease-owner agent''s submission and fire exactly one
+        Section 8.2 row (Section 9.2 Submission row; caller: Agent, lease owner —
+        §12.2). One transaction: verify the fencing pair (`session_id` + `lease_generation`)
+        against the locked row, parse the uploaded unified patch into the authoritative
+        `changed_files`/`diff_summary` (bridge claims are provisional and replaced
+        — Section 9.7), store the Task Resolution (one per attempt, Section 7.2) and
+        its patch artifact (5 MB cap with the Section 9.7 stats-only degraded path),
+        evaluate scope against `target_scope` through the single shared glob matcher
+        (Section 12.3), then dispatch: out-of-scope → T8 `in_human_review` + `scope_violation`,
+        self-flag → T8 + `self_flagged` (scope wins when both hold), clean + `audit_required`
+        → T7 `to_be_audited`, `audit_required` false → the T10 policy seam (fail-closed
+        escalate; approve only via the Policy Engine — Section 8.5). `Idempotency-Key`
+        replays a retried submission with no second row and no second transition (NFR-12).
+        Rejections: LEASE_NOT_OWNED (403), LEASE_EXPIRED/TASK_STATE_CONFLICT/SCOPE_VIOLATION
+        (409), TASK_NOT_FOUND (404), AUTH_FORBIDDEN_PROJECT (403).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of storing
+          a second resolution or firing a second transition.
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolutionSubmit'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ResolutionSubmit'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResolutionSubmit'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolutionWriteResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/tasks/{id}/resolutions:
+    get:
+      operationId: list_resolutions
+      description: 'One task''s resolutions, newest first (Section 9.2 Submission
+        row; caller: Agent / Owner — the FR-AUD-01 input the auditor flow reads).
+        Cursor pagination per pagination.md: `page_size` (default 25, maximum 100),
+        the opaque `cursor` from the previous page''s `next_cursor`, stable (submitted_at,
+        id) ordering so inserts during paging never shift or duplicate rows. Empty
+        tasks return an empty page. Cross-project agent tokens answer AUTH_FORBIDDEN_PROJECT
+        (403); unknown tasks TASK_NOT_FOUND (404).'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor; valid only
+          for this task's listing (pagination.md rule 1).
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults, same per-endpoint choice
+          as the other list routes).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolutionListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/tokens:
     get:
       operationId: api_v1_tokens_retrieve
@@ -2182,7 +2433,13 @@ components:
       - token
     Attachment:
       type: object
-      description: One attachment descriptor — FR-ATT-03's field shape, locked here.
+      description: |-
+        One attachment descriptor — FR-ATT-03's field shape, locked here.
+
+        One documented addition by WP-1.12 (MT-1.12-07, FR-ATT-07
+        "visible"): ``failure_reason`` carries the human-readable permanent-
+        failure reason when ``processing_status`` is ``failed``, null
+        otherwise — schema follow-up flagged for the OpenAPI owner.
       properties:
         id:
           type: string
@@ -2208,6 +2465,11 @@ components:
         processing_status:
           type: string
           description: 'FR-ATT-07 enum: uploaded | processing | ready | failed.'
+        failure_reason:
+          type: string
+          nullable: true
+          description: Human-readable reason when processing_status is failed (FR-ATT-07
+            visible; Section 9.5 stage 5; null otherwise).
         token_count:
           type: integer
           nullable: true
@@ -2224,6 +2486,7 @@ components:
           description: Server upload time (P7).
       required:
       - created_at
+      - failure_reason
       - filename
       - id
       - is_image
@@ -2487,6 +2750,18 @@ components:
         * `RATE_LIMITED` - RATE_LIMITED
         * `VERSION_CONFLICT` - VERSION_CONFLICT
         * `SERVER_ERROR` - SERVER_ERROR
+    DashboardSummary:
+      type: object
+      description: '``GET /dashboard/summary`` body — one card per registered project.'
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectDashboardCard'
+          description: Every registered project, ordered by project id; empty when
+            no projects exist. Single-resource GET — no cursor pagination (pagination.md).
+      required:
+      - projects
     DeviceListEnvelope:
       type: object
       description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
@@ -3195,6 +3470,38 @@ components:
       - default_branch
       - name
       - repo_path
+    ProjectDashboardCard:
+      type: object
+      description: One project's Overview card — Section 14.1 Home row; FR-MOB-01.
+      properties:
+        project_id:
+          type: string
+          description: Canonical PID + five digits (Section 7.3), in id order.
+        name:
+          type: string
+        state_counts:
+          allOf:
+          - $ref: '#/components/schemas/StateCounts'
+          description: Counts over the project's non-archived tasks, keyed by the
+            six canonical G-01 states, zero-filled (ADR-010; T19 visibility).
+        velocity:
+          type: integer
+          minimum: 0
+          description: Tasks that reached `completed` in the trailing 7-day window
+            (server clock, transition log). Conservative documented default — the
+            plan states no definition (OQ); this payload is authoritative and clients
+            never recompute it (FR-MOB-01).
+        active_agents:
+          type: integer
+          minimum: 0
+          description: AgentSession rows of this project with ended_at null (Section
+            7.2 lifecycle; no heartbeat freshness invented).
+      required:
+      - active_agents
+      - name
+      - project_id
+      - state_counts
+      - velocity
     ProjectListEnvelope:
       type: object
       description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
@@ -3355,6 +3662,235 @@ components:
           nullable: true
           description: 'Optional FR-TSK-06 optimistic check: when present, a stale
             value answers VERSION_CONFLICT.'
+    Resolution:
+      type: object
+      description: One stored resolution — the Section 7.2 field list, as returned.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Server-generated row identity (7.2).
+        task_id:
+          type: string
+          description: The addressed task (Section 7.2).
+        attempt_number:
+          type: integer
+          description: The submission attempt this row answers (Section 7.2; unique
+            per task).
+        branch_name:
+          type: string
+          description: Branch the patch came from (7.2).
+        commit_sha:
+          type: string
+          description: Commit the submission points at (7.2).
+        execution_summary:
+          type: string
+        diff_summary:
+          description: Authoritative {files, insertions, deletions} parsed from the
+            stored patch (Section 9.7).
+        changed_files:
+          type: array
+          items:
+            type: string
+          description: Authoritative repo-relative paths touched (Section 9.7).
+        requires_human_attention:
+          type: boolean
+          description: The coder's self-flag (Section 7.2; T8's guard input).
+        risk_justification:
+          type: string
+        submitted_by_session:
+          type: string
+          description: Bridge session that submitted (Section 7.2; always the lease
+            owner).
+        submitted_at:
+          type: string
+          format: date-time
+          description: Server clock at insertion (P7).
+      required:
+      - attempt_number
+      - branch_name
+      - changed_files
+      - commit_sha
+      - diff_summary
+      - execution_summary
+      - id
+      - requires_human_attention
+      - risk_justification
+      - submitted_at
+      - submitted_by_session
+      - task_id
+    ResolutionListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resolution'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
+    ResolutionPatch:
+      type: object
+      description: '``GET /resolutions/{id}/patch`` body — one shape, both paths (9.2).'
+      properties:
+        resolution_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          description: 'Artifact kind (Section 7.2): patch.'
+        sha256:
+          type: string
+          description: Server-computed SHA-256 of the patch bytes (Section 7.2; 9.7).
+        size_bytes:
+          type: integer
+          description: Server-computed size in bytes (Section 7.2) — compared against
+            the Section 9.7 5 MB cap (inclusive) for diff_too_large.
+        diff_too_large:
+          type: boolean
+          description: True when the patch exceeded the 5 MB cap and only stats/file
+            list were kept (Section 9.7's degraded path).
+        patch:
+          type: string
+          nullable: true
+          description: The stored unified patch, or null on the oversize path (9.7).
+        marker:
+          type: string
+          nullable: true
+          description: 'Literal viewers render on the oversize path: ''diff too large''
+            (Section 9.7; null when the body is served).'
+      required:
+      - diff_too_large
+      - kind
+      - marker
+      - patch
+      - resolution_id
+      - sha256
+      - size_bytes
+    ResolutionSubmit:
+      type: object
+      description: '``POST /tasks/{id}/resolution`` input (Section 10.5 tool contract).'
+      properties:
+        session_id:
+          type: string
+          description: Lease-holding session id (G-18) — the fencing pair's identity
+            half; becomes submitted_by_session (Section 7.2).
+          maxLength: 255
+        lease_generation:
+          type: integer
+          minimum: 0
+          description: Fencing generation from the claim response (Section 8.6; ADR-012);
+            a stale value answers LEASE_EXPIRED.
+        git_branch:
+          type: string
+          description: Verified branch the patch was captured from (Section 10.5;
+            stored as the Section 7.2 branch_name).
+          maxLength: 255
+        commit_sha:
+          type: string
+          description: Commit the submission points at (Section 10.5; the bridge verified
+            it matches the branch — stored verbatim).
+          maxLength: 64
+        execution_summary:
+          type: string
+          description: The coder's summary of what ran (Section 10.5).
+        requires_human_attention:
+          type: boolean
+          default: false
+          description: The coder's self-flag (Section 10.5) — true routes the submission
+            to T8 with review_reason self_flagged (8.2/8.4).
+        risk_justification:
+          type: string
+          default: ''
+          description: The coder's justification when self-flagging (Section 7.2).
+        patch:
+          type: string
+          description: 'The captured unified patch, branch vs. default-branch merge-base
+            (Section 9.7) — parsed server-side for the authoritative changed_files
+            and diff_summary; subject to the 5 MB cap with a degraded stats-only path,
+            never a rejection. Whitespace (the trailing newline) is content: the sha256
+            the bridge computes locally must match the bytes stored here.'
+        changed_files:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 'Bridge-captured file list (Section 10.5) — provisional: the
+            server''s patch parse replaces it outright (Section 9.7).'
+        diff_summary:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          description: 'Bridge-captured stats (Section 10.5) — provisional: the server''s
+            patch parse replaces it outright (Section 9.7).'
+      required:
+      - commit_sha
+      - execution_summary
+      - git_branch
+      - lease_generation
+      - patch
+      - session_id
+    ResolutionTaskState:
+      type: object
+      description: The post-transition task identity the bridge reports (Section 10.5).
+      properties:
+        id:
+          type: string
+        state:
+          type: string
+          description: Canonical state after the dispatch — to_be_audited (T7), in_human_review
+            (T8/T10 escalate) or to_be_audited with merge_status pending (T10 approve,
+            Section 8.5).
+        version:
+          type: integer
+          description: Optimistic-lock version after the row (7.2).
+        review_reason:
+          type: string
+          nullable: true
+          description: Section 8.4 member set by T8/T10-escalate; null on the clean
+            T7 path.
+        merge_status:
+          type: string
+          description: none | pending | merging | merged | conflict | failed (7.2)
+            — pending marks T10's merge-pending branch.
+      required:
+      - id
+      - merge_status
+      - review_reason
+      - state
+      - version
+    ResolutionWriteResponse:
+      type: object
+      description: The frozen submission response — Section 10.5 outcome reporting.
+      properties:
+        resolution:
+          allOf:
+          - $ref: '#/components/schemas/Resolution'
+          description: The stored Section 7.2 row.
+        task:
+          allOf:
+          - $ref: '#/components/schemas/ResolutionTaskState'
+          description: Post-transition task identity — the outcome the agent is told.
+        trigger:
+          type: string
+          description: 'Which Section 8.2 row fired: submit (T7), submit_flagged (T8),
+            submit_unreviewed / submit_policy_approved (T10''s two branches).'
+        scope_violations:
+          type: array
+          items:
+            type: string
+          description: Changed files outside target_scope (Section 12.3; empty when
+            clean) — the offending paths captured for review_reason scope_violation.
+      required:
+      - resolution
+      - scope_violations
+      - task
+      - trigger
     Revoked:
       type: object
       description: 'POST /auth/logout: the instant the session token stopped working.'
@@ -3377,6 +3913,48 @@ components:
       required:
       - project_rules
       - standard_rules
+    StateCounts:
+      type: object
+      description: |-
+        The six canonical G-01/ADR-010 state counts, always all present.
+
+        Zero-filled by the service: a state with no tasks reads ``0``, never
+        an absent key — the mobile card renders every column from these keys
+        and never invents its own (G-01; MT-5.6-01).
+      properties:
+        draft:
+          type: integer
+          minimum: 0
+          description: Tasks in draft (Section 8.2 T1).
+        pending:
+          type: integer
+          minimum: 0
+          description: Tasks visible to agents for claiming (Section 8.2).
+        in_progress:
+          type: integer
+          minimum: 0
+          description: Tasks under an active coder lease (Section 8.6).
+        to_be_audited:
+          type: integer
+          minimum: 0
+          description: Submissions awaiting an auditor claim (Section 8.2).
+        in_human_review:
+          type: integer
+          minimum: 0
+          description: Tasks escalated to the Owner — the mobile 'needs review' banner
+            derives from this count (Section 14.1; FR-MOB-04).
+        completed:
+          type: integer
+          minimum: 0
+          description: Completed tasks; immutable except archive (Section 7.4 rule
+            3).
+      required:
+      - completed
+      - draft
+      - in_human_review
+      - in_progress
+      - pending
+      - to_be_audited
     StateEnum:
       enum:
       - draft

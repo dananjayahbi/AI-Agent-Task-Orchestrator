@@ -63,6 +63,15 @@ Operator steps at the level the plan fixes:
    Substitute the hostname value from step 2; the local file deliberately
    carries the OQ-11 placeholder notation, so no environment-specific
    hostname is in Git.
+   **The deny half mirrors differently (WP-5.2):** public-hostname *routes*
+   can only forward, never deny, so the deny rules of `ingress.yaml`
+   (`http_status:403`) are applied at the edge as the Cloudflare Access
+   deny applications A2–A10 of [`access-policy.md`](./access-policy.md) §3,
+   plus the four method-aware WAF Custom rules W1–W4 of
+   [`route-allowlist.md`](./route-allowlist.md) §4. Both are listed as
+   operator steps in `access-policy.md` §4 and verified by
+   [`route-verification-checklist.md`](./route-verification-checklist.md);
+   do not try to express them as routes.
 5. **DNS** — adding the public hostname in the dashboard creates the DNS
    record (CNAME) for the tunnel hostname; verify it resolves after the
    route exists.
@@ -70,9 +79,13 @@ Operator steps at the level the plan fixes:
    directly; the ingress file and the edge routes only ever govern the tunnel
    hostname.
 
-Not here (deliberately): Cloudflare Access policy, route allowlists and edge
-rate limits — **WP-5.2** configures Section 15.3's layer 1; this document and
-`ingress.yaml` only record the structure they gate.
+Not here: Cloudflare Access policy, route allowlists and edge rate limits —
+those are **WP-5.2's** documents in this folder:
+[`access-policy.md`](./access-policy.md) (Section 15.3 layer 1),
+[`route-allowlist.md`](./route-allowlist.md) (Section 15.2 rules),
+[`rate-limits.md`](./rate-limits.md) (layer 4), all defined as code here
+with their live application as the operator steps in those files; this
+document and `ingress.yaml` record the structure they gate.
 
 ## 3. Tunnel token handling (Sections 15.4, 16.2)
 
@@ -155,8 +168,25 @@ in **WP-6.5** and will link back to this document.
 
 ## 7. Related files and sections
 
-* [`ingress.yaml`](./ingress.yaml) — canonical ingress rules and the Section
-  15.2 route-group review (routing structure; enforcement is WP-5.2).
+* [`ingress.yaml`](./ingress.yaml) — canonical ingress rules: the WP-5.1
+  routing structure plus the WP-5.2 Section 15.2 deny block (default deny,
+  403 at the tunnel; LAN untouched).
+* [`access-policy.md`](./access-policy.md) — MT-5.2-01: the Cloudflare
+  Access policy for the tunnel hostname (gate `A1`, deny applications
+  A2–A10, principals P1/P2), application steps and the named V1–V5
+  verification hooks.
+* [`route-allowlist.md`](./route-allowlist.md) — MT-5.2-02: every Section
+  15.2 row and Section 9.2 path with its explicit decision, the method
+  rules W1–W4, the conditional-row flip procedure, and the canonical
+  machine-readable rule table.
+* [`rate-limits.md`](./rate-limits.md) — MT-5.2-03: edge rules E1–E4 with
+  documented threshold choices and their alignment with the API's
+  `ORCHESTRATOR_RATE_LIMIT_*` budgets.
+* [`route-verification-checklist.md`](./route-verification-checklist.md) —
+  MT-5.2-04: the blocked-vs-allowed matrix, layer hooks, results template
+  and the recorded local run; runner at
+  [`e2e/route_verify.py`](../../e2e/route_verify.py) (results:
+  [`e2e/route_verification_results.json`](../../e2e/route_verification_results.json)).
 * [`sse-verification.md`](./sse-verification.md) — MT-5.1-04 SSE stability
   verification: the 30-min idle/heartbeat/no-buffering/lossless-resume test
   through the tunnel path — recorded LAN control run, operator procedure for

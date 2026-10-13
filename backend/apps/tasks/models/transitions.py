@@ -90,6 +90,12 @@ class TransitionReason(models.TextChoices):
     VOLUNTARY_RELEASE = "voluntary_release", "voluntary_release"
     SUBMIT = "submit", "submit"
     SUBMIT_FLAGGED = "submit_flagged", "submit_flagged"
+    # WP-3.2 rows: T10's §8.2 To column reads "policy decision" — a
+    # decision, not a state — so the row's trigger codes name its two
+    # documented §8.5 outcomes (escalate / merge-pending), registered
+    # through the same extension point as every other row.
+    SUBMIT_UNREVIEWED = "submit_unreviewed", "submit_unreviewed"
+    SUBMIT_POLICY_APPROVED = "submit_policy_approved", "submit_policy_approved"
 
 
 class TransitionQuerySet(models.QuerySet["TaskTransition"]):

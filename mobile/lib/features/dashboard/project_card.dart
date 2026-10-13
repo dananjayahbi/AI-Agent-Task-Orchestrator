@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../orchestrator_mobile.dart';
+import '../../../orchestrator_mobile.dart'
+    hide DashboardSummary, ProjectDashboardCard;
 import '../dashboard/dashboard_summary.dart';
 
 /// One project's overview card (Section 14.1 Home / Overview: "Project

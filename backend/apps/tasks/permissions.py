@@ -102,3 +102,26 @@ class CanReadCheckpoints(BasePermission):
         if not isinstance(token, ApiToken):
             return False  # anonymous → AUTH_REQUIRED via DRF
         return token.kind in (TokenKind.OWNER_SESSION, TokenKind.AGENT)
+
+
+class CanReadResolutions(BasePermission):
+    """Section 9.2 Submission-row read caller: Owner session **or** agent token.
+
+    ``GET /tasks/{id}/resolutions`` and ``GET /resolutions/{id}/patch``
+    ("Agent / Owner") as an endpoint-shape adapter — the same pattern as
+    :class:`CanReadCheckpoints`. Devices are not in the caller column and
+    answer ``ROLE_NOT_PERMITTED``. For the resolution-addressed route the
+    task id carries no PID, so the view runs
+    ``services.resolutions.assert_same_project`` after this class —
+    ADR-004 zero-bleed without a URL-derived scope (same order: scope
+    logic after role admission, before any read).
+    """
+
+    message = "Resolutions are readable by the owner or an agent token."
+
+    def has_permission(self, request: Request, view: Any) -> bool:
+        """Owner session, or any live agent token; other kinds denied."""
+        token = request.auth
+        if not isinstance(token, ApiToken):
+            return False  # anonymous → AUTH_REQUIRED via DRF
+        return token.kind in (TokenKind.OWNER_SESSION, TokenKind.AGENT)

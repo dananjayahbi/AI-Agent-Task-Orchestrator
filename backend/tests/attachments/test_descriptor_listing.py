@@ -19,6 +19,7 @@ routes:
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -53,6 +54,7 @@ DESCRIPTOR_FIELDS = {
     "size",
     "is_image",
     "processing_status",
+    "failure_reason",  # WP-1.12 addition (MT-1.12-07): FR-ATT-07 visible reason
     "token_count",
     "short_description",
     "created_at",
@@ -149,6 +151,14 @@ def test_listing_shape_and_newest_first_order(owner: APIClient, task: Any) -> No
     """The two-member envelope; newest first (created_at, then id)."""
     first = _upload(owner, task.pk, PDF_BYTES, "a.pdf")
     second = _upload(owner, task.pk, PNG_BYTES, "b.png")
+    # The host wall clock ticks coarsely (~5-15 ms): two uploads inside one
+    # tick share created_at and the documented (-created_at, -id) tiebreak
+    # then legitimately outranks insertion order. Pin the first row strictly
+    # older so "newest first" is observable regardless of clock granularity.
+    second_row = TaskAttachment.objects.get(pk=second["id"])
+    TaskAttachment.objects.filter(pk=first["id"]).update(
+        created_at=second_row.created_at - timedelta(seconds=5)
+    )
 
     response = owner.get(LIST_URL.format(task_id=task.pk))
     assert response.status_code == 200

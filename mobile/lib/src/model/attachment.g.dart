@@ -22,6 +22,8 @@ class _$Attachment extends Attachment {
   @override
   final String processingStatus;
   @override
+  final String? failureReason;
+  @override
   final int? tokenCount;
   @override
   final String? shortDescription;
@@ -39,6 +41,7 @@ class _$Attachment extends Attachment {
       required this.size,
       required this.isImage,
       required this.processingStatus,
+      this.failureReason,
       this.tokenCount,
       this.shortDescription,
       required this.createdAt})
@@ -61,6 +64,7 @@ class _$Attachment extends Attachment {
         size == other.size &&
         isImage == other.isImage &&
         processingStatus == other.processingStatus &&
+        failureReason == other.failureReason &&
         tokenCount == other.tokenCount &&
         shortDescription == other.shortDescription &&
         createdAt == other.createdAt;
@@ -76,6 +80,7 @@ class _$Attachment extends Attachment {
     _$hash = $jc(_$hash, size.hashCode);
     _$hash = $jc(_$hash, isImage.hashCode);
     _$hash = $jc(_$hash, processingStatus.hashCode);
+    _$hash = $jc(_$hash, failureReason.hashCode);
     _$hash = $jc(_$hash, tokenCount.hashCode);
     _$hash = $jc(_$hash, shortDescription.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
@@ -93,6 +98,7 @@ class _$Attachment extends Attachment {
           ..add('size', size)
           ..add('isImage', isImage)
           ..add('processingStatus', processingStatus)
+          ..add('failureReason', failureReason)
           ..add('tokenCount', tokenCount)
           ..add('shortDescription', shortDescription)
           ..add('createdAt', createdAt))
@@ -132,6 +138,11 @@ class AttachmentBuilder implements Builder<Attachment, AttachmentBuilder> {
   set processingStatus(String? processingStatus) =>
       _$this._processingStatus = processingStatus;
 
+  String? _failureReason;
+  String? get failureReason => _$this._failureReason;
+  set failureReason(String? failureReason) =>
+      _$this._failureReason = failureReason;
+
   int? _tokenCount;
   int? get tokenCount => _$this._tokenCount;
   set tokenCount(int? tokenCount) => _$this._tokenCount = tokenCount;
@@ -159,6 +170,7 @@ class AttachmentBuilder implements Builder<Attachment, AttachmentBuilder> {
       _size = $v.size;
       _isImage = $v.isImage;
       _processingStatus = $v.processingStatus;
+      _failureReason = $v.failureReason;
       _tokenCount = $v.tokenCount;
       _shortDescription = $v.shortDescription;
       _createdAt = $v.createdAt;
@@ -196,6 +208,7 @@ class AttachmentBuilder implements Builder<Attachment, AttachmentBuilder> {
               isImage, r'Attachment', 'isImage'),
           processingStatus: BuiltValueNullFieldError.checkNotNull(
               processingStatus, r'Attachment', 'processingStatus'),
+          failureReason: failureReason,
           tokenCount: tokenCount,
           shortDescription: shortDescription,
           createdAt: BuiltValueNullFieldError.checkNotNull(

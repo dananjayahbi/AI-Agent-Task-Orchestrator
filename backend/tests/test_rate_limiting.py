@@ -220,8 +220,20 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
     # class (the write half is the agent-authenticated cell); an owner
     # GET rides the same class budget — recorded in the WP-1.8 changelog.
     _Route("/api/v1/tasks/1/checkpoints", AgentEndpointThrottle, "MT-1.8-03", True),
-    # --- Submission row (Agent / Owner): WP-1.6
-    _Route("/api/v1/tasks/1/resolution", AgentEndpointThrottle, "WP-1.6", False),
+    # --- Submission row (Agent / Owner): landed with WP-3.2 --------------
+    # The POST carries the throttle on the view class (FR-SEC-05); the
+    # two reads share the class the WP-1.8/WP-1.11 recorded pattern for
+    # Agent/Owner rows (the owner GET rides the same class budget —
+    # recorded in the WP-3.2 changelog). The patch path carries a real
+    # UUID so the resolver matches its <uuid:id> converter.
+    _Route("/api/v1/tasks/1/resolution", AgentEndpointThrottle, "WP-3.2", True),
+    _Route("/api/v1/tasks/1/resolutions", AgentEndpointThrottle, "WP-3.2", True),
+    _Route(
+        "/api/v1/resolutions/3f7a1c9e-5d2b-4f81-9c0a-2e6d8b4f1a70/patch",
+        AgentEndpointThrottle,
+        "WP-3.2",
+        True,
+    ),
     # --- Audit row (Auditor / Owner): WP-1.6
     _Route("/api/v1/tasks/1/audit-verdict", AgentEndpointThrottle, "WP-1.6", False),
     # --- Merge queue row (Merge Executor): WP-3.x

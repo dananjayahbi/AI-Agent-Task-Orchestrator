@@ -48,3 +48,12 @@ retry_base_delay_seconds = 1
 # Merge Executor mode only (parent plan Section 10.2): repos the executor may
 # operate on. Required when mode = "merge-executor".
 # merge_repo_paths = []
+
+# HTTP/SSE run mode (WP-2.9; Section 10.2): listen address, port (0 =
+# ephemeral), concurrent-connection cap and idle timeout in seconds. The
+# defaults bind loopback only (Section 12.4); a wider bind is an explicit
+# opt-in. Full per-row metadata lives in `.env.example`.
+# http_host = "127.0.0.1"
+# http_port = 8765
+# http_max_connections = 16
+# http_idle_timeout_seconds = 900

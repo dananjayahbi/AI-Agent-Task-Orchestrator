@@ -130,11 +130,15 @@ def test_task_model_field_set_matches_section_7_2_exactly(project: Project) -> N
     # recorded in the WP changelog alongside `transitions`.
     # WP-1.11 adds `attachments` (TaskAttachment's FK, Section 7.2's Task
     # Attachment relation) — again relation metadata, never a Task column.
+    # WP-3.2 adds `resolutions` (TaskResolution's FK, submission artifacts)
+    # — same reading: a reverse relation the resolution history attaches,
+    # recorded in the WP changelog alongside `transitions`/`checkpoints`.
     assert reverse == {
         "attachments",
         "checkpoints",
         "dependency_edges",
         "dependent_edges",
+        "resolutions",
         "transitions",
     }, sorted(reverse)
 

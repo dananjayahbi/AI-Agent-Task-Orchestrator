@@ -21,6 +21,10 @@ dependencies = [
     # because the bridge imports it (schema-driven validation, one shared schema).
     "jsonschema>=4.23",
     "types-jsonschema",
+    # WP-2.9 HTTP/SSE run mode: the bridge imports the ASGI server directly
+    # (http_service.runner), so the dependency is declared, not borrowed from
+    # mcp's transitive set (the same rule as jsonschema above).
+    "uvicorn>=0.31.1",
 ]
 
 [dependency-groups]
@@ -30,6 +34,10 @@ dev = [
     "pytest>=9.1.1",
     "pyyaml>=6.0.3",
     "types-pyyaml>=6.0.12.20260906",
+    # WP-2.9 tests speak raw streamable-HTTP over the harness (http_harness.py);
+    # same direct-use rule as the runtime dependencies above (mcp's own client
+    # transport depends on it, but the bridge tests import it themselves).
+    "httpx2>=2.10.0",
 ]
 
 # --- Packaging: wheel carries only the bridge package (Appendix A src/ tree) ---

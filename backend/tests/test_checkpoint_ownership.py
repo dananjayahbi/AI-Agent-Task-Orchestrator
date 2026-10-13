@@ -331,6 +331,14 @@ def test_liveness_checkpoint_extends_under_checkpoint_and_liveness() -> None:
         lease_extension_mode=LeaseExtensionMode.CHECKPOINT_AND_LIVENESS,
     )
     task.refresh_from_db()
+    # Same Windows ~15.6 ms clock-tick caveat test_checkpoint_extends_the_
+    # stored_lease records: a claim and a checkpoint inside one tick
+    # compute the same min(now + duration, cap) and the strict comparison
+    # below would flake. Start the stored expiry short of now + duration —
+    # a correct extension must still move it strictly forward (observed
+    # flake here before this backdate: identical microseconds, ~1 in 10).
+    Task.objects.filter(pk=task.pk).update(lease_expires_at=timezone.now() + timedelta(minutes=1))
+    task.refresh_from_db()
     untouched_expiry = task.lease_expires_at
 
     submission = _submit(task, kind=CheckpointKind.LIVENESS)

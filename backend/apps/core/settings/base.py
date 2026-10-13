@@ -148,6 +148,45 @@ ATTACHMENT_MAX_TOTAL_BYTES = get_int("ORCHESTRATOR_ATTACHMENT_MAX_TOTAL_BYTES", 
 # documented default, never re-decided here (MT-1.11-05 out of scope).
 ATTACHMENT_RETENTION_GRACE_DAYS = get_int("ORCHESTRATOR_ATTACHMENT_RETENTION_GRACE_DAYS", 30)
 
+# --- Section 9.10 group: OCR engine (Sections 6.6, 9.10; WP-1.12) ------------
+# Tesseract-based default behind the pluggable interface (Section 6.6:
+# "Local and free; replaceable by vision-model OCR"). An unknown engine
+# name fails fast at the point of use, not silently OCR-less.
+OCR_ENGINE = get_str("ORCHESTRATOR_OCR_ENGINE", "tesseract")
+# The tesseract executable (name on PATH or absolute path); the worker
+# image provisions the binary (Section 6.6 default engine).
+OCR_TESSERACT_CMD = get_str("ORCHESTRATOR_OCR_TESSERACT_CMD", "tesseract")
+
+# --- Section 9.10 group: description provider (Section 9.5; OQ-07) -----------
+# Section 22's recorded default: disabled — vision/layout captions arrive
+# with WP-1.13; the pipeline must complete OCR-only without them (9.5).
+DESCRIPTION_PROVIDER = get_str("ORCHESTRATOR_DESCRIPTION_PROVIDER", "disabled")
+
+# --- Section 9.10 group: attachment pipeline (Section 9.5 stages; WP-1.12) ---
+# Documented defaults chosen by WP-1.12 (plan 20.4 item 3 — the plan fixes
+# "configurable", not the values; each is recorded in the WP changelog and
+# configuration.md). Unit suffixes follow configuration.md's units rule.
+ATTACHMENT_IMAGE_MAX_EDGE_PX = get_int("ORCHESTRATOR_ATTACHMENT_IMAGE_MAX_EDGE_PX", 2048)
+ATTACHMENT_CHUNK_MAX_TOKENS = get_int("ORCHESTRATOR_ATTACHMENT_CHUNK_MAX_TOKENS", 512)
+ATTACHMENT_TOKEN_ESTIMATOR = get_str("ORCHESTRATOR_ATTACHMENT_TOKEN_ESTIMATOR", "chars_div_4")
+ATTACHMENT_SUMMARY_PROVIDER = get_str("ORCHESTRATOR_ATTACHMENT_SUMMARY_PROVIDER", "disabled")
+ATTACHMENT_SUMMARY_BUDGET_TOKENS = get_int("ORCHESTRATOR_ATTACHMENT_SUMMARY_BUDGET_TOKENS", 512)
+ATTACHMENT_SUMMARY_MAX_TOKENS = get_int("ORCHESTRATOR_ATTACHMENT_SUMMARY_MAX_TOKENS", 120)
+ATTACHMENT_RETRY_MAX_ATTEMPTS = get_int("ORCHESTRATOR_ATTACHMENT_RETRY_MAX_ATTEMPTS", 3)
+ATTACHMENT_RETRY_BACKOFF_SECONDS = get_int("ORCHESTRATOR_ATTACHMENT_RETRY_BACKOFF_SECONDS", 60)
+ATTACHMENT_PARSE_TIMEOUT_SECONDS = get_int("ORCHESTRATOR_ATTACHMENT_PARSE_TIMEOUT_SECONDS", 60)
+
+# --- Section 9.10 group: request body sizing (Section 9.7; WP-3.2) ----------
+# Django's DATA_UPLOAD_MAX_MEMORY_SIZE raised from its 2.5 MB default so
+# the Section 9.7 degraded path is reachable: the submission endpoint
+# must *accept* an oversize patch (5 MB cap +1 and beyond) to store
+# "stats and file list only" — the default would answer 500 before the
+# view ran. 32 MiB is WP-3.2's recorded reading (a bound still guards
+# memory; beyond it the view answers VALIDATION_ERROR, never a silent
+# accept), flagged for owner confirmation (Section 20.1 item 5) in
+# configuration.md. Byte value; `_BYTES` unit suffix per that document.
+DATA_UPLOAD_MAX_MEMORY_SIZE = get_int("ORCHESTRATOR_REQUEST_BODY_MAX_BYTES", 32 * 1024 * 1024)
+
 # --- Section 9.10 group: feature flags --------------------------------------
 # Default: none enabled (configuration.md). Flag semantics arrive with each
 # consumer; this list is the resolved, documented value.

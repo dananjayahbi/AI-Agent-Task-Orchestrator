@@ -192,6 +192,7 @@ class FakeBackend:
 
     base_url: str = "http://bridge.invalid/api/v1"
     routes: dict[tuple[str, str], RouteResponse] = field(default_factory=dict)
+    dynamic: list[tuple[str, str, RouteResponse]] = field(default_factory=list)
     calls: list[RecordedCall] = field(default_factory=list)
 
     def route(self, method: str, path: str, status: int, payload: Any) -> None:
@@ -201,6 +202,16 @@ class FakeBackend:
     def route_fn(self, method: str, path: str, respond: Callable[[Any], tuple[int, Any]]) -> None:
         """Register a dynamic response for one (method, path)."""
         self.routes[(method.upper(), path)] = respond
+
+    def route_dynamic(self, method: str, path_suffix: str, response: RouteResponse) -> None:
+        """Register a fallback for paths *ending in* ``path_suffix``.
+
+        The bridge mints session ids at runtime, so ``.../agent-sessions/{id}/
+        end`` cannot be keyed exactly up front (WP-2.9 connection teardown);
+        consulted only when the exact route misses — existing tests are
+        untouched while the list stays empty.
+        """
+        self.dynamic.append((method.upper(), path_suffix, response))
 
     def calls_to(self, method: str, path: str) -> list[RecordedCall]:
         return [call for call in self.calls if call.method == method and call.path == path]
@@ -219,9 +230,15 @@ class FakeBackend:
         self.calls.append(
             RecordedCall(method=method.upper(), url=url, headers=dict(headers), body=payload)
         )
-        route = self.routes.get((method.upper(), urlsplit(url).path))
+        path = urlsplit(url).path
+        route = self.routes.get((method.upper(), path))
         if route is None:
-            raise AssertionError(f"unplanned backend call: {method} {urlsplit(url).path}")
+            for verb, suffix, fallback in self.dynamic:
+                if verb == method.upper() and path.endswith(suffix):
+                    route = fallback
+                    break
+        if route is None:
+            raise AssertionError(f"unplanned backend call: {method} {path}")
         if callable(route):
             status, response_payload = route(payload)
         else:
@@ -253,6 +270,10 @@ def build_settings(**overrides: Any) -> Settings:
         retry_max_attempts=1,
         retry_base_delay_seconds=0.0,
         merge_repo_paths=(),
+        http_host="127.0.0.1",
+        http_port=0,
+        http_max_connections=16,
+        http_idle_timeout_seconds=900.0,
     )
     if not overrides:
         return base

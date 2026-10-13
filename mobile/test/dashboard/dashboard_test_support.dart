@@ -6,7 +6,8 @@ import 'package:orchestrator_mobile/core/api/api_exception.dart';
 import 'package:orchestrator_mobile/core/offline/json_cache.dart';
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary.dart';
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary_source.dart';
-import 'package:orchestrator_mobile/orchestrator_mobile.dart';
+import 'package:orchestrator_mobile/orchestrator_mobile.dart'
+    hide DashboardSummary, ProjectDashboardCard;
 
 /// In-memory [JsonCache] — the Section 14.2 read-only cache seam for
 /// dashboard/board tests (never a secret store; the device token never

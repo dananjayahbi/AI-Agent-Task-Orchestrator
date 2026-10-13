@@ -165,6 +165,8 @@ Wave 1 ──> Wave 2 ──> Wave 3 ──> Wave 4 ──> Wave 5 ──> Wave 
 | 10 | Compatibility, release, hardening | 40 | 9 | M2, M4, M5, M6 |
 | **Total** | | **328** | | |
 
+*Footnote (MT-1.15-06, 2026-10-13): the series now contains **330** micro-task documents — the table above is not rewritten; two gap-closure additions beyond the original 328 are registered in `overview.md` (one from a concurrent finisher plus `MT-1.15-06` — the `GET /dashboard/summary` endpoint WP-5.6 found unowned).*
+
 ---
 
 ## 4. Rules for the executing agents

@@ -13,8 +13,14 @@
 #   1. is validated here (cloudflared tunnel ingress validate — see README.md),
 #   2. is mounted read-only at /etc/cloudflared/config.yaml (compose.yaml),
 #   3. is mirrored rule-for-rule to the edge public-hostname routes, one per
-#      line, by the procedure in infra/cloudflare/README.md.
-# Routing here is structure only; allowlist/enforcement is WP-5.2 (Section 15.2).
+#      line, by the procedure in infra/cloudflare/README.md — and the deny
+#      rules below are mirrored as the Cloudflare Access deny applications
+#      (routes cannot express "deny", access-policy.md §3/§4, MT-5.2-02).
+# WP-5.1 established the structure (allow routing); WP-5.2 (MT-5.2-02) added
+# the Section 15.2 route deny rules: default deny for the tunnel hostname,
+# every denied path answered 403 here before any service is contacted.
+# The LAN address never passes through cloudflared, so LAN-only groups keep
+# working there (Section 19 WP-5.2 acceptance).
 #
 # Hostname parameterization (Section 20.4 item 3): the concrete hostname never
 # appears in Git. The value lives only in ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME
@@ -27,6 +33,75 @@
 # references a published host port (FR-NET-01 — zero inbound ports).
 
 ingress:
+  # ---------------------------------------------------------------------------
+  # WP-5.2 / MT-5.2-02 — Section 15.2 route deny rules (route-allowlist.md §3).
+  # Listed FIRST: cloudflared takes the first matching rule, so every path
+  # below is answered 403 at the tunnel before the /api/ or web rules can
+  # route it (the "prefix divergence" risk of MT-5.2-02 — these rules are the
+  # guard). Default for the tunnel hostname is deny: anything not matched by
+  # an explicit rule below falls through the structure rules to `web`, which
+  # 404s unknown paths. Method-split writes (project/task create/edit) cannot
+  # be expressed with path regexes — they are edge method rules W1-W4 in
+  # route-allowlist.md §4, not ruleable here.
+
+  # R7 — Health (Section 15.2 "Internal only"): never reachable through the
+  # tunnel; Compose probes and the LAN publish use the backend directly.
+  - hostname: orchestrator.<owner-domain>
+    path: ^/health/
+    service: http_status:403
+
+  # R4 — high-privilege LAN-only groups (agent token creation, policy
+  # editing, admin): denied at the edge, unaffected on the LAN.
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/tokens
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/projects/[^/]+/policy
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: ^/admin
+    service: http_status:403
+
+  # R3 — Task create/publish: OQ-12 keeps it out of v1 ("No (Could), review
+  # and monitoring only"); the path-distinct publish half is denied here,
+  # the path-shared create half by method rule W3 (route-allowlist.md §4).
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/tasks/[^/]+/transition
+    service: http_status:403
+
+  # Not named in Section 15.2 → default deny (route-allowlist.md §6):
+  # attachments and the OpenAPI schema document.
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/attachments
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/tasks/[^/]+/attachments
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/schema
+    service: http_status:403
+
+  # R5 — Agent work endpoints (claim, checkpoints, submit) and R6 — Merge
+  # queue: conditional rows, v1 off (remote agents / remote Merge Executor
+  # not in use — route-allowlist.md §5 flip procedure replaces these with
+  # the service-token-gated routes in the same change).
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/projects/[^/]+/work
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: "^/api/v1/tasks/[^/]+/(claim|release|checkpoints|resolution|resolutions|audit-verdict|audit-reports)$"
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/resolutions
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/agent-sessions
+    service: http_status:403
+  - hostname: orchestrator.<owner-domain>
+    path: ^/api/v1/merge
+    service: http_status:403
+
+  # --- WP-5.1 routing structure (unchanged) ---------------------------------
   # API path prefix -> backend (Section 15.1). The events stream
   # (GET /api/v1/events/stream, Section 9.6 / ADR-002) rides this rule directly:
   # cloudflared applies no response buffering and the 15 s heartbeat keeps the
@@ -52,36 +127,29 @@ ingress:
 
 # ---------------------------------------------------------------------------
 # Section 15.2 route-policy review (recorded next to the config, Section 20.5
-# traceability). "Reachable at the routing layer" means the /api/ rule above
-# delivers the path to `backend`; blocking bad groups is WP-5.2's Access policy
-# and route allowlist, which start from this explicit list. The table mirrors
-# the plan line for line.
+# traceability). WP-5.2 (MT-5.2-02) turned this review into explicit rules:
+# the deny block above reproduces the table's LAN-only / internal-only /
+# conditional / OQ-12 decisions as path rules, and the allow side is the
+# structure below. Canonical rule table (rows, paths, edge mechanisms, the
+# four method-split writes): route-allowlist.md §2-§4. The table mirrors the
+# plan line for line.
 #
-# | Route group                                   | Exposed through tunnel | Reason                        |
-# |-----------------------------------------------|------------------------|-------------------------------|
-# | Auth, devices                                 | Yes                    | Mobile login and registration |
-# | Projects (read), tasks (read), review,        | Yes                    | Mobile feature set            |
-# |   dashboard, events stream                    |                        |                               |
-# | Task create/publish                           | Yes (Could)            | Mobile task creation (FR-MOB-08) |
-# | Agent token creation, policy editing, admin   | No (LAN only)          | High privilege                |
-# | Agent work endpoints (claim, checkpoints,     | Only if remote agents  | VPS scenario: bridge on laptop|
-# |   submit)                                     | are used, with a       | talks to remote backend       |
-# |                                               | service token          |                               |
-# | Merge queue                                   | Only for a remote      | Same                          |
-# |                                               | Merge Executor, with a |                               |
-# |                                               | service token          |                               |
-# | Health                                        | Internal only          |                               |
+# | Route group                                   | Exposed through tunnel | v1 rule here              |
+# |-----------------------------------------------|------------------------|---------------------------|
+# | Auth, devices                                 | Yes                    | rides ^/api/ (gate: A1)   |
+# | Projects (read), tasks (read), review,        | Yes                    | rides ^/api/ (gate: A1)   |
+# |   dashboard, events stream                    |                        |                           |
+# | Task create/publish                           | Yes (Could) → OQ-12 no | transition → 403; create  |
+# |                                               |                        | is method rule W3         |
+# | Agent token creation, policy editing, admin   | No (LAN only)          | tokens/policy/admin → 403 |
+# | Agent work endpoints (claim, checkpoints,     | only + service token   | v1: → 403 (flip §5)       |
+# |   submit)                                     |                        |                           |
+# | Merge queue                                   | only + service token   | v1: → 403 (flip §5)       |
+# | Health                                        | Internal only          | /health/ → 403            |
 #
-# Explicitly NOT routed through the tunnel (commented on purpose; do not
-# uncomment before WP-5.2 / a decided OQ):
-#   - Agent token creation, policy editing, admin — LAN only (high privilege).
-#   - Health — answered on the Compose network and the LAN publish only
-#     (Section 15.2 "Internal only"; WP-5.2 carries the checklist).
-#   - Agent work endpoints and merge queue — remote-agent/service-token groups:
-#     reachable only in the VPS scenario once WP-5.2 issues a service token;
-#     kept off the rule set until then.
-#   - Task create/publish — "Yes (Could)" in Section 15.2 but OQ-12 leaves
-#     mobile creation out of v1 scope: the path already rides the /api/ rule
-#     above as ordinary API structure, and it is the allowlist (WP-5.2) that
-#     decides exposure — no dedicated rule is added or enabled here.
+# Not named in Section 15.2 (default deny, route-allowlist.md §6):
+# attachments (all methods) and /api/v1/schema → 403 above; the four
+# method-shared writes (project create/edit, task create/edit) are edge
+# WAF method rules W1-W4 — ingress regexes cannot match HTTP methods and
+# must not kill the allowed GETs on the same paths.
 # ---------------------------------------------------------------------------

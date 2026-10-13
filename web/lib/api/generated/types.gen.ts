@@ -83,6 +83,11 @@ export type AgentTokenIssueResponse = {
 
 /**
  * One attachment descriptor — FR-ATT-03's field shape, locked here.
+ *
+ * One documented addition by WP-1.12 (MT-1.12-07, FR-ATT-07
+ * "visible"): ``failure_reason`` carries the human-readable permanent-
+ * failure reason when ``processing_status`` is ``failed``, null
+ * otherwise — schema follow-up flagged for the OpenAPI owner.
  */
 export type Attachment = {
     /**
@@ -113,6 +118,10 @@ export type Attachment = {
      * FR-ATT-07 enum: uploaded | processing | ready | failed.
      */
     processing_status: string;
+    /**
+     * Human-readable reason when processing_status is failed (FR-ATT-07 visible; Section 9.5 stage 5; null otherwise).
+     */
+    failure_reason: string | null;
     /**
      * FR-ATT-03 token count — null until the WP-1.12 pipeline computes it.
      */
@@ -321,6 +330,16 @@ export type ClaimResponse = {
  * * `SERVER_ERROR` - SERVER_ERROR
  */
 export type CodeEnum = 'AUTH_REQUIRED' | 'AUTH_FORBIDDEN_PROJECT' | 'VALIDATION_ERROR' | 'TASK_NOT_FOUND' | 'TASK_STATE_CONFLICT' | 'TASK_ALREADY_CLAIMED' | 'LEASE_EXPIRED' | 'LEASE_NOT_OWNED' | 'DEPENDENCY_UNMET' | 'CONCURRENCY_LIMIT_REACHED' | 'SCOPE_VIOLATION' | 'ROLE_NOT_PERMITTED' | 'AUDITOR_SAME_AS_CODER' | 'ATTACHMENT_NOT_READY' | 'ATTACHMENT_UNSUPPORTED_FORMAT' | 'POLICY_VIOLATION' | 'RATE_LIMITED' | 'VERSION_CONFLICT' | 'SERVER_ERROR';
+
+/**
+ * ``GET /dashboard/summary`` body — one card per registered project.
+ */
+export type DashboardSummary = {
+    /**
+     * Every registered project, ordered by project id; empty when no projects exist. Single-resource GET — no cursor pagination (pagination.md).
+     */
+    projects: Array<ProjectDashboardCard>;
+};
 
 /**
  * pagination.md envelope: exactly ``results`` + ``next_cursor``.
@@ -816,6 +835,29 @@ export type ProjectCreate = {
 };
 
 /**
+ * One project's Overview card — Section 14.1 Home row; FR-MOB-01.
+ */
+export type ProjectDashboardCard = {
+    /**
+     * Canonical PID + five digits (Section 7.3), in id order.
+     */
+    project_id: string;
+    name: string;
+    /**
+     * Counts over the project's non-archived tasks, keyed by the six canonical G-01 states, zero-filled (ADR-010; T19 visibility).
+     */
+    state_counts: StateCounts;
+    /**
+     * Tasks that reached `completed` in the trailing 7-day window (server clock, transition log). Conservative documented default — the plan states no definition (OQ); this payload is authoritative and clients never recompute it (FR-MOB-01).
+     */
+    velocity: number;
+    /**
+     * AgentSession rows of this project with ended_at null (Section 7.2 lifecycle; no heartbeat freshness invented).
+     */
+    active_agents: number;
+};
+
+/**
  * pagination.md envelope: exactly ``results`` + ``next_cursor``.
  */
 export type ProjectListEnvelope = {
@@ -929,6 +971,189 @@ export type ReleaseRequest = {
 };
 
 /**
+ * One stored resolution — the Section 7.2 field list, as returned.
+ */
+export type Resolution = {
+    /**
+     * Server-generated row identity (7.2).
+     */
+    id: string;
+    /**
+     * The addressed task (Section 7.2).
+     */
+    task_id: string;
+    /**
+     * The submission attempt this row answers (Section 7.2; unique per task).
+     */
+    attempt_number: number;
+    /**
+     * Branch the patch came from (7.2).
+     */
+    branch_name: string;
+    /**
+     * Commit the submission points at (7.2).
+     */
+    commit_sha: string;
+    execution_summary: string;
+    /**
+     * Authoritative {files, insertions, deletions} parsed from the stored patch (Section 9.7).
+     */
+    diff_summary: unknown;
+    /**
+     * Authoritative repo-relative paths touched (Section 9.7).
+     */
+    changed_files: Array<string>;
+    /**
+     * The coder's self-flag (Section 7.2; T8's guard input).
+     */
+    requires_human_attention: boolean;
+    risk_justification: string;
+    /**
+     * Bridge session that submitted (Section 7.2; always the lease owner).
+     */
+    submitted_by_session: string;
+    /**
+     * Server clock at insertion (P7).
+     */
+    submitted_at: string;
+};
+
+/**
+ * pagination.md envelope: exactly ``results`` + ``next_cursor``.
+ */
+export type ResolutionListEnvelope = {
+    results: Array<Resolution>;
+    /**
+     * Opaque cursor for the next page; null = end of list.
+     */
+    next_cursor: string | null;
+};
+
+/**
+ * ``GET /resolutions/{id}/patch`` body — one shape, both paths (9.2).
+ */
+export type ResolutionPatch = {
+    resolution_id: string;
+    /**
+     * Artifact kind (Section 7.2): patch.
+     */
+    kind: string;
+    /**
+     * Server-computed SHA-256 of the patch bytes (Section 7.2; 9.7).
+     */
+    sha256: string;
+    /**
+     * Server-computed size in bytes (Section 7.2) — compared against the Section 9.7 5 MB cap (inclusive) for diff_too_large.
+     */
+    size_bytes: number;
+    /**
+     * True when the patch exceeded the 5 MB cap and only stats/file list were kept (Section 9.7's degraded path).
+     */
+    diff_too_large: boolean;
+    /**
+     * The stored unified patch, or null on the oversize path (9.7).
+     */
+    patch: string | null;
+    /**
+     * Literal viewers render on the oversize path: 'diff too large' (Section 9.7; null when the body is served).
+     */
+    marker: string | null;
+};
+
+/**
+ * ``POST /tasks/{id}/resolution`` input (Section 10.5 tool contract).
+ */
+export type ResolutionSubmit = {
+    /**
+     * Lease-holding session id (G-18) — the fencing pair's identity half; becomes submitted_by_session (Section 7.2).
+     */
+    session_id: string;
+    /**
+     * Fencing generation from the claim response (Section 8.6; ADR-012); a stale value answers LEASE_EXPIRED.
+     */
+    lease_generation: number;
+    /**
+     * Verified branch the patch was captured from (Section 10.5; stored as the Section 7.2 branch_name).
+     */
+    git_branch: string;
+    /**
+     * Commit the submission points at (Section 10.5; the bridge verified it matches the branch — stored verbatim).
+     */
+    commit_sha: string;
+    /**
+     * The coder's summary of what ran (Section 10.5).
+     */
+    execution_summary: string;
+    /**
+     * The coder's self-flag (Section 10.5) — true routes the submission to T8 with review_reason self_flagged (8.2/8.4).
+     */
+    requires_human_attention?: boolean;
+    /**
+     * The coder's justification when self-flagging (Section 7.2).
+     */
+    risk_justification?: string;
+    /**
+     * The captured unified patch, branch vs. default-branch merge-base (Section 9.7) — parsed server-side for the authoritative changed_files and diff_summary; subject to the 5 MB cap with a degraded stats-only path, never a rejection. Whitespace (the trailing newline) is content: the sha256 the bridge computes locally must match the bytes stored here.
+     */
+    patch: string;
+    /**
+     * Bridge-captured file list (Section 10.5) — provisional: the server's patch parse replaces it outright (Section 9.7).
+     */
+    changed_files?: Array<string> | null;
+    /**
+     * Bridge-captured stats (Section 10.5) — provisional: the server's patch parse replaces it outright (Section 9.7).
+     */
+    diff_summary?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
+ * The post-transition task identity the bridge reports (Section 10.5).
+ */
+export type ResolutionTaskState = {
+    id: string;
+    /**
+     * Canonical state after the dispatch — to_be_audited (T7), in_human_review (T8/T10 escalate) or to_be_audited with merge_status pending (T10 approve, Section 8.5).
+     */
+    state: string;
+    /**
+     * Optimistic-lock version after the row (7.2).
+     */
+    version: number;
+    /**
+     * Section 8.4 member set by T8/T10-escalate; null on the clean T7 path.
+     */
+    review_reason: string | null;
+    /**
+     * none | pending | merging | merged | conflict | failed (7.2) — pending marks T10's merge-pending branch.
+     */
+    merge_status: string;
+};
+
+/**
+ * The frozen submission response — Section 10.5 outcome reporting.
+ */
+export type ResolutionWriteResponse = {
+    /**
+     * The stored Section 7.2 row.
+     */
+    resolution: Resolution;
+    /**
+     * Post-transition task identity — the outcome the agent is told.
+     */
+    task: ResolutionTaskState;
+    /**
+     * Which Section 8.2 row fired: submit (T7), submit_flagged (T8), submit_unreviewed / submit_policy_approved (T10's two branches).
+     */
+    trigger: string;
+    /**
+     * Changed files outside target_scope (Section 12.3; empty when clean) — the offending paths captured for review_reason scope_violation.
+     */
+    scope_violations: Array<string>;
+};
+
+/**
  * POST /auth/logout: the instant the session token stopped working.
  */
 export type Revoked = {
@@ -941,6 +1166,40 @@ export type Revoked = {
 export type RulesBlock = {
     standard_rules: Array<string>;
     project_rules: string;
+};
+
+/**
+ * The six canonical G-01/ADR-010 state counts, always all present.
+ *
+ * Zero-filled by the service: a state with no tasks reads ``0``, never
+ * an absent key — the mobile card renders every column from these keys
+ * and never invents its own (G-01; MT-5.6-01).
+ */
+export type StateCounts = {
+    /**
+     * Tasks in draft (Section 8.2 T1).
+     */
+    draft: number;
+    /**
+     * Tasks visible to agents for claiming (Section 8.2).
+     */
+    pending: number;
+    /**
+     * Tasks under an active coder lease (Section 8.6).
+     */
+    in_progress: number;
+    /**
+     * Submissions awaiting an auditor claim (Section 8.2).
+     */
+    to_be_audited: number;
+    /**
+     * Tasks escalated to the Owner — the mobile 'needs review' banner derives from this count (Section 14.1; FR-MOB-04).
+     */
+    in_human_review: number;
+    /**
+     * Completed tasks; immutable except archive (Section 7.4 rule 3).
+     */
+    completed: number;
 };
 
 /**
@@ -1504,6 +1763,26 @@ export type ApiV1AuthRefreshCreateResponses = {
 
 export type ApiV1AuthRefreshCreateResponse = ApiV1AuthRefreshCreateResponses[keyof ApiV1AuthRefreshCreateResponses];
 
+export type RetrieveDashboardSummaryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/dashboard/summary';
+};
+
+export type RetrieveDashboardSummaryErrors = {
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type RetrieveDashboardSummaryError = RetrieveDashboardSummaryErrors[keyof RetrieveDashboardSummaryErrors];
+
+export type RetrieveDashboardSummaryResponses = {
+    200: DashboardSummary;
+};
+
+export type RetrieveDashboardSummaryResponse = RetrieveDashboardSummaryResponses[keyof RetrieveDashboardSummaryResponses];
+
 export type ApiV1DevicesRetrieveData = {
     body?: never;
     path?: never;
@@ -1949,6 +2228,30 @@ export type ListWorkResponses = {
 
 export type ListWorkResponse = ListWorkResponses[keyof ListWorkResponses];
 
+export type GetResolutionPatchData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/resolutions/{id}/patch';
+};
+
+export type GetResolutionPatchErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+};
+
+export type GetResolutionPatchError = GetResolutionPatchErrors[keyof GetResolutionPatchErrors];
+
+export type GetResolutionPatchResponses = {
+    200: ResolutionPatch;
+};
+
+export type GetResolutionPatchResponse = GetResolutionPatchResponses[keyof GetResolutionPatchResponses];
+
 export type RetrieveTaskData = {
     body?: never;
     path: {
@@ -2197,6 +2500,71 @@ export type ReleaseTaskResponses = {
 };
 
 export type ReleaseTaskResponse = ReleaseTaskResponses[keyof ReleaseTaskResponses];
+
+export type SubmitResolutionData = {
+    body: ResolutionSubmit;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second resolution or firing a second transition.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{id}/resolution';
+};
+
+export type SubmitResolutionErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type SubmitResolutionError = SubmitResolutionErrors[keyof SubmitResolutionErrors];
+
+export type SubmitResolutionResponses = {
+    201: ResolutionWriteResponse;
+};
+
+export type SubmitResolutionResponse = SubmitResolutionResponses[keyof SubmitResolutionResponses];
+
+export type ListResolutionsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        /**
+         * Opaque cursor from the previous page's next_cursor; valid only for this task's listing (pagination.md rule 1).
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults, same per-endpoint choice as the other list routes).
+         */
+        page_size?: number;
+    };
+    url: '/api/v1/tasks/{id}/resolutions';
+};
+
+export type ListResolutionsErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+};
+
+export type ListResolutionsError = ListResolutionsErrors[keyof ListResolutionsErrors];
+
+export type ListResolutionsResponses = {
+    200: ResolutionListEnvelope;
+};
+
+export type ListResolutionsResponse = ListResolutionsResponses[keyof ListResolutionsResponses];
 
 export type ApiV1TokensRetrieveData = {
     body?: never;

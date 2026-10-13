@@ -25,6 +25,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ClaimRequest.serializer)
       ..add(ClaimResponse.serializer)
       ..add(CodeEnum.serializer)
+      ..add(DashboardSummary.serializer)
       ..add(DeviceListEnvelope.serializer)
       ..add(DeviceRegisterRequest.serializer)
       ..add(DeviceRegisterResponse.serializer)
@@ -53,12 +54,20 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(PriorityEnum.serializer)
       ..add(Project.serializer)
       ..add(ProjectCreate.serializer)
+      ..add(ProjectDashboardCard.serializer)
       ..add(ProjectListEnvelope.serializer)
       ..add(ProjectPolicy.serializer)
       ..add(Refreshed.serializer)
       ..add(ReleaseRequest.serializer)
+      ..add(Resolution.serializer)
+      ..add(ResolutionListEnvelope.serializer)
+      ..add(ResolutionPatch.serializer)
+      ..add(ResolutionSubmit.serializer)
+      ..add(ResolutionTaskState.serializer)
+      ..add(ResolutionWriteResponse.serializer)
       ..add(Revoked.serializer)
       ..add(RulesBlock.serializer)
+      ..add(StateCounts.serializer)
       ..add(StateEnum.serializer)
       ..add(Task.serializer)
       ..add(TaskCreate.serializer)
@@ -83,8 +92,12 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(Project)]),
           () => ListBuilder<Project>())
       ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(String)]),
-          () => ListBuilder<String>())
+          const FullType(
+              BuiltList, const [const FullType(ProjectDashboardCard)]),
+          () => ListBuilder<ProjectDashboardCard>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(Resolution)]),
+          () => ListBuilder<Resolution>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => ListBuilder<String>())
@@ -133,6 +146,24 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltMap, const [
+            const FullType(String),
+            const FullType.nullable(JsonObject)
+          ]),
+          () => MapBuilder<String, JsonObject?>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Task)]),
           () => ListBuilder<Task>())

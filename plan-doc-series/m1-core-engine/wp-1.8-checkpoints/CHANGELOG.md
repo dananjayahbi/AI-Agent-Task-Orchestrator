@@ -114,3 +114,11 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
 - Not run (coordination): `test_authorization_matrix.py` — its deferred
   drift-guard row for `/api/v1/tasks/1/checkpoints` now fails by design
   (the endpoint exists); the events agent owns that file.
+
+### Convergence gate (2026-10-13)
+
+- `test_checkpoint_endpoint.py` (MT-1.8-03 success shape) backdated the
+  stored lease before the strict `lease_expires_at >` comparison, using
+  `test_checkpoint_ownership.py`'s documented Windows ~15.6 ms clock-tick
+  pattern — the latent same-tick flake (claim + checkpoint in one tick →
+  identical microseconds) is now prevented, no assertion weakened.

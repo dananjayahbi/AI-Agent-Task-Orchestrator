@@ -259,3 +259,11 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   `-- auth` (41) and `-- errors` (12) suites, plus the live route-gate
   smoke above. Nothing was committed (no `git add`/`git commit` by this
   WP).
+
+### Convergence gate (2026-10-13)
+
+- WP-3.2's submission-artifact schemas (+ MT-1.15-06's dashboard endpoint)
+  moved `schemas/openapi.yaml`; `npm --prefix web run generate:api`
+  regenerated `lib/api/generated/` (sanctioned command, byte-stable across
+  two runs) so `check:api`'s drift gate compares cleanly against the
+  regenerated client — no generated file hand-edited.

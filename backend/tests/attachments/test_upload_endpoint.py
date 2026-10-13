@@ -134,6 +134,7 @@ def test_uploaded_descriptor_never_leaks_storage_key_or_digest(task: Any) -> Non
         "size",
         "is_image",
         "processing_status",
+        "failure_reason",
         "token_count",
         "short_description",
         "created_at",

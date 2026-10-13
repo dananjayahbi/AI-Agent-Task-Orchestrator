@@ -201,8 +201,9 @@ class AttachmentListCreateView(APIView):
             "(FR-ATT-07); `token_count` and `short_description` are null "
             "until the WP-1.12 pipeline fills them. `Idempotency-Key` "
             "replays a retried upload without duplicating (ADR-012). The "
-            "pipeline enqueue hook exists and is a documented no-op until "
-            "MT-1.12-01 wires the worker job."
+            "pipeline enqueue hook hands the job to the Celery worker "
+            'after commit (Section 9.9 "on upload"; MT-1.12-01 — the '
+            "unit layer keeps a documented no-op seam)."
         ),
     )
     def post(self, request: Request, id: str, *args: Any, **kwargs: Any) -> Response:

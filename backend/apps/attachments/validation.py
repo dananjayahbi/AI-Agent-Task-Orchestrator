@@ -152,6 +152,18 @@ def _declared_matches(declared: str, sniffed: str) -> bool:
     return declared == sniffed
 
 
+def types_agree(first: str, second: str) -> bool:
+    """Whether two recorded/sniffed types name the same content family.
+
+    The pipeline's stage-1 re-detection reuses this exact rule (with
+    ``first`` = the recorded type): markdown and plain text are one
+    sniffable family (recorded in MT-1.11-02), everything else must
+    match exactly — a disagreement is a data-integrity signal
+    (MT-1.12-01 risk note), never a silent override.
+    """
+    return _declared_matches(first, second)
+
+
 def strip_filename(filename: str) -> str:
     """The client name with every path component removed (Section 12.3).
 
@@ -302,5 +314,6 @@ __all__ = [
     "existing_attachment_for",
     "sniff_mime",
     "strip_filename",
+    "types_agree",
     "validate_upload",
 ]

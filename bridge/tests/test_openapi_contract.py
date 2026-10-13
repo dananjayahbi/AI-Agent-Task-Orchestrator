@@ -266,6 +266,9 @@ RESPONSE_SAMPLES["attachment_get"] = {
     "size": 20480,
     "is_image": False,
     "processing_status": "uploaded",
+    # FR-ATT-07 (required, nullable) — surfaced by the WP-3.2 regen when
+    # the WP-1.12 pipeline landed the field on the descriptor.
+    "failure_reason": None,
     "token_count": None,
     "short_description": None,
     "created_at": "2026-10-11T18:32:00Z",
@@ -274,6 +277,36 @@ RESPONSE_SAMPLES["attachment_get"] = {
 RESPONSE_SAMPLES["attachment_list"] = {
     "results": [RESPONSE_SAMPLES["attachment_get"]],
     "next_cursor": None,
+}
+
+#: WP-3.2's frozen 201 body for ``POST /tasks/{id}/resolution`` — the
+#: Section 10.5 outcome reporting half (the suite schema-checks responses
+#: for declared GETs; a mutating endpoint's response sample here documents
+#: the same frozen contract for bridge-side consumers).
+RESPONSE_SAMPLES["resolution_submit"] = {
+    "resolution": {
+        "id": "3f7a1c9e-5d2b-4f81-9c0a-2e6d8b4f1a70",
+        "task_id": "PID00007-T004",
+        "attempt_number": 1,
+        "branch_name": "feat/PID00007-T004",
+        "commit_sha": "0123456789abcdef0123456789abcdef01234567",  # pragma: allowlist secret
+        "execution_summary": "Implemented the export and ran the suite.",
+        "diff_summary": {"files": 1, "insertions": 1, "deletions": 1},
+        "changed_files": ["src/billing/invoice.py"],
+        "requires_human_attention": False,
+        "risk_justification": "",
+        "submitted_by_session": "sess-bridge-0001",
+        "submitted_at": "2026-10-11T18:32:00Z",
+    },
+    "task": {
+        "id": "PID00007-T004",
+        "state": "to_be_audited",
+        "version": 4,
+        "review_reason": None,
+        "merge_status": "none",
+    },
+    "trigger": "submit",
+    "scope_violations": [],
 }
 
 #: Request-body samples for declared mutating endpoints whose operation
@@ -292,6 +325,28 @@ REQUEST_SAMPLES: dict[str, Any] = {
         "message": "Halfway there",
         "percent": 50,
         "kind": "progress",
+    },
+    # WP-3.2's submission payload (Section 10.5 submit_task_resolution
+    # inputs + the ADR-012 fencing pair + the captured evidence; the
+    # bridge's provisional stats are replaced server-side — Section 9.7).
+    "resolution_submit": {
+        "session_id": "sess-bridge-0001",
+        "lease_generation": 1,
+        "git_branch": "feat/PID00007-T004",
+        "commit_sha": "0123456789abcdef0123456789abcdef01234567",  # pragma: allowlist secret
+        "execution_summary": "Implemented the export and ran the suite.",
+        "requires_human_attention": False,
+        "risk_justification": "",
+        "patch": (
+            "diff --git a/src/billing/invoice.py b/src/billing/invoice.py\n"
+            "--- a/src/billing/invoice.py\n"
+            "+++ b/src/billing/invoice.py\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        ),
+        "changed_files": ["src/billing/invoice.py"],
+        "diff_summary": {"files": 1, "insertions": 1, "deletions": 1},
     },
 }
 
