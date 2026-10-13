@@ -68,4 +68,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # WP-1.10 realtime gateway (MT-1.10-01 — the Section 9.2 Events row:
     # /events/stream and /events).
     path("api/v1/", include("apps.events.urls")),
+    # WP-1.11 attachment surface (MT-1.11-03/04/05 — the Section 9.2
+    # Attachments row: upload, list, detail, delete).
+    path("api/v1/", include("apps.attachments.urls")),
 ]

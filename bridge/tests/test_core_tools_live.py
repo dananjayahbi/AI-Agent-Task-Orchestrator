@@ -195,7 +195,8 @@ def test_orient_list_details_claim_release_chain(live_backend: _live_backend.Liv
     claimed = claim_task(runtime, task_id=task_id, agent_identifier="bridge-it-coder")
     assert claimed["branch"] == f"feat/{live_backend.project_id}-{task_id.split('-')[-1]}"
     assert claimed["lease"]["generation"] >= 1
-    assert claimed["rules"]["standard_rules"]  # the backend's Section 10.6 block
+    assert claimed["rules"]["role"] == "coder"  # MT-2.7-03 bridge render
+    assert "Provide a clear execution summary" in claimed["rules"]["text"]
 
     released = release_task(runtime, task_id=task_id, reason="chain complete")
     assert released["state"] == "pending"

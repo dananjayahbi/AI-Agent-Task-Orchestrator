@@ -5,6 +5,7 @@
 // ignore_for_file: constant_identifier_names, no_leading_underscores_for_local_identifiers, unnecessary_brace_in_string_interps, unnecessary_this, unused_element, unused_import, use_function_type_syntax_for_parameters, use_super_parameters
 import 'package:built_collection/built_collection.dart';
 import 'package:orchestrator_mobile/src/model/merge_strategy_enum.dart';
+import 'package:orchestrator_mobile/src/model/policy_preset_enum.dart';
 import 'package:orchestrator_mobile/src/model/lease_extension_mode_enum.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -15,20 +16,21 @@ part 'patched_project_policy.g.dart';
 ///
 /// Properties:
 /// * [leaseDurationMinutes] - Lease length and per-checkpoint extension; default 45 (7.2).
-/// * [leaseMaxTotalMinutes] - Hard cap on one continuous claim; default 240 (7.2).
-/// * [leaseExtensionMode] - checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged).  * `checkpoint_only` - checkpoint only * `checkpoint_and_liveness` - checkpoint and liveness
+/// * [leaseMaxTotalMinutes] - Hard cap on one continuous claim; default 240 (7.2). Must be >= lease_duration_minutes (MT-3.1-03 cross-field rule).
+/// * [leaseExtensionMode] - checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged; checkpoint_only is the enforced default, MT-3.1-01).  * `checkpoint_only` - checkpoint only * `checkpoint_and_liveness` - checkpoint and liveness
 /// * [maxRetries] - Lease failures before escalation; default 3 (7.2).
 /// * [maxConcurrentTasks] - Simultaneous in_progress tasks; default 1 (G-26). 0 is legal: it pauses claiming without touching active_status.
 /// * [autonomousDiffThresholdLines] - Max changed lines for auto-complete; default 250 (7.2).
 /// * [auditorMinConfidence] - Minimum auditor confidence, 1-5; default 4 (7.2).
-/// * [criticalPathGlobs] - Escalating paths (CI/CD, root migrations, security config).
-/// * [migrationPathGlobs] - Escalating framework-specific migration paths.
-/// * [sensitiveConfigGlobs] - Escalating env/key/security-rule paths.
+/// * [criticalPathGlobs] - Escalating paths (CI/CD, root migrations, security config). Section 12.3 rules apply (MT-3.1-03): syntax-checked, repo-root-relative, no '..' traversal.
+/// * [migrationPathGlobs] - Escalating framework-specific migration paths; Section 12.3 rules apply (MT-3.1-03).
+/// * [sensitiveConfigGlobs] - Escalating env/key/security-rule paths; Section 12.3 rules apply (MT-3.1-03).
 /// * [autoCompleteEnabled] - If false, every task goes to human review; default true (7.2).
 /// * [mergeStrategy] - squash (default) / merge_commit / fast_forward_only (7.2).  * `squash` - squash * `merge_commit` - merge commit * `fast_forward_only` - fast forward only
 /// * [branchPrefix] - Canonical branch-name prefix, `{PID}` resolved per project when names are derived (G-09; default `feat/{PID}-`). Changing it affects bridge branch naming from WP-2.x on.
 /// * [auditRequiredDefault] - Default audit_required for new tasks; default true (7.2).
 /// * [stalledAfterMinutes] - UI warning when no checkpoint arrives; default 20 (7.2).
+/// * [policyPreset] - Apply a framework preset (WP-3.1): fills critical_path_globs, migration_path_globs and sensitive_config_globs in one action. Unknown ids are rejected; combining it with any explicit glob field in the same request is refused (no implicit ordering). Omitting it leaves the patched globs as sent.  * `django` - django * `nextjs` - nextjs * `flutter` - flutter
 @BuiltValue()
 abstract class PatchedProjectPolicy
     implements Built<PatchedProjectPolicy, PatchedProjectPolicyBuilder> {
@@ -36,11 +38,11 @@ abstract class PatchedProjectPolicy
   @BuiltValueField(wireName: r'lease_duration_minutes')
   int? get leaseDurationMinutes;
 
-  /// Hard cap on one continuous claim; default 240 (7.2).
+  /// Hard cap on one continuous claim; default 240 (7.2). Must be >= lease_duration_minutes (MT-3.1-03 cross-field rule).
   @BuiltValueField(wireName: r'lease_max_total_minutes')
   int? get leaseMaxTotalMinutes;
 
-  /// checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged).  * `checkpoint_only` - checkpoint only * `checkpoint_and_liveness` - checkpoint and liveness
+  /// checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged; checkpoint_only is the enforced default, MT-3.1-01).  * `checkpoint_only` - checkpoint only * `checkpoint_and_liveness` - checkpoint and liveness
   @BuiltValueField(wireName: r'lease_extension_mode')
   LeaseExtensionModeEnum? get leaseExtensionMode;
   // enum leaseExtensionModeEnum {  checkpoint_only,  checkpoint_and_liveness,  };
@@ -61,15 +63,15 @@ abstract class PatchedProjectPolicy
   @BuiltValueField(wireName: r'auditor_min_confidence')
   int? get auditorMinConfidence;
 
-  /// Escalating paths (CI/CD, root migrations, security config).
+  /// Escalating paths (CI/CD, root migrations, security config). Section 12.3 rules apply (MT-3.1-03): syntax-checked, repo-root-relative, no '..' traversal.
   @BuiltValueField(wireName: r'critical_path_globs')
   BuiltList<String>? get criticalPathGlobs;
 
-  /// Escalating framework-specific migration paths.
+  /// Escalating framework-specific migration paths; Section 12.3 rules apply (MT-3.1-03).
   @BuiltValueField(wireName: r'migration_path_globs')
   BuiltList<String>? get migrationPathGlobs;
 
-  /// Escalating env/key/security-rule paths.
+  /// Escalating env/key/security-rule paths; Section 12.3 rules apply (MT-3.1-03).
   @BuiltValueField(wireName: r'sensitive_config_globs')
   BuiltList<String>? get sensitiveConfigGlobs;
 
@@ -93,6 +95,11 @@ abstract class PatchedProjectPolicy
   /// UI warning when no checkpoint arrives; default 20 (7.2).
   @BuiltValueField(wireName: r'stalled_after_minutes')
   int? get stalledAfterMinutes;
+
+  /// Apply a framework preset (WP-3.1): fills critical_path_globs, migration_path_globs and sensitive_config_globs in one action. Unknown ids are rejected; combining it with any explicit glob field in the same request is refused (no implicit ordering). Omitting it leaves the patched globs as sent.  * `django` - django * `nextjs` - nextjs * `flutter` - flutter
+  @BuiltValueField(wireName: r'policy_preset')
+  PolicyPresetEnum? get policyPreset;
+  // enum policyPresetEnum {  django,  nextjs,  flutter,  };
 
   PatchedProjectPolicy._();
 
@@ -226,6 +233,13 @@ class _$PatchedProjectPolicySerializer
       yield serializers.serialize(
         object.stalledAfterMinutes,
         specifiedType: const FullType(int),
+      );
+    }
+    if (object.policyPreset != null) {
+      yield r'policy_preset';
+      yield serializers.serialize(
+        object.policyPreset,
+        specifiedType: const FullType(PolicyPresetEnum),
       );
     }
   }
@@ -375,6 +389,14 @@ class _$PatchedProjectPolicySerializer
           ) as int?;
           if (valueDes == null) continue;
           result.stalledAfterMinutes = valueDes;
+          break;
+        case r'policy_preset':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(PolicyPresetEnum),
+          ) as PolicyPresetEnum?;
+          if (valueDes == null) continue;
+          result.policyPreset = valueDes;
           break;
         default:
           unhandled.add(key);

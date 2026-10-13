@@ -33,7 +33,10 @@ def test_cache_hit_answers_with_zero_backend_calls(
     assert fake_backend.calls == []  # cheap: no transport activity at all
     assert result["project_id"] == "PID00007"
     assert result["project_name"] == "Tea Factory ERP"
-    assert result["rules"] == "Project rule: run the tests."
+    # MT-2.7-02: rules is the merged Section 10.6 block, not the raw field.
+    assert "Project rule: run the tests." in result["rules"]
+    assert "8. Provide a clear execution summary." in result["rules"]
+    assert result["rules"].index("8.") < result["rules"].index("Project rule:")
     assert result["policy_summary"] == {"max_concurrent_tasks": 1, "lease_duration_minutes": 45}
 
 

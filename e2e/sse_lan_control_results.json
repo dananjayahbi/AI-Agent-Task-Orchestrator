@@ -1,0 +1,87 @@
+{
+  "test": "MT-5.1-04 SSE stability soak",
+  "label": "lan-control",
+  "base_url": "http://127.0.0.1:8010",
+  "started_at": "2026-10-13T00:19:28Z",
+  "config": {
+    "idle_seconds": 150.0,
+    "cycles": 2,
+    "heartbeat_seconds": 15.0,
+    "gap_tolerance_seconds": 30.0,
+    "max_latency_seconds": 2.0
+  },
+  "cycles": [
+    {
+      "cycle": 1,
+      "started_at": "2026-10-13T00:19:29Z",
+      "heartbeats": 10,
+      "max_gap_seconds": 15.001173000026029,
+      "unplanned_disconnects": 0,
+      "idle_events": [
+        1
+      ],
+      "probe": {
+        "project_id": "PID00003",
+        "latency_seconds": 0.077,
+        "within_nfr03": true
+      },
+      "resume": {
+        "resumed_from": 1,
+        "expected_missed": [
+          2,
+          3
+        ],
+        "delivered": [
+          2,
+          3,
+          4
+        ],
+        "no_gaps_no_duplicates": true,
+        "live_after_resume_project_id": "PID00006",
+        "live_after_resume_latency_seconds": 0.062
+      },
+      "finished_at": "2026-10-13T00:22:00Z"
+    },
+    {
+      "cycle": 2,
+      "started_at": "2026-10-13T00:22:00Z",
+      "heartbeats": 10,
+      "max_gap_seconds": 15.00109770000563,
+      "unplanned_disconnects": 0,
+      "idle_events": [
+        5
+      ],
+      "probe": {
+        "project_id": "PID00007",
+        "latency_seconds": 0.059,
+        "within_nfr03": true
+      },
+      "resume": {
+        "resumed_from": 5,
+        "expected_missed": [
+          6,
+          7
+        ],
+        "delivered": [
+          6,
+          7,
+          8
+        ],
+        "no_gaps_no_duplicates": true,
+        "live_after_resume_project_id": "PID00010",
+        "live_after_resume_latency_seconds": 0.076
+      },
+      "finished_at": "2026-10-13T00:24:30Z"
+    }
+  ],
+  "failures": [],
+  "auth": {
+    "user": {
+      "id": 2,
+      "username": "soak-owner"
+    },
+    "session_expires_at": "2026-10-13T12:19:29.568783Z"
+  },
+  "finished_at": "2026-10-13T00:24:30Z",
+  "pass": true
+}

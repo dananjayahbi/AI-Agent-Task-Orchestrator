@@ -365,6 +365,14 @@ def test_stdio_process_handshake_lists_core_tools(
 
     init_response = next(message for message in rpc_messages if message.get("id") == 1)
     assert init_response["result"]["serverInfo"]["name"] == "orchestrator-bridge"
+    # MT-2.7-03 (G-08 channel one): the initialize response's `instructions`
+    # carry the Section 10.6 coder rules plus the stub project's appended
+    # `system_prompt_rules` — rules on connect, over the real wire.
+    instructions = init_response["result"].get("instructions")
+    assert isinstance(instructions, str)
+    assert "8. Provide a clear execution summary." in instructions
+    assert "Project rule." in instructions
+    assert instructions.index("8.") < instructions.index("Project rule.")
 
     tools_response = next(message for message in rpc_messages if message.get("id") == 2)
     advertised = [tool["name"] for tool in tools_response["result"]["tools"]]
@@ -386,6 +394,146 @@ def test_stdio_process_handshake_lists_core_tools(
     methods_paths = [(call.method, call.path) for call in stub_http_backend.requests]
     assert ("POST", "/api/v1/agent-sessions") in methods_paths
     assert any(path.endswith("/end") for _method, path in methods_paths)
+
+
+def test_stdio_process_claim_response_carries_composed_rules(
+    stub_manifest_env: dict[str, str], stub_http_backend: StubHttpBackend
+) -> None:
+    """WP-2.7 inspector evidence: ``tools/call claim_task`` over the real wire.
+
+    The stub backend answers the claim with its own wire ``rules_block``
+    (Section 9.3 step 6); the tool's response must carry the bridge's
+    Section 10.6 render instead — the G-09 branch, the lease-derived
+    checkpoint cadence, the task's test command, and the stub project's
+    ``system_prompt_rules`` appended — proving the composed block survives
+    JSON-RPC framing to the client.
+    """
+    task_id = "PID00007-T001"
+    stub_http_backend.responses[("POST", f"/api/v1/tasks/{task_id}/claim")] = (
+        201,
+        {
+            "task": {
+                "id": task_id,
+                "title": "Wire claim",
+                "state": "in_progress",
+                "test_command": "pytest -q tests/wire",
+            },
+            "lease": {
+                "assigned_agent": "wire-agent",
+                "session_id": "wire-session",
+                "role": "coder",
+                "lease_generation": 1,
+                "lease_acquired_at": "2026-10-13T10:00:00Z",
+                "lease_expires_at": "2026-10-13T10:45:00Z",
+                "lease_hard_cap_at": "2026-10-13T12:00:00Z",
+                "last_checkpoint": None,
+                "failure_retry_count": 0,
+            },
+            # The backend's own block — shape-checked but NOT the delivery source.
+            "rules_block": {"standard_rules": ["backend text"], "project_rules": "backend"},
+        },
+    )
+    env = {key: value for key, value in os.environ.items() if not key.startswith("ORCHESTRATOR_")}
+    env.update(stub_manifest_env)
+    messages = "\n".join(
+        [
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {},
+                        "clientInfo": {"name": "wp-2-7-claim-wire", "version": "1.0"},
+                    },
+                }
+            ),
+            json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}),
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "claim_task",
+                        "arguments": {
+                            "task_id": task_id,
+                            "agent_identifier": "wire-agent",
+                            "role": "coder",
+                        },
+                    },
+                }
+            ),
+        ]
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "orchestrator_bridge"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        env=env,
+        cwd=BRIDGE_ROOT,
+    )
+    stdin = proc.stdin
+    stdout = proc.stdout
+    stderr_pipe = proc.stderr
+    assert stdin is not None and stdout is not None and stderr_pipe is not None
+    watchdog = threading.Timer(60.0, proc.kill)
+    watchdog.start()
+    try:
+        stdin.write(messages + "\n")
+        stdin.flush()
+        rpc_lines: list[str] = []
+        saw_claim = False
+        for line in stdout:
+            if not line.strip():
+                continue
+            rpc_lines.append(line)
+            if json.loads(line).get("id") == 2:
+                saw_claim = True
+                break
+        stdin.close()
+    except BaseException:
+        proc.kill()
+        raise
+    finally:
+        watchdog.cancel()
+    try:
+        proc.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=15)
+    tail = stdout.read() or ""
+    stderr = stderr_pipe.read() or ""
+    if not saw_claim:
+        pytest.fail(
+            f"claim_task never answered (exit={proc.returncode}); "
+            f"stdout={rpc_lines + tail.splitlines()!r}; stderr={stderr}"
+        )
+    assert proc.returncode == 0, f"clean shutdown failed: {stderr}"
+
+    rpc_messages = [json.loads(line) for line in (*rpc_lines, *tail.splitlines()) if line.strip()]
+    claim_response = next(message for message in rpc_messages if message.get("id") == 2)
+    assert "error" not in claim_response, claim_response
+    result = claim_response["result"]
+    payload = json.loads(result["content"][0]["text"])
+    # The bridge's own Section 10.6 render, parameterized by this claim.
+    rules = payload["rules"]
+    assert rules["role"] == "coder"
+    assert "1. Work only on the assigned branch (feat/PID00007-T001)." in rules["text"]
+    assert "every 15 minutes" in rules["text"]  # 45-minute lease ÷ 3 (RISK-02)
+    assert "pytest -q tests/wire" in rules["text"]  # the task's own test command
+    assert "Project rule." in rules["text"]  # the cached project rules appended
+    assert "8. Provide a clear execution summary." in rules["text"]
+    assert rules["text"].index("8.") < rules["text"].index("Project rule.")
+    # The artifacts of Section 10.5 ride alongside.
+    assert payload["branch"] == "feat/PID00007-T001"
+    assert payload["lease"]["generation"] == 1
+    # The backend's wire rules_block is NOT the delivered text (G-08 single source).
+    assert "backend text" not in rules["text"]
 
 
 def test_stdio_process_fails_fast_without_manifest(tmp_path: Path) -> None:

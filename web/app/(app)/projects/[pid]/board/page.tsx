@@ -1,12 +1,10 @@
-import { PagePlaceholder } from '@/components/layout/page-placeholder';
+import { Board } from '@/components/board/board';
 
-/** Project board — kanban for one project (Section 13.1; WP-4.3 builds it). */
+/**
+ * Project board route (Section 13.1; WP-4.3 — MT-4.3-01 … MT-4.3-06 build
+ * the six-column realtime Kanban; MT-4.4 will add drag-and-drop).
+ */
 export default async function ProjectBoardPage({ params }: { params: Promise<{ pid: string }> }) {
   const { pid } = await params;
-  return (
-    <PagePlaceholder
-      title={`Board — ${pid}`}
-      description="Kanban board for this project: six canonical-state columns, filters, search, and archive toggle."
-    />
-  );
+  return <Board pid={pid} />;
 }

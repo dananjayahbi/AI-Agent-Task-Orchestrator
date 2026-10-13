@@ -82,6 +82,81 @@ export type AgentTokenIssueResponse = {
 };
 
 /**
+ * One attachment descriptor — FR-ATT-03's field shape, locked here.
+ */
+export type Attachment = {
+    /**
+     * Server-generated row identity (Section 7.2).
+     */
+    id: string;
+    /**
+     * The owning task (Section 7.2).
+     */
+    task_id: string;
+    /**
+     * Client filename, path components stripped.
+     */
+    filename: string;
+    /**
+     * The sniffed content type (Section 9.5 — never the declared one).
+     */
+    mime_type: string;
+    /**
+     * Stored size in bytes (Section 7.2 ``size_bytes``).
+     */
+    size: number;
+    /**
+     * Whether the sniffed type is an image — drives the pipeline split (9.5).
+     */
+    is_image: boolean;
+    /**
+     * FR-ATT-07 enum: uploaded | processing | ready | failed.
+     */
+    processing_status: string;
+    /**
+     * FR-ATT-03 token count — null until the WP-1.12 pipeline computes it.
+     */
+    token_count: number | null;
+    /**
+     * FR-ATT-03 short description — null until the WP-1.12 pipeline produces it.
+     */
+    short_description: string | null;
+    /**
+     * Server upload time (P7).
+     */
+    created_at: string;
+};
+
+/**
+ * MT-1.11-05's DELETE response — the soft-deleted record's marker.
+ */
+export type AttachmentDelete = {
+    /**
+     * The deleted attachment's identity.
+     */
+    id: string;
+    /**
+     * The owning task.
+     */
+    task_id: string;
+    /**
+     * Server time of the soft delete (MT-1.11-05): the retention job (Section 9.9) owns the hard removal (Section 16.3).
+     */
+    deleted_at: string;
+};
+
+/**
+ * pagination.md envelope: exactly ``results`` + ``next_cursor``.
+ */
+export type AttachmentListEnvelope = {
+    results: Array<Attachment>;
+    /**
+     * Opaque cursor for the next page; null = end of list.
+     */
+    next_cursor: string | null;
+};
+
+/**
  * * `vision` - vision
  * * `text_only` - text_only
  * * `unknown` - unknown
@@ -558,11 +633,11 @@ export type PatchedProjectPolicy = {
      */
     lease_duration_minutes?: number;
     /**
-     * Hard cap on one continuous claim; default 240 (7.2).
+     * Hard cap on one continuous claim; default 240 (7.2). Must be >= lease_duration_minutes (MT-3.1-03 cross-field rule).
      */
     lease_max_total_minutes?: number;
     /**
-     * checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged).
+     * checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged; checkpoint_only is the enforced default, MT-3.1-01).
      *
      * * `checkpoint_only` - checkpoint only
      * * `checkpoint_and_liveness` - checkpoint and liveness
@@ -585,15 +660,15 @@ export type PatchedProjectPolicy = {
      */
     auditor_min_confidence?: number;
     /**
-     * Escalating paths (CI/CD, root migrations, security config).
+     * Escalating paths (CI/CD, root migrations, security config). Section 12.3 rules apply (MT-3.1-03): syntax-checked, repo-root-relative, no '..' traversal.
      */
     critical_path_globs?: Array<string>;
     /**
-     * Escalating framework-specific migration paths.
+     * Escalating framework-specific migration paths; Section 12.3 rules apply (MT-3.1-03).
      */
     migration_path_globs?: Array<string>;
     /**
-     * Escalating env/key/security-rule paths.
+     * Escalating env/key/security-rule paths; Section 12.3 rules apply (MT-3.1-03).
      */
     sensitive_config_globs?: Array<string>;
     /**
@@ -667,6 +742,13 @@ export type PatchedTaskUpdate = {
 export type PlatformEnum = 'ios' | 'android';
 
 /**
+ * * `django` - django
+ * * `nextjs` - nextjs
+ * * `flutter` - flutter
+ */
+export type PolicyPresetEnum = 'django' | 'nextjs' | 'flutter';
+
+/**
  * * `urgent` - urgent
  * * `high` - high
  * * `medium` - medium
@@ -713,7 +795,7 @@ export type Project = {
 };
 
 /**
- * POST /projects body — the Section 9.2 create inputs, nothing else.
+ * POST /projects body — Section 9.2 create inputs + WP-3.1 preset.
  */
 export type ProjectCreate = {
     name: string;
@@ -723,6 +805,14 @@ export type ProjectCreate = {
      * Optional at creation; editable afterwards via PATCH.
      */
     system_prompt_rules?: string;
+    /**
+     * Optional framework preset (WP-3.1, MT-3.1-02): seeds the new project's policy with the preset's critical/migration/sensitive globs. Omitted = the Section 7.2 stock defaults. Unknown ids are VALIDATION_ERROR.
+     *
+     * * `django` - django
+     * * `nextjs` - nextjs
+     * * `flutter` - flutter
+     */
+    policy_preset?: PolicyPresetEnum;
 };
 
 /**
@@ -745,11 +835,11 @@ export type ProjectPolicy = {
      */
     lease_duration_minutes: number;
     /**
-     * Hard cap on one continuous claim; default 240 (7.2).
+     * Hard cap on one continuous claim; default 240 (7.2). Must be >= lease_duration_minutes (MT-3.1-03 cross-field rule).
      */
     lease_max_total_minutes: number;
     /**
-     * checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged).
+     * checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged; checkpoint_only is the enforced default, MT-3.1-01).
      *
      * * `checkpoint_only` - checkpoint only
      * * `checkpoint_and_liveness` - checkpoint and liveness
@@ -772,15 +862,15 @@ export type ProjectPolicy = {
      */
     auditor_min_confidence: number;
     /**
-     * Escalating paths (CI/CD, root migrations, security config).
+     * Escalating paths (CI/CD, root migrations, security config). Section 12.3 rules apply (MT-3.1-03): syntax-checked, repo-root-relative, no '..' traversal.
      */
     critical_path_globs: Array<string>;
     /**
-     * Escalating framework-specific migration paths.
+     * Escalating framework-specific migration paths; Section 12.3 rules apply (MT-3.1-03).
      */
     migration_path_globs: Array<string>;
     /**
-     * Escalating env/key/security-rule paths.
+     * Escalating env/key/security-rule paths; Section 12.3 rules apply (MT-3.1-03).
      */
     sensitive_config_globs: Array<string>;
     /**
@@ -1036,6 +1126,87 @@ export type ClaimResponseWritable = {
 };
 
 /**
+ * The Section 7.2 policy table as a validated read/write contract.
+ */
+export type PatchedProjectPolicyWritable = {
+    /**
+     * Lease length and per-checkpoint extension; default 45 (7.2).
+     */
+    lease_duration_minutes?: number;
+    /**
+     * Hard cap on one continuous claim; default 240 (7.2). Must be >= lease_duration_minutes (MT-3.1-03 cross-field rule).
+     */
+    lease_max_total_minutes?: number;
+    /**
+     * checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged; checkpoint_only is the enforced default, MT-3.1-01).
+     *
+     * * `checkpoint_only` - checkpoint only
+     * * `checkpoint_and_liveness` - checkpoint and liveness
+     */
+    lease_extension_mode?: LeaseExtensionModeEnum;
+    /**
+     * Lease failures before escalation; default 3 (7.2).
+     */
+    max_retries?: number;
+    /**
+     * Simultaneous in_progress tasks; default 1 (G-26). 0 is legal: it pauses claiming without touching active_status.
+     */
+    max_concurrent_tasks?: number;
+    /**
+     * Max changed lines for auto-complete; default 250 (7.2).
+     */
+    autonomous_diff_threshold_lines?: number;
+    /**
+     * Minimum auditor confidence, 1-5; default 4 (7.2).
+     */
+    auditor_min_confidence?: number;
+    /**
+     * Escalating paths (CI/CD, root migrations, security config). Section 12.3 rules apply (MT-3.1-03): syntax-checked, repo-root-relative, no '..' traversal.
+     */
+    critical_path_globs?: Array<string>;
+    /**
+     * Escalating framework-specific migration paths; Section 12.3 rules apply (MT-3.1-03).
+     */
+    migration_path_globs?: Array<string>;
+    /**
+     * Escalating env/key/security-rule paths; Section 12.3 rules apply (MT-3.1-03).
+     */
+    sensitive_config_globs?: Array<string>;
+    /**
+     * If false, every task goes to human review; default true (7.2).
+     */
+    auto_complete_enabled?: boolean;
+    /**
+     * squash (default) / merge_commit / fast_forward_only (7.2).
+     *
+     * * `squash` - squash
+     * * `merge_commit` - merge commit
+     * * `fast_forward_only` - fast forward only
+     */
+    merge_strategy?: MergeStrategyEnum;
+    /**
+     * Canonical branch-name prefix, `{PID}` resolved per project when names are derived (G-09; default `feat/{PID}-`). Changing it affects bridge branch naming from WP-2.x on.
+     */
+    branch_prefix?: string;
+    /**
+     * Default audit_required for new tasks; default true (7.2).
+     */
+    audit_required_default?: boolean;
+    /**
+     * UI warning when no checkpoint arrives; default 20 (7.2).
+     */
+    stalled_after_minutes?: number;
+    /**
+     * Apply a framework preset (WP-3.1): fills critical_path_globs, migration_path_globs and sensitive_config_globs in one action. Unknown ids are rejected; combining it with any explicit glob field in the same request is refused (no implicit ordering). Omitting it leaves the patched globs as sent.
+     *
+     * * `django` - django
+     * * `nextjs` - nextjs
+     * * `flutter` - flutter
+     */
+    policy_preset?: PolicyPresetEnum;
+};
+
+/**
  * GET representations of a project — Section 7.2 fields, in plan order.
  */
 export type ProjectWritable = {
@@ -1068,6 +1239,87 @@ export type ProjectListEnvelopeWritable = {
      * Opaque cursor for the next page; null = end of list.
      */
     next_cursor: string | null;
+};
+
+/**
+ * The Section 7.2 policy table as a validated read/write contract.
+ */
+export type ProjectPolicyWritable = {
+    /**
+     * Lease length and per-checkpoint extension; default 45 (7.2).
+     */
+    lease_duration_minutes: number;
+    /**
+     * Hard cap on one continuous claim; default 240 (7.2). Must be >= lease_duration_minutes (MT-3.1-03 cross-field rule).
+     */
+    lease_max_total_minutes: number;
+    /**
+     * checkpoint_only (default) or checkpoint_and_liveness (per-project option — OQ-04's recommended product default is unchanged; checkpoint_only is the enforced default, MT-3.1-01).
+     *
+     * * `checkpoint_only` - checkpoint only
+     * * `checkpoint_and_liveness` - checkpoint and liveness
+     */
+    lease_extension_mode: LeaseExtensionModeEnum;
+    /**
+     * Lease failures before escalation; default 3 (7.2).
+     */
+    max_retries: number;
+    /**
+     * Simultaneous in_progress tasks; default 1 (G-26). 0 is legal: it pauses claiming without touching active_status.
+     */
+    max_concurrent_tasks: number;
+    /**
+     * Max changed lines for auto-complete; default 250 (7.2).
+     */
+    autonomous_diff_threshold_lines: number;
+    /**
+     * Minimum auditor confidence, 1-5; default 4 (7.2).
+     */
+    auditor_min_confidence: number;
+    /**
+     * Escalating paths (CI/CD, root migrations, security config). Section 12.3 rules apply (MT-3.1-03): syntax-checked, repo-root-relative, no '..' traversal.
+     */
+    critical_path_globs: Array<string>;
+    /**
+     * Escalating framework-specific migration paths; Section 12.3 rules apply (MT-3.1-03).
+     */
+    migration_path_globs: Array<string>;
+    /**
+     * Escalating env/key/security-rule paths; Section 12.3 rules apply (MT-3.1-03).
+     */
+    sensitive_config_globs: Array<string>;
+    /**
+     * If false, every task goes to human review; default true (7.2).
+     */
+    auto_complete_enabled: boolean;
+    /**
+     * squash (default) / merge_commit / fast_forward_only (7.2).
+     *
+     * * `squash` - squash
+     * * `merge_commit` - merge commit
+     * * `fast_forward_only` - fast forward only
+     */
+    merge_strategy: MergeStrategyEnum;
+    /**
+     * Canonical branch-name prefix, `{PID}` resolved per project when names are derived (G-09; default `feat/{PID}-`). Changing it affects bridge branch naming from WP-2.x on.
+     */
+    branch_prefix: string;
+    /**
+     * Default audit_required for new tasks; default true (7.2).
+     */
+    audit_required_default: boolean;
+    /**
+     * UI warning when no checkpoint arrives; default 20 (7.2).
+     */
+    stalled_after_minutes: number;
+    /**
+     * Apply a framework preset (WP-3.1): fills critical_path_globs, migration_path_globs and sensitive_config_globs in one action. Unknown ids are rejected; combining it with any explicit glob field in the same request is refused (no implicit ordering). Omitting it leaves the patched globs as sent.
+     *
+     * * `django` - django
+     * * `nextjs` - nextjs
+     * * `flutter` - flutter
+     */
+    policy_preset?: PolicyPresetEnum;
 };
 
 /**
@@ -1136,6 +1388,61 @@ export type EndAgentSessionResponses = {
 };
 
 export type EndAgentSessionResponse = EndAgentSessionResponses[keyof EndAgentSessionResponses];
+
+export type DeleteAttachmentData = {
+    body?: never;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same upload replays the original response instead of storing a second copy; reusing it with a different upload is an open point (headers.md) and executes normally.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/attachments/{id}';
+};
+
+export type DeleteAttachmentErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+};
+
+export type DeleteAttachmentError = DeleteAttachmentErrors[keyof DeleteAttachmentErrors];
+
+export type DeleteAttachmentResponses = {
+    200: AttachmentDelete;
+};
+
+export type DeleteAttachmentResponse = DeleteAttachmentResponses[keyof DeleteAttachmentResponses];
+
+export type RetrieveAttachmentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/attachments/{id}';
+};
+
+export type RetrieveAttachmentErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+};
+
+export type RetrieveAttachmentError = RetrieveAttachmentErrors[keyof RetrieveAttachmentErrors];
+
+export type RetrieveAttachmentResponses = {
+    200: Attachment;
+};
+
+export type RetrieveAttachmentResponse = RetrieveAttachmentResponses[keyof RetrieveAttachmentResponses];
 
 export type ApiV1AuthLoginCreateData = {
     body: LoginRequest;
@@ -1492,7 +1799,7 @@ export type RetrieveProjectPolicyResponses = {
 export type RetrieveProjectPolicyResponse = RetrieveProjectPolicyResponses[keyof RetrieveProjectPolicyResponses];
 
 export type PartialUpdateProjectPolicyData = {
-    body?: PatchedProjectPolicy;
+    body?: PatchedProjectPolicyWritable;
     path: {
         pid: string;
     };
@@ -1696,6 +2003,71 @@ export type PartialUpdateTaskResponses = {
 };
 
 export type PartialUpdateTaskResponse = PartialUpdateTaskResponses[keyof PartialUpdateTaskResponses];
+
+export type ListTaskAttachmentsData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        /**
+         * Opaque cursor from the previous page's next_cursor; valid only for this task's listing (pagination.md rule 1).
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults, same per-endpoint choice as the other list routes).
+         */
+        page_size?: number;
+    };
+    url: '/api/v1/tasks/{id}/attachments';
+};
+
+export type ListTaskAttachmentsErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+};
+
+export type ListTaskAttachmentsError = ListTaskAttachmentsErrors[keyof ListTaskAttachmentsErrors];
+
+export type ListTaskAttachmentsResponses = {
+    200: AttachmentListEnvelope;
+};
+
+export type ListTaskAttachmentsResponse = ListTaskAttachmentsResponses[keyof ListTaskAttachmentsResponses];
+
+export type UploadAttachmentData = {
+    body: Attachment;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same upload replays the original response instead of storing a second copy; reusing it with a different upload is an open point (headers.md) and executes normally.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{id}/attachments';
+};
+
+export type UploadAttachmentErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    415: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type UploadAttachmentError = UploadAttachmentErrors[keyof UploadAttachmentErrors];
+
+export type UploadAttachmentResponses = {
+    201: Attachment;
+};
+
+export type UploadAttachmentResponse = UploadAttachmentResponses[keyof UploadAttachmentResponses];
 
 export type ListCheckpointsData = {
     body?: never;

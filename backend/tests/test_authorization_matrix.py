@@ -38,6 +38,7 @@ command); the file runs in CI's unit job as part of the Security layer.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
@@ -162,6 +163,9 @@ urlpatterns = [
     # WP-1.10's real SSE gateway routes (MT-1.10-05) — the *Read events*
     # row runs on them above.
     path("api/v1/", include("apps.events.urls")),
+    # WP-1.11's real attachment routes — the landed Attachments-row cases
+    # (upload/list/detail/delete) run against them below.
+    path("api/v1/", include("apps.attachments.urls")),
 ]
 
 
@@ -349,6 +353,8 @@ def matrix(owner_client: APIClient) -> Iterator[_Authz]:
         kwargs: dict[str, Any] = {"headers": headers} if headers else {}
         if method == "GET":
             return client.get(path, **kwargs)
+        if method == "DELETE":
+            return client.delete(path, **kwargs)
         return client.post(path, {}, **kwargs)
 
     def _post(actor: str, path: str, data: dict[str, Any]) -> Any:
@@ -685,6 +691,100 @@ def test_wp18_landed_checkpoint_routes_enforce_their_callers(matrix: _Authz) -> 
     assert agent_post.json()["lease_extended"] is True
 
 
+# --- WP-1.11 landing: the Attachments row's real callers (deferred retired) --
+
+
+def test_wp111_landed_attachment_routes_enforce_their_callers(
+    matrix: _Authz, tmp_path: Path
+) -> None:
+    """Real-route cases for upload/list/detail/delete (removed deferred).
+
+    Section 9.2's Attachments caller column is "Owner / Agent (read)";
+    §12.2 prints no attachments capability row, so this is the landed-
+    routes pattern (WP-1.8/WP-2.x), not a PROBES entry. The catalog:
+    upload POST and delete DELETE are Owner-only (anonymous 401, device
+    403, agent 403 — agents read, never write); the two GETs admit the
+    owner **and** an agent token scoped to the addressed project, with
+    cross-project agents answered AUTH_FORBIDDEN_PROJECT before any
+    role logic (ADR-004 zero-bleed, Section 12.1). The services' full
+    catalogs live in tests/attachments/.
+    """
+    task = f"{PID_ONE}-T001"
+    attachments = f"/api/v1/tasks/{task}/attachments"
+
+    # Upload (Owner only): anonymous 401, device 403, agent 403.
+    anon_upload = matrix.call("anonymous", "POST", attachments)
+    assert anon_upload.status_code == 401
+    assert _code(anon_upload) == AUTH_REQUIRED
+
+    # Owner passes the authz cell and fails at input validation (no
+    # `file` part): 400 VALIDATION_ERROR — a *denied* actor would have
+    # been stopped at 403/401 before the body was ever examined.
+    owner_upload = matrix.post("owner", attachments, {})
+    assert owner_upload.status_code == 400
+    assert _code(owner_upload) == VALIDATION_ERROR
+
+    for actor in ("coder", "auditor", "decomposer", "merge_executor", "device"):
+        denied = matrix.post(actor, attachments, {})
+        assert denied.status_code == 403, actor
+        assert _code(denied) == ROLE_NOT_PERMITTED, actor
+
+    # Listing (Owner / Agent read): device excluded, both admitted callers.
+    anon_list = matrix.call("anonymous", "GET", attachments)
+    assert anon_list.status_code == 401
+    assert _code(anon_list) == AUTH_REQUIRED
+
+    device_list = matrix.call("device", "GET", attachments)
+    assert device_list.status_code == 403
+    assert _code(device_list) == ROLE_NOT_PERMITTED
+
+    owner_list = matrix.call("owner", "GET", attachments)
+    assert owner_list.status_code == 200
+    assert owner_list.json() == {"results": [], "next_cursor": None}
+
+    agent_list = matrix.call("coder", "GET", attachments)
+    assert agent_list.status_code == 200
+
+    # Cross-project agent token on both halves (zero-bleed).
+    foreign_list = matrix.call("decomposer", "GET", attachments)
+    assert foreign_list.status_code == 200  # same project: allowed
+
+    # Detail + delete with a real uploaded row (owner uploads bytes).
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
+    client = APIClient()
+    login = client.post("/api/v1/auth/login", {"username": "owner", "password": PASSWORD})
+    assert login.status_code == 200, login.content
+    with override_settings(STORAGE_BACKEND="local", MEDIA_ROOT=str(tmp_path)):
+        created = client.post(
+            attachments,
+            {"file": SimpleUploadedFile("matrix.png", png, content_type="image/png")},
+            format="multipart",
+        )
+    assert created.status_code == 201, created.content
+    attachment_id = created.json()["id"]
+    detail = f"/api/v1/attachments/{attachment_id}"
+
+    # Detail GET: owner and scoped agent read; device/anonymous refused.
+    assert client.get(detail).status_code == 200
+    assert matrix.call("coder", "GET", detail).status_code == 200
+    assert matrix.call("device", "GET", detail).status_code == 403
+    assert matrix.call("anonymous", "GET", detail).status_code == 401
+
+    # DELETE: Owner only — every other actor is refused before the rule.
+    for actor in ("coder", "auditor", "decomposer", "merge_executor", "device"):
+        denied = matrix.call(actor, "DELETE", detail)
+        assert denied.status_code == 403, actor
+        assert _code(denied) == ROLE_NOT_PERMITTED, actor
+    assert matrix.call("anonymous", "DELETE", detail).status_code == 401
+
+    with override_settings(STORAGE_BACKEND="local", MEDIA_ROOT=str(tmp_path)):
+        deleted = client.delete(detail)
+    assert deleted.status_code == 200, deleted.content
+    assert deleted.json()["deleted_at"] is not None
+
+
 # --- WP-2.x activation: §9.2 agent read-only cells on their real routes -----
 
 
@@ -801,9 +901,12 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     "/api/v1/merge/pending",  # Merge queue read (WP-3.x)
     "/api/v1/merge/1/start",  # Merge queue write (WP-3.x)
     "/api/v1/merge/1/result",  # Merge queue write (WP-3.x)
-    "/api/v1/tasks/1/attachments",  # WP-1.11
-    "/api/v1/attachments/1",  # WP-1.11
-    "/api/v1/attachments/1/content",  # WP-1.11
+    # WP-1.11 removed its upload/list/detail/delete entries as it landed
+    # them: test_wp111_landed_attachment_routes_enforce_their_callers
+    # below carries the real per-actor cases (the Section 9.2 Attachments
+    # caller column "Owner / Agent (read)" — §12.2 prints no attachments
+    # capability row, so no PROBES entry exists or is needed).
+    "/api/v1/attachments/1/content",  # WP-1.14 (MT-1.11-04 out of scope)
     # WP-1.10 (MT-1.10-05) removed its entries as it landed them: the
     # *Read events* row now runs on the real /api/v1/events and
     # /api/v1/events/stream routes (probes above), and

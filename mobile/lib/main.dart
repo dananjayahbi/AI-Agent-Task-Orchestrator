@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'core/config/app_config.dart';
+import 'core/offline/json_cache.dart';
 import 'core/realtime/last_event_id_store.dart';
 import 'core/security/auth_gate.dart';
 import 'features/onboarding/onboarding_progress_store.dart';
@@ -19,6 +20,11 @@ Future<void> main() async {
   // The SSE resume marker store (MT-5.5-05) — plain preferences, the id is
   // not a secret (Section 9.6); the device token never goes near it.
   final lastEventIdStore = await SharedPreferencesLastEventIdStore.open();
+
+  // Read-only offline cache of the last overview and board (Section 14.2;
+  // WP-5.6) — plain preferences keyed by feature; values are never secrets
+  // (the device token never goes near it).
+  final jsonCache = await SharedPreferencesJsonCache.open();
 
   // Onboarding progress (MT-5.5-06): a URL confirmed during onboarding
   // overrides the flavor default for every consumer (app_config precedence
@@ -40,6 +46,7 @@ Future<void> main() async {
       overrides: [
         appConfigProvider.overrideWithValue(effectiveConfig),
         lastEventIdStoreProvider.overrideWithValue(lastEventIdStore),
+        jsonCacheProvider.overrideWithValue(jsonCache),
         onboardingProgressStoreProvider.overrideWithValue(progressStore),
         // Unfinished onboarding (fresh install or mid-flow resume) claims
         // screen time; a completed flow leaves the gate in control.

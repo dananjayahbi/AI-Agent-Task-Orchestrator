@@ -39,6 +39,24 @@ Structure (WP-4.1):
   `session/`, `errors/`, `states/`.
 - `tests/` — Vitest suites (auth flows, route gate, error catalog).
 
+Board additions (WP-4.3 — Kanban read side with realtime):
+
+- `app/(app)/projects/[pid]/board/` — the project board route (Section 13.1).
+- `lib/board/` — canonical states/columns (`states.ts`), filter model bound
+  to the tasks-list contract (`filters.ts`), Section 8.6 stalled derivation
+  (`stalled.ts`), lease countdown (`lease.ts`), shared clock (`use-now.ts`),
+  and the pure event→cache reducer (`patch.ts`).
+- `lib/stream/` — Section 9.6 event catalog gate (`event-catalog.ts`) and
+  the reusable SSE subscription hook with reconnect + `Last-Event-ID`
+  resume and visible connection status (`use-event-stream.ts`).
+- `lib/queries/` — `tasks.ts` (board list), `checkpoint-progress.ts`
+  (stream-fed percent map) and `board-live.ts` (SSE → react-query patching).
+- `components/board/` — `Board`, `BoardColumn`, `TaskCard`,
+  `PriorityChip`, `BoardFiltersBar`, `VirtualList` (dependency-free column
+  windowing for the Section 13.4 500-card target) and the stream status
+  indicator.
+- `tests/board/`, `tests/stream/` — MT-4.3-01 … MT-4.3-06 suites.
+
 ## Shared conventions (WP-0.5)
 
 Every configuration value this package reads follows the shared conventions:

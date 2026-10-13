@@ -146,7 +146,10 @@ class ProjectListCreateView(APIView):
             "the Section 7.3 database sequence — no client-supplied id is "
             "accepted (an `id` key is rejected as unknown). The default "
             "Project Policy (Section 7.2 defaults) is created as a pair "
-            "(Section 7.1). Caller: Owner only."
+            "(Section 7.1). Optional `policy_preset` (WP-3.1) seeds the "
+            "new policy's three glob fields from a framework preset "
+            "(django | nextjs | flutter); omitted = stock Section 7.2 "
+            "defaults. Caller: Owner only."
         ),
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -161,6 +164,7 @@ class ProjectListCreateView(APIView):
             default_branch=validated["default_branch"],
             system_prompt_rules=validated.get("system_prompt_rules", ""),
             actor_ref=_actor_ref(request),
+            policy_preset=validated.get("policy_preset"),
         )
         return Response(
             ProjectSerializer(project).data,

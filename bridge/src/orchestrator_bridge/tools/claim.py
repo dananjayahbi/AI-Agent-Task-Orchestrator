@@ -1,4 +1,4 @@
-"""``claim_task`` (parent plan Sections 9.2, 9.3, 10.5, 10.6; MT-2.4-04).
+"""``claim_task`` (parent plan Sections 9.2, 9.3, 10.5, 10.6; MT-2.4-04, MT-2.7-03).
 
 The atomicity-critical tool. The backend owns the claim algorithm
 (select-for-update skip-locked, re-validation inside the lock — Section 9.3);
@@ -8,19 +8,23 @@ the bridge's job is the honest wire call and the response assembly:
   ``agent_session_id``, the lease's identity half) and ``worker_agent_id``
   (the tool's ``agent_identifier`` label). **The wire body carries no
   ``role``**: the backend derives claimable work from the token's scopes
-  (Section 12.2); the tool-level ``role`` input is validated for the model
-  and travels again when the claim contract grows a role field (auditor
-  claims land with backend WP-3.3 — recorded in the WP changelog).
+  (Section 12.2); the tool-level ``role`` input is validated for the model,
+  selects the rules template (MT-2.7-03) and travels again when the claim
+  contract grows a role field (auditor claims land with backend WP-3.3 —
+  recorded in the WP changelog).
 * idempotency: the POST carries an ``Idempotency-Key`` minted by the WP-2.3
   transport (NFR-12, ADR-012) — one logical claim, replayed safely.
 * response = the three Section 10.5 artifacts — **lease, rules block,
-  branch name** — plus the task row. The rules block comes verbatim from the
-  backend (Section 10.6; WP-2.7 merges project rules into it later — the
-  bridge renders what the backend returns, MT-2.7-03 is a forward consumer
-  note, not a blocker). The branch name is derived per G-09 from the
-  manifest's ``auto_branch_prefix`` + the task index
-  (``feat/PID00007-`` + ``T004`` → ``feat/PID00007-T004``); WP-2.10's helper
-  will own and extend the derivation — this is the same rule, kept minimal.
+  branch name** — plus the task row. The ``rules`` block is the bridge's own
+  Section 10.6 render (MT-2.7-03 resolves this module's forward note): the
+  coder/auditor template from :mod:`orchestrator_bridge.rules` with the
+  claim's real parameters — the G-09 branch name, the task's test command,
+  the checkpoint interval derived from *this* lease — and the session's
+  cached ``system_prompt_rules`` appended (MT-2.7-02). One render path serves
+  every channel, so the text cannot diverge (G-08). The backend still returns
+  its own ``rules_block`` on the wire (Section 9.3 step 6, the OpenAPI
+  contract) and its presence is shape-checked, but the bridge's templates are
+  the delivery source of truth per Section 10.6's bridge-owned block.
 * the returned ``lease_generation`` is recorded for the release fencing pair
   (ADR-012; MT-2.4-05 consumes it).
 """
@@ -34,6 +38,12 @@ from ..api_errors import ApiError, ErrorCode, ErrorKind
 from ..endpoints import endpoint
 from ..error_translation import translate_error
 from ..manifest import StartupBinding
+from ..rules import (
+    DEFAULT_LEASE_MINUTES,
+    checkpoint_interval_minutes,
+    lease_minutes,
+    render_rules,
+)
 from .errors import ToolFailure
 from .runtime import ToolRuntime
 
@@ -73,6 +83,14 @@ def _lease_block(lease: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _policy_lease_fallback(policy_summary: Mapping[str, Any]) -> int:
+    """The policy summary's ``lease_duration_minutes`` when it is sane."""
+    raw = policy_summary.get("lease_duration_minutes")
+    if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0:
+        return raw
+    return DEFAULT_LEASE_MINUTES  # Section 7.2 default
+
+
 def claim_task(
     runtime: ToolRuntime,
     *,
@@ -81,7 +99,7 @@ def claim_task(
     role: str = "coder",
 ) -> dict[str, Any]:
     """One atomic claim; returns lease + rules block + branch (Section 10.5)."""
-    del role  # validated input; the token scopes decide server-side (12.2).
+    role_key = role if role in ("coder", "auditor") else "coder"
     body = {
         "session_id": runtime.agent_session_id,
         "worker_agent_id": agent_identifier,
@@ -123,14 +141,32 @@ def claim_task(
     if isinstance(generation, int):
         runtime.record_lease(task_id, generation)
     claimed_task_id = task.get("id")
+    branch = branch_name_for(runtime.binding, task_id)
+    # MT-2.7-03: the delivered block is the bridge's Section 10.6 render for
+    # the claiming role, parameterized by this claim — the G-09 branch, the
+    # task's own test command, and the checkpoint interval derived from this
+    # lease (RISK-02). Project rules come from the session cache (single
+    # render path, G-08); a cache miss fetches through the client and a
+    # failure surfaces translated, never as a crash.
+    try:
+        context = runtime.project_context()
+    except ApiError as exc:
+        raise _failure(exc) from None
+    test_command = task.get("test_command")
+    rendered_rules = render_rules(
+        role_key,
+        branch=branch,
+        test_command=test_command if isinstance(test_command, str) and test_command else None,
+        checkpoint_minutes=checkpoint_interval_minutes(
+            lease_minutes(lease, fallback=_policy_lease_fallback(context.policy_summary))
+        ),
+        project_rules=context.rules,
+    )
     return {
         "task_id": claimed_task_id if isinstance(claimed_task_id, str) else task_id,
-        "branch": branch_name_for(runtime.binding, task_id),
+        "branch": branch,
         "lease": _lease_block(lease),
-        "rules": {
-            "standard_rules": list(rules.get("standard_rules") or []),
-            "project_rules": rules.get("project_rules") or "",
-        },
+        "rules": {"role": role_key, "text": rendered_rules},
         "task": dict(task),
     }
 

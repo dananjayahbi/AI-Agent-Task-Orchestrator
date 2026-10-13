@@ -5,25 +5,55 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orchestrator_mobile/app/app.dart';
 import 'package:orchestrator_mobile/app/nav_shell.dart';
 import 'package:orchestrator_mobile/app/routes.dart';
+import 'package:orchestrator_mobile/core/offline/json_cache.dart';
+import 'package:orchestrator_mobile/core/realtime/realtime_providers.dart';
 import 'package:orchestrator_mobile/core/security/biometric_authenticator.dart';
 import 'package:orchestrator_mobile/core/security/secure_token_store.dart';
+import 'package:orchestrator_mobile/features/board/board_repository.dart';
+import 'package:orchestrator_mobile/features/board/projects_repository.dart';
+import 'package:orchestrator_mobile/features/dashboard/dashboard_summary.dart';
+import 'package:orchestrator_mobile/features/dashboard/dashboard_summary_source.dart';
+import 'package:orchestrator_mobile/orchestrator_mobile.dart';
 
+import 'board/board_test_support.dart';
+import 'dashboard/dashboard_test_support.dart';
+import 'realtime/realtime_test_support.dart';
 import 'security/security_test_support.dart';
 
-/// Navigation shell integrity (MT-5.5-01): every Section 14.1 area is
-/// reachable — the four tab areas through the shell, the flow and modal
-/// areas through their routes. Placeholders must be honest empty states.
+/// Navigation shell integrity (MT-5.5-01, kept honest through WP-5.6):
+/// every Section 14.1 area is reachable — the four tab areas through the
+/// shell (Home and Board now render their real WP-5.6 screens), the flow
+/// and modal areas through their routes. Remaining placeholders must be
+/// honest empty states.
 void main() {
   Future<void> pumpApp(WidgetTester tester) async {
     // No stored credential → the MT-5.5-04 gate passes the shell through
     // (onboarding runs inside the app), so the shell is what these
-    // navigation checks exercise.
+    // navigation checks exercise. Feature seams are faked: no real HTTP,
+    // no real preferences, no real stream.
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
           secureTokenStoreProvider
               .overrideWithValue(InMemorySecureTokenStore()),
           biometricAuthProvider.overrideWithValue(FakeBiometricAuthenticator()),
+          jsonCacheProvider.overrideWithValue(InMemoryJsonCache()),
+          dashboardSummarySourceProvider.overrideWithValue(
+            FakeDashboardSummarySource()
+              ..next = summaryOf(<ProjectDashboardCard>[
+                dashboardCard(
+                  projectId: 'PID00001',
+                  name: 'Nav project',
+                  counts: <StateEnum, int>{StateEnum.draft: 1},
+                ),
+              ]),
+          ),
+          projectsRepositoryProvider
+              .overrideWithValue(FakeProjectsRepository()),
+          boardRepositoryProvider.overrideWithValue(FakeBoardRepository()),
+          sseClientProvider.overrideWithValue(
+            buildTestSseClient(transport: FakeSseTransport()),
+          ),
         ],
         child: const OrchestratorApp(),
       ),
@@ -44,31 +74,40 @@ void main() {
       ]) {
         expect(find.text(label), findsOneWidget);
       }
-      // Home is the default tab and shows its honest placeholder.
+      // Home is the default tab and now renders the real WP-5.6
+      // dashboard (MT-5.6-01), not a placeholder.
       expect(find.text('Home / Overview'), findsOneWidget);
-      expect(find.textContaining('Not implemented yet'), findsOneWidget);
+      expect(find.text('Nav project'), findsOneWidget);
+      expect(find.textContaining('Not implemented yet'), findsNothing);
     });
 
     testWidgets('every tab area is reachable by tapping its destination',
         (tester) async {
       await pumpApp(tester);
 
-      // NavigationBar label -> a fragment unique to that area's placeholder.
-      const List<(String, String)> tabs = <(String, String)>[
-        ('Board', 'horizontally paged'),
-        ('Notifications', 'per-event-type toggles'),
-        ('Settings', 'Device info'),
-        ('Home', 'needs-review banner'),
+      // NavigationBar label -> a fragment unique to that area's content.
+      // The last flag says whether the area is still a placeholder.
+      const List<(String, String, bool)> tabs = <(String, String, bool)>[
+        ('Board', 'Select a project above to see its board.', false),
+        ('Notifications', 'per-event-type toggles', true),
+        ('Settings', 'Device info', true),
+        ('Home', 'Nav project', false),
       ];
-      for (final (String navLabel, String fragment) in tabs) {
+      for (final (String navLabel, String fragment, bool placeholder) in tabs) {
         await tester.tap(find.text(navLabel));
         await tester.pumpAndSettle();
         expect(
-          find.textContaining('Not implemented yet'),
+          find.textContaining(fragment),
           findsOneWidget,
-          reason: 'tab "$navLabel" must render its placeholder',
+          reason: 'tab "$navLabel" must render its content',
         );
-        expect(find.textContaining(fragment), findsOneWidget);
+        expect(
+          find.textContaining('Not implemented yet'),
+          placeholder ? findsOneWidget : findsNothing,
+          reason: placeholder
+              ? 'tab "$navLabel" must still render its honest placeholder'
+              : 'tab "$navLabel" must render the real WP-5.6 screen',
+        );
       }
     });
 

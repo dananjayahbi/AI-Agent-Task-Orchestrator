@@ -16,6 +16,9 @@ import 'package:orchestrator_mobile/src/model/agent_session.dart';
 import 'package:orchestrator_mobile/src/model/agent_session_create.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_request.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_response.dart';
+import 'package:orchestrator_mobile/src/model/attachment.dart';
+import 'package:orchestrator_mobile/src/model/attachment_delete.dart';
+import 'package:orchestrator_mobile/src/model/attachment_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_create.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_write_response.dart';
@@ -1363,7 +1366,7 @@ class ApiApi {
   }
 
   /// createProject
-  /// Create a project. The &#x60;PID&#x60; id is assigned server-side from the Section 7.3 database sequence — no client-supplied id is accepted (an &#x60;id&#x60; key is rejected as unknown). The default Project Policy (Section 7.2 defaults) is created as a pair (Section 7.1). Caller: Owner only.
+  /// Create a project. The &#x60;PID&#x60; id is assigned server-side from the Section 7.3 database sequence — no client-supplied id is accepted (an &#x60;id&#x60; key is rejected as unknown). The default Project Policy (Section 7.2 defaults) is created as a pair (Section 7.1). Optional &#x60;policy_preset&#x60; (WP-3.1) seeds the new policy&#39;s three glob fields from a framework preset (django | nextjs | flutter); omitted &#x3D; stock Section 7.2 defaults. Caller: Owner only.
   ///
   /// Parameters:
   /// * [projectCreate]
@@ -1573,6 +1576,100 @@ class ApiApi {
     }
 
     return Response<Task>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// deleteAttachment
+  /// Delete one attachment (Section 9.2; caller: Owner only). Resolved conservatively against Section 16.3: on a completed or archived task the call answers 409 TASK_STATE_CONFLICT — the retention job owns those bytes (archive plus the configurable grace period, Section 12.4; OQ-10 default 30 days). On any earlier state the record is soft-deleted (&#x60;deleted_at&#x60; stamped) and the stored object is removed only when no other de-duplicated record shares its content key. &#x60;Idempotency-Key&#x60; replays a retried DELETE&#39;s response (ADR-012).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [idempotencyKey] - Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same upload replays the original response instead of storing a second copy; reusing it with a different upload is an open point (headers.md) and executes normally.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AttachmentDelete] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AttachmentDelete>> deleteAttachment({
+    required String id,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/attachments/{id}'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AttachmentDelete? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AttachmentDelete),
+            ) as AttachmentDelete;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AttachmentDelete>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1872,6 +1969,111 @@ class ApiApi {
     }
 
     return Response<ProjectListEnvelope>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// listTaskAttachments
+  /// List one task&#39;s attachment descriptors (Section 9.2; caller: Owner or the project&#39;s agent token). Newest first (&#x60;created_at&#x60;, then id — stable, deterministic, pagination.md rule 2). Descriptors carry &#x60;id&#x60;, &#x60;filename&#x60;, &#x60;size&#x60;, &#x60;processing_status&#x60; plus FR-ATT-03&#39;s &#x60;token_count&#x60; and &#x60;short_description&#x60;, which are null until the WP-1.12 pipeline produces them. Pagination is cursor-based: pass &#x60;cursor&#x60; from the previous &#x60;next_cursor&#x60; *for this task only* (rule 1); &#x60;page_size&#x60; defaults to 25, clamped to 100. Soft-deleted attachments are excluded. Cross-project agent tokens answer AUTH_FORBIDDEN_PROJECT (403).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cursor] - Opaque cursor from the previous page's next_cursor; valid only for this task's listing (pagination.md rule 1).
+  /// * [pageSize] - Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults, same per-endpoint choice as the other list routes).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [AttachmentListEnvelope] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<AttachmentListEnvelope>> listTaskAttachments({
+    required String id,
+    String? cursor,
+    int? pageSize,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/tasks/{id}/attachments'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor':
+            encodeQueryParameter(_serializers, cursor, const FullType(String)),
+      if (pageSize != null)
+        r'page_size':
+            encodeQueryParameter(_serializers, pageSize, const FullType(int)),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    AttachmentListEnvelope? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(AttachmentListEnvelope),
+            ) as AttachmentListEnvelope;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<AttachmentListEnvelope>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -2695,6 +2897,97 @@ class ApiApi {
     );
   }
 
+  /// retrieveAttachment
+  /// Read one attachment descriptor by id (Section 9.2; caller: Owner or an agent token scoped to the attachment&#39;s project). &#x60;token_count&#x60; and &#x60;short_description&#x60; are null until the WP-1.12 pipeline fills them (FR-ATT-03/07). Foreign agent tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown or malformed ids answer VALIDATION_ERROR (400 — the catalog has no attachment not-found code; recorded mapping).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Attachment] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Attachment>> retrieveAttachment({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/attachments/{id}'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Attachment? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Attachment),
+            ) as Attachment;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Attachment>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// retrieveProject
   /// Read one project. Caller: Owner or an agent token scoped to this project (Section 9.2: agents read-only for own project); other agent tokens answer AUTH_FORBIDDEN_PROJECT (403) and devices ROLE_NOT_PERMITTED. A malformed or unknown pid answers VALIDATION_ERROR (400): the catalog has no PROJECT_NOT_FOUND.
   ///
@@ -3048,6 +3341,157 @@ class ApiApi {
     }
 
     return Response<Task>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// uploadAttachment
+  /// Upload one attachment (Section 9.2; caller: Owner only — agents read, never upload). The multipart body carries the file part &#x60;file&#x60;; limits and the allowlist are Section 9.5&#39;s (25 MB per file, 10 per task, 100 MB total — configurable defaults), the MIME type is **sniffed from the content**, never taken from the extension or the declared type, and a mismatch is rejected (415 ATTACHMENT_UNSUPPORTED_FORMAT; oversize/over-count/over-total answer 400 VALIDATION_ERROR). Identical bytes already attached to the task de-duplicate onto the existing record (200 instead of 201 — one record, one stored object). The response is the FR-ATT-03 descriptor with processing_status &#x60;uploaded&#x60; (FR-ATT-07); &#x60;token_count&#x60; and &#x60;short_description&#x60; are null until the WP-1.12 pipeline fills them. &#x60;Idempotency-Key&#x60; replays a retried upload without duplicating (ADR-012). The pipeline enqueue hook exists and is a documented no-op until MT-1.12-01 wires the worker job.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [id2] - Server-generated row identity (Section 7.2).
+  /// * [taskId] - The owning task (Section 7.2).
+  /// * [filename] - Client filename, path components stripped.
+  /// * [mimeType] - The sniffed content type (Section 9.5 — never the declared one).
+  /// * [size] - Stored size in bytes (Section 7.2 ``size_bytes``).
+  /// * [isImage] - Whether the sniffed type is an image — drives the pipeline split (9.5).
+  /// * [processingStatus] - FR-ATT-07 enum: uploaded | processing | ready | failed.
+  /// * [tokenCount] - FR-ATT-03 token count — null until the WP-1.12 pipeline computes it.
+  /// * [shortDescription] - FR-ATT-03 short description — null until the WP-1.12 pipeline produces it.
+  /// * [createdAt] - Server upload time (P7).
+  /// * [idempotencyKey] - Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same upload replays the original response instead of storing a second copy; reusing it with a different upload is an open point (headers.md) and executes normally.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Attachment] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Attachment>> uploadAttachment({
+    required String id,
+    required String id2,
+    required String taskId,
+    required String filename,
+    required String mimeType,
+    required int size,
+    required bool isImage,
+    required String processingStatus,
+    int? tokenCount,
+    String? shortDescription,
+    required DateTime createdAt,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/tasks/{id}/attachments'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'multipart/form-data',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = FormData.fromMap(<String, dynamic>{
+        r'id': encodeFormParameter(_serializers, id2, const FullType(String)),
+        r'task_id':
+            encodeFormParameter(_serializers, taskId, const FullType(String)),
+        r'filename':
+            encodeFormParameter(_serializers, filename, const FullType(String)),
+        r'mime_type':
+            encodeFormParameter(_serializers, mimeType, const FullType(String)),
+        r'size': encodeFormParameter(_serializers, size, const FullType(int)),
+        r'is_image':
+            encodeFormParameter(_serializers, isImage, const FullType(bool)),
+        r'processing_status': encodeFormParameter(
+            _serializers, processingStatus, const FullType(String)),
+        r'token_count':
+            encodeFormParameter(_serializers, tokenCount, const FullType(int)),
+        r'short_description': encodeFormParameter(
+            _serializers, shortDescription, const FullType(String)),
+        r'created_at': encodeFormParameter(
+            _serializers, createdAt, const FullType(DateTime)),
+      });
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Attachment? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Attachment),
+            ) as Attachment;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Attachment>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

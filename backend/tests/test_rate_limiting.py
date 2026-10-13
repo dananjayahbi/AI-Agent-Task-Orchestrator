@@ -232,9 +232,13 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
     # uses these routes from WP-2.x)
     _Route("/api/v1/agent-sessions", AgentEndpointThrottle, "MT-1.6-09", True),
     _Route("/api/v1/agent-sessions/1/end", AgentEndpointThrottle, "MT-1.6-09", True),
-    # --- Attachments row reads (Owner / Agent): WP-1.11
-    _Route("/api/v1/tasks/1/attachments", AgentEndpointThrottle, "WP-1.11", False),
-    _Route("/api/v1/attachments/1", AgentEndpointThrottle, "WP-1.11", False),
+    # --- Attachments row reads (Owner / Agent): landed with MT-1.11-03/04.
+    # The shared routes carry AgentEndpointThrottle on the view classes
+    # (WP-1.8's recorded pattern for shared Owner/Agent routes); the
+    # owner's POST/DELETE halves ride the same class budget — recorded
+    # in the WP-1.11 changelog.
+    _Route("/api/v1/tasks/1/attachments", AgentEndpointThrottle, "MT-1.11-03", True),
+    _Route("/api/v1/attachments/1", AgentEndpointThrottle, "MT-1.11-04", True),
     # Note: GET /events and GET /events/stream are deliberately absent —
     # their caller column is Owner (Section 9.6: agents never subscribe to
     # events; MT-1.2-05's CanReadEvents), so they are not agent endpoints.

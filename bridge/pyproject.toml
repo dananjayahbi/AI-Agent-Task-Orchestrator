@@ -59,6 +59,10 @@ orchestrator-bridge = "orchestrator_bridge.entrypoints:cli_entry"
 orchestrator-bridge-stdio = "orchestrator_bridge.entrypoints.stdio:main"
 orchestrator-bridge-http = "orchestrator_bridge.entrypoints.http:main"
 orchestrator-bridge-executor = "orchestrator_bridge.entrypoints.executor:main"
+# Section 10.11's `orchestrator init` surface (FR-MCP-08; WP-2.12) — the
+# one-time onboarding command; `python -m orchestrator_bridge.init` is the
+# same entry as a module invocation.
+orchestrator = "orchestrator_bridge.init.cli:main"
 
 # --- Ruff: formatter + linter (kept identical in backend/ and bridge/) ---
 

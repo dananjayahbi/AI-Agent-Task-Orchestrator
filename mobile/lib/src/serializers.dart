@@ -20,6 +20,9 @@ import 'package:orchestrator_mobile/src/model/agent_session.dart';
 import 'package:orchestrator_mobile/src/model/agent_session_create.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_request.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_response.dart';
+import 'package:orchestrator_mobile/src/model/attachment.dart';
+import 'package:orchestrator_mobile/src/model/attachment_delete.dart';
+import 'package:orchestrator_mobile/src/model/attachment_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/capability_enum.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint.dart';
 import 'package:orchestrator_mobile/src/model/checkpoint_create.dart';
@@ -53,6 +56,7 @@ import 'package:orchestrator_mobile/src/model/patched_project_policy.dart';
 import 'package:orchestrator_mobile/src/model/patched_project_update.dart';
 import 'package:orchestrator_mobile/src/model/patched_task_update.dart';
 import 'package:orchestrator_mobile/src/model/platform_enum.dart';
+import 'package:orchestrator_mobile/src/model/policy_preset_enum.dart';
 import 'package:orchestrator_mobile/src/model/priority_enum.dart';
 import 'package:orchestrator_mobile/src/model/project.dart';
 import 'package:orchestrator_mobile/src/model/project_create.dart';
@@ -80,6 +84,9 @@ part 'serializers.g.dart';
   AgentSessionCreate,
   AgentTokenIssueRequest,
   AgentTokenIssueResponse,
+  Attachment,
+  AttachmentDelete,
+  AttachmentListEnvelope,
   CapabilityEnum,
   Checkpoint,
   CheckpointCreate,
@@ -113,6 +120,7 @@ part 'serializers.g.dart';
   PatchedProjectUpdate,
   PatchedTaskUpdate,
   PlatformEnum,
+  PolicyPresetEnum,
   PriorityEnum,
   Project,
   ProjectCreate,
@@ -156,6 +164,10 @@ Serializers serializers = (_$serializers.toBuilder()
         const FullType(
             BuiltMap, [FullType(String), FullType.nullable(JsonObject)]),
         () => MapBuilder<String, JsonObject?>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Attachment)]),
+        () => ListBuilder<Attachment>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Task)]),

@@ -125,7 +125,7 @@ class SseClient {
   final SseTransport _transport;
   final EventHistorySource _history;
   final LastEventIdStore _idStore;
-  final String? _projectFilter;
+  String? _projectFilter;
   final String? _taskFilter;
   final SseBackoffConfig _backoff;
   final Duration _heartbeatTimeout;
@@ -142,6 +142,7 @@ class SseClient {
   int? _lastId;
   bool _running = false;
   int _failures = 0;
+  bool _filterSwitchPending = false;
   Future<void>? _loopFuture;
   SseConnection? _connection;
   Completer<void>? _pendingWait;
@@ -156,9 +157,34 @@ class SseClient {
   /// The resume marker the client will send on the next connect, if any.
   int? get lastProcessedEventId => _lastId;
 
+  /// The project filter the subscription currently carries (Section 9.6).
+  String? get projectFilter => _projectFilter;
+
   /// True while the client loop is meant to be running (started, not
   /// paused/disposed).
   bool get isRunning => _running;
+
+  /// Re-points the server-side subscription at [projectId]'s events
+  /// (Section 9.6 filters; MT-5.6-04: the subscription follows the
+  /// MT-5.6-02 selection).
+  ///
+  /// A live connection is closed so the run loop reconnects with the new
+  /// filter immediately. The reconnect carries `Last-Event-ID`, so the
+  /// server replays anything emitted across the switch — no gap — and the
+  /// in-session id guard drops anything already processed — no duplicates
+  /// (Section 9.6). The deliberate close is not counted as a stream
+  /// failure.
+  void updateProjectFilter(String? projectId) {
+    if (projectId == _projectFilter) {
+      return;
+    }
+    _projectFilter = projectId;
+    final SseConnection? connection = _connection;
+    if (_running && connection != null) {
+      _filterSwitchPending = true;
+      connection.close();
+    }
+  }
 
   /// Starts (or resumes) the stream after loading the persisted resume id.
   Future<void> start() async {
@@ -214,6 +240,12 @@ class SseClient {
       }
       try {
         await _streamSession();
+        if (_filterSwitchPending) {
+          // Deliberate close from [updateProjectFilter]: reconnect with the
+          // new filter without spending the failure budget.
+          _filterSwitchPending = false;
+          continue;
+        }
         // A clean server-side close still counts toward the failure budget:
         // it prevents a tight reconnect loop against a closing server.
         _failures++;
@@ -240,7 +272,9 @@ class SseClient {
     final SseConnection connection = await _transport.open(
       path: streamPath,
       query: <String, String>{
-        if (_projectFilter != null) 'project': _projectFilter,
+        // `_projectFilter` is mutable (updateProjectFilter), so the field
+        // does not promote — read it through a promoting local.
+        if (_projectFilter != null) 'project': _projectFilter!,
         if (_taskFilter != null) 'task': _taskFilter,
       },
       headers: <String, String>{

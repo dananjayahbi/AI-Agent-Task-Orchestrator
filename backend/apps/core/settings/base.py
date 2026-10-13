@@ -136,6 +136,18 @@ STORAGE_S3_BUCKET = get_str("ORCHESTRATOR_STORAGE_S3_BUCKET", "")
 STORAGE_S3_ACCESS_KEY_ID = get_str("ORCHESTRATOR_STORAGE_S3_ACCESS_KEY_ID", "")
 STORAGE_S3_SECRET_ACCESS_KEY = get_str("ORCHESTRATOR_STORAGE_S3_SECRET_ACCESS_KEY", "")
 
+# --- Section 9.10 group: attachment limits (Section 9.5) ---------------------
+# The Section 9.5 defaults, environment-overridable; unit suffixes live in
+# the environment names (configuration.md rule 4). Byte values, not MB —
+# configuration.md's units rule: a size setting always says _BYTES.
+ATTACHMENT_MAX_FILE_BYTES = get_int("ORCHESTRATOR_ATTACHMENT_MAX_FILE_BYTES", 25 * 1024 * 1024)
+ATTACHMENT_MAX_PER_TASK = get_int("ORCHESTRATOR_ATTACHMENT_MAX_PER_TASK", 10)
+ATTACHMENT_MAX_TOTAL_BYTES = get_int("ORCHESTRATOR_ATTACHMENT_MAX_TOTAL_BYTES", 100 * 1024 * 1024)
+# Section 12.4 / OQ-10's default retention grace period (days after the
+# task is archived before the retention job purges attachments). The
+# documented default, never re-decided here (MT-1.11-05 out of scope).
+ATTACHMENT_RETENTION_GRACE_DAYS = get_int("ORCHESTRATOR_ATTACHMENT_RETENTION_GRACE_DAYS", 30)
+
 # --- Section 9.10 group: feature flags --------------------------------------
 # Default: none enabled (configuration.md). Flag semantics arrive with each
 # consumer; this list is the resolved, documented value.

@@ -15,6 +15,7 @@ from rest_framework.exceptions import NotFound
 from apps.events.services import write_event
 
 from ..models import Project, ProjectPolicy
+from ..policy_presets import get_preset, preset_glob_fields
 from .pids import allocate_project_id, ensure_valid_pid
 
 
@@ -25,8 +26,9 @@ def create_project(
     default_branch: str,
     system_prompt_rules: str = "",
     actor_ref: str | None = None,
+    policy_preset: str | None = None,
 ) -> Project:
-    """Create the Section 7.1 pair atomically: default policy + new project.
+    """Create the Section 7.1 pair atomically: policy + new project.
 
     The PID is server-assigned (FR-PRJ-01 — no client id reaches this
     function; the strict request serializers already reject one) and the
@@ -34,15 +36,31 @@ def create_project(
     editing it later is ``PATCH /projects/{pid}/policy`` — MT-1.3-04).
     Either the pair exists after this call or neither row does.
 
+    ``policy_preset`` (WP-3.1, MT-3.1-02) seeds the *creation-time* glob
+    triple from a framework preset: only ``critical_path_globs``,
+    ``migration_path_globs`` and ``sensitive_config_globs`` are replaced
+    — every other policy field keeps its Section 7.2 default, so presets
+    never widen their blast radius. Unknown ids raise the catalog
+    ``VALIDATION_ERROR`` from ``get_preset`` (never a KeyError), and the
+    preset's globs pass the same Section 12.3 validator the PATCH
+    endpoint uses (``preset_glob_fields``) before they are persisted.
+    Omitting the parameter reproduces the exact WP-1.3 behavior.
+
     Section 9.6: exactly one ``project.created`` event is written inside
     the creating transaction (MT-1.9-02), so a rollback takes the pair
     and its event together. ``actor_ref`` is the API caller's owner user
     id; direct service calls without a user context fall back to the
-    role label (Section 9.6 ``actor.ref`` is a free label).
+    role label (Section 9.6 ``actor.ref`` is a free label). When a preset
+    was selected the event's ``data`` records the preset id — audit
+    trail for how the row got its non-stock globs (Section 12.5).
     """
     with transaction.atomic():
         pid = allocate_project_id()  # raises PidSequenceExhausted → rollback
-        policy = ProjectPolicy.objects.create()
+        policy = ProjectPolicy()
+        if policy_preset is not None:
+            for field, globs in preset_glob_fields(get_preset(policy_preset)).items():
+                setattr(policy, field, globs)
+        policy.save()
         project = Project.objects.create(
             id=pid,
             name=name,
@@ -56,6 +74,7 @@ def create_project(
             project_id=project.pk,
             actor_type="owner",
             actor_ref=actor_ref or "owner",
+            data={"policy_preset": policy_preset} if policy_preset is not None else None,
         )
     return project
 

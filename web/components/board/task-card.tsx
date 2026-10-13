@@ -1,0 +1,148 @@
+'use client';
+
+/**
+ * Task card (MT-4.3-02; parent plan Section 13.2 verbatim list): "cards
+ * show id, title, priority chip, worker badge with lease countdown,
+ * percent bar, attachment count, and a stalled/escalation marker."
+ *
+ * Data discipline (Section 13.3 / MT-4.3-02 out of scope): the card
+ * renders exactly what its props carry — the board cache (task row +
+ * stream-fed checkpoint percent). No network call ever originates here.
+ *
+ * Explicit unknowns (risk notes):
+ *  - percent: `null` renders an indeterminate bar labelled "Progress
+ *    unknown" — a missing report is never drawn as 0 %;
+ *  - attachment count: the tasks list contract has no attachment count
+ *    (OQ-4.3-01), so the card shows "–" until the field exists in the
+ *    contract (or WP-4.6's detail view).
+ */
+import { PriorityChip } from '@/components/board/priority-chip';
+import type { Task } from '@/lib/api/generated/types.gen';
+import { formatLeaseRemaining, leaseRemainingMs } from '@/lib/board/lease';
+import { DEFAULT_STALLED_AFTER_MINUTES, isTaskStalled } from '@/lib/board/stalled';
+
+type TaskCardProps = {
+  task: Task;
+  /** Latest checkpoint percent 0-100; null/undefined = never reported. */
+  percent?: number | null;
+  /** Section 8.6 policy knob (`stalled_after_minutes`, default 20). */
+  stalledAfterMinutes?: number;
+  /** Shared clock reading (useNow) — one ticker drives every card. */
+  nowMs: number;
+  /** Known attachment count; unknown until the contract exposes it (OQ-4.3-01). */
+  attachmentCount?: number | null;
+};
+
+/** Section 8.1 note: merge-pending is a sub-status badge, never a column. */
+export function isMergePending(task: Task): boolean {
+  return task.merge_status === 'pending' || task.merge_status === 'merging';
+}
+
+export function TaskCard({
+  task,
+  percent = null,
+  stalledAfterMinutes = DEFAULT_STALLED_AFTER_MINUTES,
+  nowMs,
+  attachmentCount = null,
+}: TaskCardProps) {
+  const remainingMs = leaseRemainingMs(task, nowMs);
+  const stalled = isTaskStalled(task, stalledAfterMinutes, nowMs);
+  const escalated = task.state === 'in_human_review';
+  const merging = isMergePending(task);
+  const knownPercent = typeof percent === 'number' && Number.isFinite(percent);
+
+  return (
+    <article
+      data-testid="task-card"
+      aria-label={task.id}
+      className="flex h-full flex-col gap-1.5 overflow-hidden rounded-lg border border-border bg-card p-2.5 text-card-foreground"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span data-testid="task-card-id" className="font-mono text-[11px] text-muted-foreground">
+          {task.id}
+        </span>
+        <PriorityChip priority={task.priority} />
+      </div>
+
+      <h3 data-testid="task-card-title" className="line-clamp-2 text-sm font-medium">
+        {task.title}
+      </h3>
+
+      {task.worker_agent_id !== null && remainingMs !== null && (
+        <div
+          data-testid="task-card-worker"
+          className="truncate rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+          aria-label={`Worker ${task.worker_agent_id}, lease ${formatLeaseRemaining(remainingMs)} remaining`}
+        >
+          <span className="font-medium">{task.worker_agent_id}</span>
+          {' · lease '}
+          <span data-testid="task-card-lease">{formatLeaseRemaining(remainingMs)}</span>
+        </div>
+      )}
+
+      <div className="mt-auto flex flex-col gap-1">
+        <div
+          data-testid="task-card-progress"
+          data-percent={knownPercent ? Math.round(percent) : 'unknown'}
+          role="progressbar"
+          aria-label={knownPercent ? `Progress ${Math.round(percent)} percent` : 'Progress unknown'}
+          aria-valuenow={knownPercent ? Math.round(percent) : undefined}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        >
+          <div
+            className={
+              knownPercent ? 'h-full rounded-full bg-primary' : 'h-full bg-muted-foreground/30'
+            }
+            style={{ width: knownPercent ? `${Math.min(100, Math.max(0, percent))}%` : '100%' }}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span data-testid="task-card-progress-label">
+            {knownPercent ? `${Math.round(percent)}%` : 'Progress unknown'}
+          </span>
+          <span
+            data-testid="task-card-attachments"
+            title="Attachment count is not part of the tasks list contract yet (OQ-4.3-01)"
+          >
+            {attachmentCount === null ? '–' : attachmentCount} attachments
+          </span>
+        </div>
+      </div>
+
+      {(stalled || escalated || merging) && (
+        <div className="flex flex-wrap gap-1">
+          {stalled && (
+            <span
+              data-testid="task-card-stalled"
+              aria-label="Stalled: no progress checkpoint within the policy window"
+              className="rounded-full bg-destructive px-2 py-0.5 text-[11px] font-semibold text-destructive-foreground"
+            >
+              Stalled
+            </span>
+          )}
+          {escalated && (
+            <span
+              data-testid="task-card-escalation"
+              title={task.review_reason ?? 'Escalated for human review'}
+              aria-label={`Needs review${task.review_reason ? `: ${task.review_reason}` : ''}`}
+              className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-secondary-foreground"
+            >
+              Needs review
+            </span>
+          )}
+          {merging && (
+            <span
+              data-testid="task-card-merge-badge"
+              aria-label="Approved, merging"
+              className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-secondary-foreground"
+            >
+              approved, merging
+            </span>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}

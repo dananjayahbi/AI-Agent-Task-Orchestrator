@@ -128,9 +128,15 @@ def test_task_model_field_set_matches_section_7_2_exactly(project: Project) -> N
     # WP-1.8 adds `checkpoints` (TaskCheckpoint's FK, MT-1.8-01) under the
     # same reading: a reverse relation the checkpoint history attaches,
     # recorded in the WP changelog alongside `transitions`.
-    assert reverse == {"checkpoints", "dependency_edges", "dependent_edges", "transitions"}, sorted(
-        reverse
-    )
+    # WP-1.11 adds `attachments` (TaskAttachment's FK, Section 7.2's Task
+    # Attachment relation) — again relation metadata, never a Task column.
+    assert reverse == {
+        "attachments",
+        "checkpoints",
+        "dependency_edges",
+        "dependent_edges",
+        "transitions",
+    }, sorted(reverse)
 
     project_field = Task._meta.get_field("project")
     assert project_field.attname == "project_id", "the Section 7.2 FK column name"

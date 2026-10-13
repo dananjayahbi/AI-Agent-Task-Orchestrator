@@ -7,8 +7,10 @@ Shapes mirror the OpenAPI operations:
   timestamps) read-only. ``agent_policy`` renders as the policy row's
   integer id — the policy *contents* belong to ``GET /projects/{pid}/policy``
   (MT-1.3-04), never here.
-* ``ProjectCreateSerializer`` — ``POST /projects``: exactly the four
-  Section 9.2 create inputs; the id is never among them (FR-PRJ-01 —
+* ``ProjectCreateSerializer`` — ``POST /projects``: the Section 9.2
+  create inputs plus the optional WP-3.1 ``policy_preset`` selection
+  (MT-3.1-02 — a preset *adds* a selection knob, it introduces no new
+  Section 7.2 policy field); the id is never among them (FR-PRJ-01 —
   server-assigned), and the strict mixin turns a client-supplied ``id``
   into ``VALIDATION_ERROR`` rather than silently dropping it.
 * ``ProjectUpdateSerializer`` — ``PATCH /projects/{pid}``: the FR-PRJ-02
@@ -29,6 +31,7 @@ from rest_framework import serializers
 from apps.core.pagination import MAX_PAGE_SIZE
 
 from ..models import ActiveStatus, Project
+from ..policy_presets import PRESET_IDS
 from .base import StrictSerializerMixin
 
 
@@ -67,7 +70,7 @@ class ProjectSerializer(serializers.Serializer[Any]):
 
 
 class ProjectCreateSerializer(StrictSerializerMixin, serializers.Serializer[Any]):
-    """POST /projects body — the Section 9.2 create inputs, nothing else."""
+    """POST /projects body — Section 9.2 create inputs + WP-3.1 preset."""
 
     name = serializers.CharField(max_length=200)
     repo_path = serializers.CharField(max_length=500)
@@ -77,6 +80,16 @@ class ProjectCreateSerializer(StrictSerializerMixin, serializers.Serializer[Any]
         allow_blank=True,
         default="",
         help_text="Optional at creation; editable afterwards via PATCH.",
+    )
+    policy_preset = serializers.ChoiceField(
+        choices=PRESET_IDS,
+        required=False,
+        help_text=(
+            "Optional framework preset (WP-3.1, MT-3.1-02): seeds the new "
+            "project's policy with the preset's critical/migration/sensitive "
+            "globs. Omitted = the Section 7.2 stock defaults. Unknown ids "
+            "are VALIDATION_ERROR."
+        ),
     )
 
 

@@ -255,6 +255,27 @@ RESPONSE_SAMPLES["work_list"] = {
     "next_cursor": None,
 }
 
+#: WP-1.11's descriptor (FR-ATT-03 field shape, locked by the OpenAPI diff):
+#: shared by the detail GET and the list envelope's items; the pipeline
+#: fields stay null until WP-1.12 fills them.
+RESPONSE_SAMPLES["attachment_get"] = {
+    "id": "3f7a1c9e-5d2b-4f81-9c0a-2e6d8b4f1a70",
+    "task_id": "PID00007-T004",
+    "filename": "invoice-export.pdf",
+    "mime_type": "application/pdf",
+    "size": 20480,
+    "is_image": False,
+    "processing_status": "uploaded",
+    "token_count": None,
+    "short_description": None,
+    "created_at": "2026-10-11T18:32:00Z",
+}
+
+RESPONSE_SAMPLES["attachment_list"] = {
+    "results": [RESPONSE_SAMPLES["attachment_get"]],
+    "next_cursor": None,
+}
+
 #: Request-body samples for declared mutating endpoints whose operation
 #: declares a requestBody (validated against the referenced component).
 REQUEST_SAMPLES: dict[str, Any] = {

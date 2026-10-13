@@ -39,6 +39,7 @@ __all__ = [
     "INIT_COMMAND",
     "ApiVersionError",
     "BindingError",
+    "InitError",
     "ManifestNotFoundError",
     "ManifestParseError",
     "ManifestValidationError",
@@ -106,3 +107,12 @@ class ProjectMismatchError(SessionOpenError):
     """
 
     canonical_code = "AUTH_FORBIDDEN_PROJECT"
+
+
+class InitError(Exception):
+    """``orchestrator init`` failed at one of its duties (Section 10.11; WP-2.12).
+
+    Not a :class:`BindingError`: init runs *before* a binding exists. The
+    init CLI catches this family, prints one scrubbed line and exits non-zero
+    — same no-traceback, no-secret posture as the run-mode entry points.
+    """

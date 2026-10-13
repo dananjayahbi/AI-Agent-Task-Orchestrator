@@ -2,8 +2,11 @@
 
 Acceptance source: plan-doc-series/m2-mcp-bridge/wp-2.4-core-tools/
 MT-2.4-04-claim-task.md (parent plan Sections 9.2, 9.3, 10.5, 10.6; FR-MCP-03,
-FR-LEA-01; G-09). The WP-2.7 rules-content merge (MT-2.7-03) is a forward
-consumer note: the bridge renders the backend's Section 10.6 block as-is.
+FR-LEA-01; G-09). The former forward note ("WP-2.7 merges at MT-2.7-03") is
+resolved: the delivered ``rules`` block is now the bridge's own Section 10.6
+render — coder/auditor template + the session's cached project rules, with
+this claim's branch, test command and lease-derived checkpoint interval
+(MT-2.7-03). The backend's wire ``rules_block`` stays shape-checked.
 """
 
 from __future__ import annotations
@@ -71,10 +74,29 @@ def test_successful_claim_returns_the_three_section_10_5_artifacts() -> None:
     assert result["branch"] == "feat/PID00007-T004"  # G-09
     assert result["lease"]["generation"] == 3
     assert result["lease"]["expires_at"] == "2026-10-12T09:45:00Z"
-    assert result["rules"]["standard_rules"] == _RULES["standard_rules"]
-    assert result["rules"]["project_rules"] == _RULES["project_rules"]
     assert result["task"]["id"] == "PID00007-T004"
     assert result["task_id"] == "PID00007-T004"
+
+
+def test_claim_rules_block_is_the_bridge_section_10_6_render() -> None:
+    """MT-2.7-03: the response carries the bridge's render, not the raw block.
+
+    All eight coder rules, the claim's G-09 branch, the lease-derived
+    checkpoint interval (45-minute lease → 15), and the session's cached
+    project rules appended after the standard rules (Section 10.6 order).
+    """
+    fake, _ = _backend()
+    runtime = build_runtime(fake)
+    result = claim_task(runtime, task_id="PID00007-T004", agent_identifier="coder-1")
+    rules = result["rules"]
+    assert rules["role"] == "coder"
+    text = rules["text"]
+    assert "8. Provide a clear execution summary." in text
+    assert "feat/PID00007-T004" in text  # G-09 branch in rule 1
+    assert "every 15 minutes" in text  # 45-minute lease → 15 (RISK-02)
+    # The cached fixture project rule is appended, after the standard rules.
+    assert "Project rule: run the tests." in text
+    assert text.index("8.") < text.index("Project rule:")
 
 
 def test_wire_body_is_the_claim_request_contract_only() -> None:

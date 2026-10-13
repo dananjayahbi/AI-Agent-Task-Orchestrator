@@ -157,6 +157,10 @@ in **WP-6.5** and will link back to this document.
 
 * [`ingress.yaml`](./ingress.yaml) — canonical ingress rules and the Section
   15.2 route-group review (routing structure; enforcement is WP-5.2).
+* [`sse-verification.md`](./sse-verification.md) — MT-5.1-04 SSE stability
+  verification: the 30-min idle/heartbeat/no-buffering/lossless-resume test
+  through the tunnel path — recorded LAN control run, operator procedure for
+  the through-tunnel run (OQ-11), and the split acceptance table.
 * [`infra/compose/compose.yaml`](../compose/compose.yaml) — the `cloudflared`
   service (profiles `[prod, tunnel]`, pinned official image, token from the
   environment, ingress mounted read-only, zero published ports).

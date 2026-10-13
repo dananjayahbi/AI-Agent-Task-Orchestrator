@@ -37,6 +37,8 @@ class _$ProjectPolicy extends ProjectPolicy {
   final bool auditRequiredDefault;
   @override
   final int stalledAfterMinutes;
+  @override
+  final PolicyPresetEnum? policyPreset;
 
   factory _$ProjectPolicy([void Function(ProjectPolicyBuilder)? updates]) =>
       (ProjectPolicyBuilder()..update(updates))._build();
@@ -56,7 +58,8 @@ class _$ProjectPolicy extends ProjectPolicy {
       required this.mergeStrategy,
       required this.branchPrefix,
       required this.auditRequiredDefault,
-      required this.stalledAfterMinutes})
+      required this.stalledAfterMinutes,
+      this.policyPreset})
       : super._();
   @override
   ProjectPolicy rebuild(void Function(ProjectPolicyBuilder) updates) =>
@@ -83,7 +86,8 @@ class _$ProjectPolicy extends ProjectPolicy {
         mergeStrategy == other.mergeStrategy &&
         branchPrefix == other.branchPrefix &&
         auditRequiredDefault == other.auditRequiredDefault &&
-        stalledAfterMinutes == other.stalledAfterMinutes;
+        stalledAfterMinutes == other.stalledAfterMinutes &&
+        policyPreset == other.policyPreset;
   }
 
   @override
@@ -104,6 +108,7 @@ class _$ProjectPolicy extends ProjectPolicy {
     _$hash = $jc(_$hash, branchPrefix.hashCode);
     _$hash = $jc(_$hash, auditRequiredDefault.hashCode);
     _$hash = $jc(_$hash, stalledAfterMinutes.hashCode);
+    _$hash = $jc(_$hash, policyPreset.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -125,7 +130,8 @@ class _$ProjectPolicy extends ProjectPolicy {
           ..add('mergeStrategy', mergeStrategy)
           ..add('branchPrefix', branchPrefix)
           ..add('auditRequiredDefault', auditRequiredDefault)
-          ..add('stalledAfterMinutes', stalledAfterMinutes))
+          ..add('stalledAfterMinutes', stalledAfterMinutes)
+          ..add('policyPreset', policyPreset))
         .toString();
   }
 }
@@ -210,6 +216,11 @@ class ProjectPolicyBuilder
   set stalledAfterMinutes(int? stalledAfterMinutes) =>
       _$this._stalledAfterMinutes = stalledAfterMinutes;
 
+  PolicyPresetEnum? _policyPreset;
+  PolicyPresetEnum? get policyPreset => _$this._policyPreset;
+  set policyPreset(PolicyPresetEnum? policyPreset) =>
+      _$this._policyPreset = policyPreset;
+
   ProjectPolicyBuilder() {
     ProjectPolicy._defaults(this);
   }
@@ -232,6 +243,7 @@ class ProjectPolicyBuilder
       _branchPrefix = $v.branchPrefix;
       _auditRequiredDefault = $v.auditRequiredDefault;
       _stalledAfterMinutes = $v.stalledAfterMinutes;
+      _policyPreset = $v.policyPreset;
       _$v = null;
     }
     return this;
@@ -284,6 +296,7 @@ class ProjectPolicyBuilder
                 auditRequiredDefault, r'ProjectPolicy', 'auditRequiredDefault'),
             stalledAfterMinutes: BuiltValueNullFieldError.checkNotNull(
                 stalledAfterMinutes, r'ProjectPolicy', 'stalledAfterMinutes'),
+            policyPreset: policyPreset,
           );
     } catch (_) {
       late String _$failedField;

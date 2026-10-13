@@ -78,6 +78,25 @@ def write_manifest() -> Callable[..., Path]:
     return _write
 
 
+@pytest.fixture
+def isolated_init_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point every ``default_user_config_path`` reader/writer at a temp file.
+
+    WP-2.12 (``orchestrator init``) resolves the user config in three modules
+    (``config`` for the loader, ``init.token_store`` for the writer,
+    ``init.selftest`` for the verdict source); init tests must never touch a
+    real profile config from this machine.
+    """
+    import orchestrator_bridge.config as _config
+    from orchestrator_bridge.init import selftest as _selftest
+    from orchestrator_bridge.init import token_store as _token_store
+
+    path = tmp_path / "profile" / "orchestrator" / "bridge.toml"
+    for module in (_config, _token_store, _selftest):
+        monkeypatch.setattr(module, "default_user_config_path", lambda p=path: p)
+    return path
+
+
 @pytest.fixture(autouse=True)
 def _hermetic_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Strip every ambient ``ORCHESTRATOR_*`` variable for one test."""

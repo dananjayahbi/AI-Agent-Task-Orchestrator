@@ -15,6 +15,8 @@ class _$ProjectCreate extends ProjectCreate {
   final String defaultBranch;
   @override
   final String? systemPromptRules;
+  @override
+  final PolicyPresetEnum? policyPreset;
 
   factory _$ProjectCreate([void Function(ProjectCreateBuilder)? updates]) =>
       (ProjectCreateBuilder()..update(updates))._build();
@@ -23,7 +25,8 @@ class _$ProjectCreate extends ProjectCreate {
       {required this.name,
       required this.repoPath,
       required this.defaultBranch,
-      this.systemPromptRules})
+      this.systemPromptRules,
+      this.policyPreset})
       : super._();
   @override
   ProjectCreate rebuild(void Function(ProjectCreateBuilder) updates) =>
@@ -39,7 +42,8 @@ class _$ProjectCreate extends ProjectCreate {
         name == other.name &&
         repoPath == other.repoPath &&
         defaultBranch == other.defaultBranch &&
-        systemPromptRules == other.systemPromptRules;
+        systemPromptRules == other.systemPromptRules &&
+        policyPreset == other.policyPreset;
   }
 
   @override
@@ -49,6 +53,7 @@ class _$ProjectCreate extends ProjectCreate {
     _$hash = $jc(_$hash, repoPath.hashCode);
     _$hash = $jc(_$hash, defaultBranch.hashCode);
     _$hash = $jc(_$hash, systemPromptRules.hashCode);
+    _$hash = $jc(_$hash, policyPreset.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -59,7 +64,8 @@ class _$ProjectCreate extends ProjectCreate {
           ..add('name', name)
           ..add('repoPath', repoPath)
           ..add('defaultBranch', defaultBranch)
-          ..add('systemPromptRules', systemPromptRules))
+          ..add('systemPromptRules', systemPromptRules)
+          ..add('policyPreset', policyPreset))
         .toString();
   }
 }
@@ -86,6 +92,11 @@ class ProjectCreateBuilder
   set systemPromptRules(String? systemPromptRules) =>
       _$this._systemPromptRules = systemPromptRules;
 
+  PolicyPresetEnum? _policyPreset;
+  PolicyPresetEnum? get policyPreset => _$this._policyPreset;
+  set policyPreset(PolicyPresetEnum? policyPreset) =>
+      _$this._policyPreset = policyPreset;
+
   ProjectCreateBuilder() {
     ProjectCreate._defaults(this);
   }
@@ -97,6 +108,7 @@ class ProjectCreateBuilder
       _repoPath = $v.repoPath;
       _defaultBranch = $v.defaultBranch;
       _systemPromptRules = $v.systemPromptRules;
+      _policyPreset = $v.policyPreset;
       _$v = null;
     }
     return this;
@@ -125,6 +137,7 @@ class ProjectCreateBuilder
           defaultBranch: BuiltValueNullFieldError.checkNotNull(
               defaultBranch, r'ProjectCreate', 'defaultBranch'),
           systemPromptRules: systemPromptRules,
+          policyPreset: policyPreset,
         );
     replace(_$result);
     return _$result;

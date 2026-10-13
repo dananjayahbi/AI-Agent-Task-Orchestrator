@@ -8,6 +8,8 @@ import { render, type RenderResult } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { vi, type Mock } from 'vitest';
 
+import type { Task } from '@/lib/api/generated/types.gen';
+
 export function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -110,6 +112,147 @@ export function makeProject(overrides: Partial<Record<string, unknown>> = {}) {
 
 export function pageOf(results: unknown[], nextCursor: string | null = null) {
   return { results, next_cursor: nextCursor };
+}
+
+/** Complete Task fixture matching the generated `Task` contract (WP-4.3). */
+export function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: 'PID00001-T001',
+    project_id: 'PID00001',
+    title: 'Implement login form',
+    description: '',
+    acceptance_criteria: [],
+    target_scope: [],
+    test_command: '',
+    priority: 'medium',
+    state: 'pending',
+    version: 1,
+    worker_agent_id: null,
+    worker_session_id: null,
+    claimed_role: null,
+    lease_acquired_at: null,
+    lease_expires_at: null,
+    last_checkpoint_at: null,
+    failure_retry_count: 0,
+    attempt_number: 0,
+    audit_required: true,
+    review_reason: null,
+    latest_feedback: '',
+    merge_status: 'none',
+    archived_at: null,
+    created_by: null,
+    created_at: '2026-10-01T09:00:00Z',
+    updated_at: '2026-10-01T09:00:00Z',
+    depends_on: [],
+    ...overrides,
+  };
+}
+
+/** Section 9.6 event envelope fixture (WP-4.3 stream tests). */
+export function makeEventEnvelope(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 1,
+    type: 'task.transitioned',
+    project_id: 'PID00001',
+    task_id: 'PID00001-T001',
+    occurred_at: '2026-10-01T10:00:00Z',
+    actor: { type: 'system', ref: 'lease-sweeper' },
+    data: {},
+    ...overrides,
+  };
+}
+
+export type SseConnection = {
+  response: Response;
+  /** One `id:` + `data:` frame (Section 9.6 wire shape, MT-1.10-01). */
+  frame: (id: number, envelope: unknown) => void;
+  /** `: heartbeat` comment line (MT-1.10-04) — carries no id or data. */
+  heartbeat: () => void;
+  /** Clean stream end — the hook must reconnect and resume. */
+  close: () => void;
+  /** Network-level failure — the hook must reconnect with backoff. */
+  fail: (error?: unknown) => void;
+};
+
+/** A controllable SSE `Response` for `GET /events/stream` route mocks. */
+export function sseConnection(): SseConnection {
+  const encoder = new TextEncoder();
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  const body = new ReadableStream<Uint8Array>({
+    start(streamController) {
+      controller = streamController;
+    },
+  });
+  const response = new Response(body, {
+    status: 200,
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
+  return {
+    response,
+    frame: (id, envelope) =>
+      controller.enqueue(encoder.encode(`id: ${id}\ndata: ${JSON.stringify(envelope)}\n\n`)),
+    heartbeat: () => controller.enqueue(encoder.encode(': heartbeat\n\n')),
+    close: () => controller.close(),
+    fail: (error) => controller.error(error ?? new Error('stream lost')),
+  };
+}
+
+/**
+ * Behaving-like-the-server tasks route (MT-4.3-03): applies exactly the
+ * contract's query parameters (`include_archived`, `priority`, `state`) so
+ * tests prove the client sends what it should and renders what returns.
+ */
+export function tasksServerRoute(pid: string, tasks: unknown[]): Route {
+  return {
+    method: 'GET',
+    match: new RegExp(`/api/v1/projects/${pid}/tasks(\\?|$)`),
+    respond: ({ search }) => {
+      const params = new URLSearchParams(search);
+      const includeArchived = params.get('include_archived') === 'true';
+      const priority = params.get('priority');
+      const states = params.getAll('state');
+      type Row = { priority: string; state: string; archived_at: string | null };
+      const filtered = tasks.filter((task) => {
+        const row = task as Row;
+        return (
+          (includeArchived || row.archived_at === null) &&
+          (priority === null || row.priority === priority) &&
+          (states.length === 0 || states.includes(row.state))
+        );
+      });
+      return jsonResponse(pageOf(filtered));
+    },
+  };
+}
+
+/** Standard board test routes: tasks list, policy, and an SSE stream. */
+export function installBoardApi(
+  options: {
+    pid?: string;
+    tasks?: unknown[];
+    policy?: unknown;
+    sse?: () => Response;
+    extraRoutes?: Route[];
+  } = {},
+): { calls: RecordedCall[]; fetchMock: Mock } {
+  const { pid = 'PID00001', tasks = [], policy = makePolicy(), sse, extraRoutes = [] } = options;
+  const routes: Route[] = [
+    tasksServerRoute(pid, tasks),
+    {
+      method: 'GET',
+      match: new RegExp(`/api/v1/projects/${pid}/policy(\\?|$)`),
+      respond: () => jsonResponse(policy),
+    },
+    ...extraRoutes,
+  ];
+  if (sse !== undefined) {
+    routes.push({
+      method: 'GET',
+      match: /\/api\/v1\/events\/stream(\?|$)/,
+      respond: () => sse(),
+    });
+  }
+  return installApi(routes);
 }
 
 /** Complete ProjectPolicy fixture (all contract-required fields). */

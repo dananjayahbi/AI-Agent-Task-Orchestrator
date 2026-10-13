@@ -58,10 +58,10 @@ BRIDGE_ENDPOINTS: Final[tuple[Endpoint, ...]] = (
     # --- not yet in the generated document: pending, provenance recorded ------
     Endpoint("checkpoint_create", "POST", "/api/v1/tasks/{id}/checkpoints"),
     Endpoint("resolution_submit", "POST", "/api/v1/tasks/{id}/resolution"),
-    Endpoint("attachment_list", "GET", "/api/v1/tasks/{id}/attachments"),
-    Endpoint("attachment_get", "GET", "/api/v1/attachments/{id}"),
     Endpoint("attachment_content", "GET", "/api/v1/attachments/{id}/content"),
     # --- declared in the current document -------------------------------------
+    Endpoint("attachment_list", "GET", "/api/v1/tasks/{id}/attachments"),
+    Endpoint("attachment_get", "GET", "/api/v1/attachments/{id}"),
     Endpoint("session_open", "POST", "/api/v1/agent-sessions"),
     Endpoint("session_end", "POST", "/api/v1/agent-sessions/{id}/end"),
     Endpoint("work_list", "GET", "/api/v1/projects/{pid}/work"),
@@ -96,7 +96,5 @@ def endpoint(endpoint_id: str) -> Endpoint:
 #: route is in the document and the contract test validates its sample.)
 PENDING_BACKEND: Final[dict[str, str]] = {
     "resolution_submit": "WP-3.2 (backend submission endpoints)",
-    "attachment_list": "WP-1.11 (attachment storage and upload API)",
-    "attachment_get": "WP-1.11 (attachment storage and upload API)",
     "attachment_content": "WP-1.14 (attachment retrieval API)",
 }

@@ -85,4 +85,57 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   pointer; `git grep --no-index -iE "(tunnel|cf)_token.*[A-Za-z0-9]{20,}"`
   over `infra/cloudflare` + `infra/compose` returns no match (no secret or
   environment-specific value committed).
-- **MT-5.1-04 — deferred:** Dependencies (WP-1.9 events, WP-1.10 SSE stream endpoint) not yet met — deferred until WP-1.9/1.10 per roadmap.md §4a (recorded 2026-10-12).
+- **MT-5.1-04 — partially verified (LAN control done; through-tunnel
+  operator-pending OQ-11):** The scripted scenario landed at
+  `e2e/sse_tunnel_stability.py` — stdlib-only Python (no dependencies to
+  install between the operator and the tunnel run), owner-session bearer
+  auth (Section 15.4 token transport; credentials travel as
+  `SSE_SOAK_USERNAME`/`SSE_SOAK_PASSWORD` env vars, never committed), one
+  cycle = idle soak (`--idle-seconds`, ≥2 cycles enforced — MT "repeat at
+  least once") + no-buffering probe (one real `project.created` published
+  via `POST /projects` near the end of the window — the production fan-out
+  path, no test hooks — asserted delivered on the still-open stream within
+  the NFR-03 2 s budget) + deliberate drop and `Last-Event-ID` reconnect
+  asserting the replay equals stored history exactly (no gaps, no
+  duplicates — Section 9.6) and that the same connection then delivers a
+  live event (handover). Zero-unplanned-disconnect is enforced by failing
+  the run on EOF/socket starvation — nothing is silently retried, because
+  the test's job is to prove reconnection is *not* needed. The client
+  asserts the same properties at any duration and never shortens the
+  acceptance bar: acceptance = `--idle-seconds 1800 --cycles 2` (~65 min,
+  on demand/nightly, not per-PR — Section 20.4 item 2, documented
+  invocation); CI/local = a reduced window (150 s = 10 heartbeat
+  intervals) measuring the same cadence/gap/buffering/resume properties.
+  **LAN control run (2026-10-13, recorded with evidence in
+  `infra/cloudflare/sse-verification.md`):** dev-profile Compose stack
+  (backend on `ORCHESTRATOR_PORT_BACKEND=8010` — alternate port absorbed
+  from the environment because concurrent agents hold 8000; the cached
+  pre-WP-1.7 backend image lacked celery and refused to boot, so the image
+  was rebuilt from the current tree — image rebuild, not a code change),
+  reduced run 150 s × 2 cycles → **PASS**: 10/10 heartbeats per cycle,
+  max inter-frame gap 15.00 s (≤30 s tolerance), probe latency 0.077 s /
+  0.059 s and live-after-resume 0.062 s / 0.076 s (all within NFR-03),
+  zero unplanned disconnects, replay exact (`[2,3]`/`[6,7]` expected =
+  delivered, plus the live event), `pass: true` in the JSON results
+  document (`e2e/sse_lan_control_results.json`). **Operator-pending
+  (OQ-11):** the through-the-edge half — the same client, `--base-url
+  https://<ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME>`, `--idle-seconds
+  1800 --cycles 2` — cannot run until the tunnel hostname/token are
+  provisioned; the exact invocation, prerequisites (edge routes mirroring
+  `ingress.yaml`, run-before-WP-5.2-Access note, session-lifetime-vs-drop
+  caveat) and the append-results procedure are documented in
+  `infra/cloudflare/sse-verification.md`, which also carries the split
+  acceptance table (criteria 1–4: local half done, tunnel half pending;
+  criteria 5–6 done). FR-NET-01's "no inbound ports" is structurally
+  verified (cloudflared publishes none — MT-5.1-01/02); the end-to-end
+  hostname run stays honestly open until the operator executes it.
+  Observation recorded (not an acceptance failure, no product client
+  affected): `GET /events/stream` answers **406** to a strict
+  `Accept: text/event-stream` header (DRF content negotiation registers
+  only JSON renderers; the stream view sets the response content type
+  itself) — the backend's own tests and the web's fetch-based SSE client
+  open the stream with a normal `*/*` Accept, so the soak client uses
+  that transport too; a future client needing the strict header (e.g.
+  native `EventSource`, mobile WP-5.5) would require a backend contract
+  change, raised in the verification notes rather than silently worked
+  around.
