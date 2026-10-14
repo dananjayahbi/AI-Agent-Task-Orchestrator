@@ -7,10 +7,13 @@ import 'package:orchestrator_mobile/core/realtime/realtime_providers.dart';
 import 'package:orchestrator_mobile/core/realtime/sse_client.dart';
 import 'package:orchestrator_mobile/features/board/board_repository.dart';
 import 'package:orchestrator_mobile/features/board/projects_repository.dart';
+import 'package:orchestrator_mobile/features/task_detail/attachment_providers.dart';
+import 'package:orchestrator_mobile/features/task_detail/task_detail_repository.dart';
 import 'package:orchestrator_mobile/orchestrator_mobile.dart';
 
 import '../dashboard/dashboard_test_support.dart';
 import '../realtime/realtime_test_support.dart';
+import '../task_detail/task_detail_test_support.dart';
 
 /// A well-formed generated [Task] for fixtures — every required Section
 /// 7.2 field, canonical [StateEnum] value, no hand-built JSON anywhere.
@@ -162,16 +165,24 @@ SseClient buildTestSseClient({
 }
 
 /// Overrides for pumping Board-side widgets deterministically — no real
-/// HTTP, no real preferences, no real stream.
+/// HTTP, no real preferences, no real stream. The task-detail seams are
+/// included because the card handoff pushes the real WP-5.7 screen.
 List<Override> boardOverrides({
   required FakeProjectsRepository projects,
   required FakeBoardRepository board,
   JsonCache? cache,
   SseClient? sseClient,
+  FakeTaskDetailRepository? taskDetail,
 }) =>
     <Override>[
       projectsRepositoryProvider.overrideWithValue(projects),
       boardRepositoryProvider.overrideWithValue(board),
+      taskDetailRepositoryProvider.overrideWithValue(
+        taskDetail ?? FakeTaskDetailRepository(),
+      ),
+      attachmentRepositoryProvider.overrideWithValue(
+        FakeAttachmentRepository(),
+      ),
       jsonCacheProvider.overrideWithValue(cache ?? InMemoryJsonCache()),
       sseClientProvider.overrideWithValue(
         sseClient ?? buildTestSseClient(transport: FakeSseTransport()),

@@ -115,7 +115,13 @@ class TaskSerializer(serializers.Serializer[Any]):
     review_reason = serializers.CharField(
         allow_null=True, read_only=True, help_text="Section 8.4 enum | null."
     )
-    latest_feedback = serializers.CharField(read_only=True)
+    latest_feedback = serializers.CharField(
+        read_only=True,
+        help_text="Section 7.2: text from auditor/human — the T16 "
+        "request-changes note shown to the next coder through "
+        "get_task_details (Section 10.5; MT-3.6-03); empty until the "
+        "first note, newest note wins.",
+    )
     merge_status = serializers.CharField(
         read_only=True, help_text="none | pending | merging | merged | conflict | failed."
     )

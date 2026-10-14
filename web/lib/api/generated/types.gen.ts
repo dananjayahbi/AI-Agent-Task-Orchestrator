@@ -540,6 +540,19 @@ export type DashboardSummary = {
 };
 
 /**
+ * * `web` - web
+ * * `mobile` - mobile
+ */
+export type DecidedViaEnum = 'web' | 'mobile';
+
+/**
+ * * `approve` - approve
+ * * `request_changes` - request_changes
+ * * `reassign` - reassign
+ */
+export type DecisionEnum = 'approve' | 'request_changes' | 'reassign';
+
+/**
  * pagination.md envelope: exactly ``results`` + ``next_cursor``.
  */
 export type DeviceListEnvelope = {
@@ -1365,6 +1378,91 @@ export type ResolutionWriteResponse = {
 };
 
 /**
+ * One recorded Section 7.2 Review Decision row, field for field.
+ */
+export type ReviewDecisionRecord = {
+    /**
+     * Server-generated UUID (MT-3.6-02).
+     */
+    id: string;
+    /**
+     * Section 7.2 ``task_id``.
+     */
+    task_id: string;
+    /**
+     * Section 7.2 ``resolution_id`` — the current attempt's resolution the reviewer saw (mandatory for approve, MT-3.6-04; null for note actions on a review that never had a submission, e.g. T9).
+     */
+    resolution_id: string | null;
+    /**
+     * approve | request_changes | reassign (Section 9.2's three).
+     *
+     * * `approve` - approve
+     * * `request_changes` - request_changes
+     * * `reassign` - reassign
+     */
+    decision: DecisionEnum;
+    /**
+     * The reviewer's note — mandatory for request_changes (T16 guard); it becomes the Task's latest_feedback (Section 11.5).
+     */
+    note: string;
+    /**
+     * The acting principal: owner user id (web) or device id (mobile).
+     */
+    decided_by: string;
+    /**
+     * web | mobile — Section 7.2's two review channels (13/14).
+     *
+     * * `web` - web
+     * * `mobile` - mobile
+     */
+    decided_via: DecidedViaEnum;
+    /**
+     * Server clock at insertion (P7).
+     */
+    decided_at: string;
+};
+
+/**
+ * ``POST /tasks/{id}/review`` input (Section 9.2 Review row).
+ */
+export type ReviewDecisionRequest = {
+    /**
+     * approve | request_changes | reassign — the only three the plan accepts; anything else is VALIDATION_ERROR (MT-3.6-01 risk note: never inferred from UI intent).
+     *
+     * * `approve` - approve
+     * * `request_changes` - request_changes
+     * * `reassign` - reassign
+     */
+    decision: DecisionEnum;
+    /**
+     * The reviewer's note — mandatory for request_changes (T16 guard), optional for reassign (it then becomes latest_feedback, Section 11.5), carried onto the approve record too.
+     */
+    note?: string;
+    /**
+     * The resolution id the reviewer was looking at — **required for approve** (Section 14.2 approve safety; MT-3.6-04 binds the decision to it server-side and rejects an outdated id with VERSION_CONFLICT).
+     */
+    resolution_id?: string | null;
+    /**
+     * The task ``version`` the client saw (FR-TSK-06) — a stale value answers VERSION_CONFLICT (409) and changes nothing.
+     */
+    version: number;
+};
+
+/**
+ * The frozen review response — the record + post-transition identity.
+ */
+export type ReviewDecisionResponse = {
+    /**
+     * The recorded Section 7.2 row (all decisions are recorded, Section 11.5).
+     */
+    decision: ReviewDecisionRecord;
+    /**
+     * Post-transition task identity — merge_status pending marks T15's merge-pending sub-status; state pending is T16's return.
+     */
+    task: VerdictTaskState;
+};
+
+/**
  * POST /auth/logout: the instant the session token stopped working.
  */
 export type Revoked = {
@@ -1501,6 +1599,9 @@ export type Task = {
      * Section 8.4 enum | null.
      */
     readonly review_reason: string | null;
+    /**
+     * Section 7.2: text from auditor/human — the T16 request-changes note shown to the next coder through get_task_details (Section 10.5; MT-3.6-03); empty until the first note, newest note wins.
+     */
     readonly latest_feedback: string;
     /**
      * none | pending | merging | merged | conflict | failed.
@@ -2940,6 +3041,38 @@ export type ListResolutionsResponses = {
 };
 
 export type ListResolutionsResponse = ListResolutionsResponses[keyof ListResolutionsResponses];
+
+export type SubmitReviewDecisionData = {
+    body: ReviewDecisionRequest;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second Audit Report or firing a second transition.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/tasks/{id}/review';
+};
+
+export type SubmitReviewDecisionErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type SubmitReviewDecisionError = SubmitReviewDecisionErrors[keyof SubmitReviewDecisionErrors];
+
+export type SubmitReviewDecisionResponses = {
+    201: ReviewDecisionResponse;
+};
+
+export type SubmitReviewDecisionResponse = SubmitReviewDecisionResponses[keyof SubmitReviewDecisionResponses];
 
 export type ApiV1TokensRetrieveData = {
     body?: never;

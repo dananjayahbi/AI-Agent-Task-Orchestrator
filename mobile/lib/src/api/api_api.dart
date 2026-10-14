@@ -50,6 +50,8 @@ import 'package:orchestrator_mobile/src/model/resolution_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/resolution_patch.dart';
 import 'package:orchestrator_mobile/src/model/resolution_submit.dart';
 import 'package:orchestrator_mobile/src/model/resolution_write_response.dart';
+import 'package:orchestrator_mobile/src/model/review_decision_request.dart';
+import 'package:orchestrator_mobile/src/model/review_decision_response.dart';
 import 'package:orchestrator_mobile/src/model/revoked.dart';
 import 'package:orchestrator_mobile/src/model/task.dart';
 import 'package:orchestrator_mobile/src/model/task_create.dart';
@@ -1482,7 +1484,7 @@ class ApiApi {
   }
 
   /// createTask
-  /// Create a task (Section 9.2 Tasks row; caller: Owner only). T1&#39;s model-level step: the id is allocated server-side (&#x60;{PID}-T{index}&#x60;, Section 7.3), &#x60;state&#x60; starts at &#x60;draft&#x60;, &#x60;version&#x60; starts at 1 (FR-TSK-06), &#x60;audit_required&#x60; copies the project policy, and &#x60;target_scope&#x60; globs are validated against Section 12.3. Accepts the FR-TSK-02 field set only — &#x60;state&#x60;, &#x60;version&#x60;, &#x60;id&#x60;, lease/merge fields are rejected as unknown. &#x60;Idempotency-Key&#x60; replays a retry without duplicating the task (ADR-012).
+  /// Create a task (Section 9.2 Tasks row; Section 12.2 *Create draft tasks* caller: Owner, Decomposer agent role, Device — MT-3.8-01). T1&#39;s model-level step: the id is allocated server-side (&#x60;{PID}-T{index}&#x60;, Section 7.3), &#x60;state&#x60; starts at &#x60;draft&#x60;, &#x60;version&#x60; starts at 1 (FR-TSK-06), &#x60;audit_required&#x60; copies the project policy, and &#x60;target_scope&#x60; globs are validated against Section 12.3. Accepts the FR-TSK-02 field set only — &#x60;state&#x60;, &#x60;version&#x60;, &#x60;id&#x60;, lease/merge fields are rejected as unknown. Agents of every other role answer ROLE_NOT_PERMITTED (403). &#x60;Idempotency-Key&#x60; replays a retry without duplicating the task (ADR-012).
   ///
   /// Parameters:
   /// * [pid]
@@ -4073,6 +4075,122 @@ class ApiApi {
     }
 
     return Response<ResolutionWriteResponse>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// submitReviewDecision
+  /// Record one human review decision (Section 9.2 Review row; caller: Owner / Device — §12.2). &#x60;decision&#x60; is one of the three plan values; &#x60;version&#x60; is the optimistic-lock token (a stale value answers VERSION_CONFLICT, 409). **approve** (T15) requires the &#x60;resolution_id&#x60; the reviewer saw (Section 14.2 approve safety): the server compares it to the task&#39;s current-attempt resolution under the row lock and rejects an outdated binding with VERSION_CONFLICT and zero side effects (MT-3.6-04); a pass sets &#x60;merge_status &#x3D; pending&#x60; (the Section 8.1 sub-status WP-3.7&#39;s queue picks up) and records the decision. **request_changes** (T16) requires a &#x60;note&#x60; (VALIDATION_ERROR otherwise) which becomes the task&#39;s &#x60;latest_feedback&#x60; for the next coder, preserves &#x60;attempt_number&#x60; and returns the task to &#x60;pending&#x60;; **reassign** (T16) also returns to &#x60;pending&#x60; and clears the worker. Each decision writes the Transition row, the &#x60;review.decided&#x60; event (§9.6) and the Section 7.2 Review Decision record in one transaction (§8.2 rule 2). &#x60;Idempotency-Key&#x60; replays a retried decision without a second record or a second transition. Rejections: VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT (403), TASK_NOT_FOUND (404), TASK_STATE_CONFLICT / VERSION_CONFLICT (409).
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [reviewDecisionRequest]
+  /// * [idempotencyKey] - Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second Audit Report or firing a second transition.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ReviewDecisionResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ReviewDecisionResponse>> submitReviewDecision({
+    required String id,
+    required ReviewDecisionRequest reviewDecisionRequest,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/tasks/{id}/review'.replaceAll(
+        '{' r'id' '}',
+        encodeQueryParameter(_serializers, id, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(ReviewDecisionRequest);
+      _bodyData =
+          _serializers.serialize(reviewDecisionRequest, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ReviewDecisionResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ReviewDecisionResponse),
+            ) as ReviewDecisionResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ReviewDecisionResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

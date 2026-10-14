@@ -104,6 +104,12 @@ class TransitionReason(models.TextChoices):
     AUDIT_CLAIMED = "audit_claimed", "audit_claimed"
     AUDIT_PASSED = "audit_passed", "audit_passed"
     AUDIT_ESCALATED = "audit_escalated", "audit_escalated"
+    # WP-3.6 rows (T15/T16): the Review-row trigger codes as ADR-010
+    # snake_case machine values — catalog-first (Section 20.4 item 5),
+    # added with the rows that use them.
+    APPROVE = "approve", "approve"
+    REQUEST_CHANGES = "request_changes", "request_changes"
+    REASSIGN = "reassign", "reassign"
 
 
 class TransitionQuerySet(models.QuerySet["TaskTransition"]):

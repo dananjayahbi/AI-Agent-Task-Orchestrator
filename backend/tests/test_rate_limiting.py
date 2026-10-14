@@ -241,6 +241,12 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
     # the same class budget — recorded in the WP-3.3 changelog).
     _Route("/api/v1/tasks/1/audit-verdict", AgentEndpointThrottle, "WP-3.3", True),
     _Route("/api/v1/tasks/1/audit-reports", AgentEndpointThrottle, "WP-3.3", True),
+    # --- Review row (Owner / Device): landed with WP-3.6 ---------------
+    # The row's non-owner cell is Device (mobile review sheet), so the
+    # view carries DeviceEndpointThrottle; an owner request rides the
+    # same per-token budget (the shared-row recording of WP-1.8/WP-3.2/
+    # WP-3.3, once more — recorded in the WP-3.6 changelog).
+    _Route("/api/v1/tasks/1/review", DeviceEndpointThrottle, "WP-3.6", True),
     # --- Merge queue row (Merge Executor): WP-3.x
     _Route("/api/v1/merge/pending", AgentEndpointThrottle, "WP-3.x", False),
     _Route("/api/v1/merge/1/start", AgentEndpointThrottle, "WP-3.x", False),

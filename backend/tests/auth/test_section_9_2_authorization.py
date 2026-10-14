@@ -60,7 +60,8 @@ GAPS: frozenset[tuple[str, str]] = frozenset({("GET", "/api/v1/devices")})
 DEFERRED_ROWS: frozenset[tuple[str, str]] = frozenset(
     {
         ("POST", "/api/v1/tasks/{id}/transition"),
-        ("POST", "/api/v1/tasks/{id}/review"),
+        # WP-3.6 removed the review row from this set: POST /tasks/{id}/review
+        # landed and its caller cells run on the real route (PROOF below).
         ("GET", "/api/v1/merge/pending"),
         ("POST", "/api/v1/merge/{task}/start"),
         ("POST", "/api/v1/merge/{task}/result"),
@@ -190,6 +191,13 @@ PROOF: dict[tuple[str, str], tuple[str, str]] = {
     ("GET", "/api/v1/tasks/{id}/audit-reports"): (
         "tests.test_authorization_matrix",
         "test_wp33_landed_audit_routes_enforce_their_callers",
+    ),
+    # --- Review row (Owner; §12.2 adds Device) — WP-3.6's landing case
+    # (the deferred entry it replaced); the whole printed grid for the
+    # row also runs in the PROBES walk above.
+    ("POST", "/api/v1/tasks/{id}/review"): (
+        "tests.test_authorization_matrix",
+        "test_wp36_landed_review_route_enforces_its_callers",
     ),
     # --- Attachments row (Owner / Agent (read)) — the WP-1.11/1.13/1.14
     # landing cases in the adopted matrix; the negative token paths on these

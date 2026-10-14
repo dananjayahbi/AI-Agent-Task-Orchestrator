@@ -351,6 +351,67 @@ _SUBMIT_TASK_RESOLUTION_SCHEMA: Final[dict[str, Any]] = {
 }
 
 
+_CREATE_DRAFT_TASK_SCHEMA: Final[dict[str, Any]] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Short task title (Section 7.2; the backend's create cap).",
+        },
+        "description": {
+            "type": "string",
+            "default": "",
+            "description": "Markdown description (FR-TSK-02); editable afterwards via PATCH.",
+        },
+        "criteria": {
+            "type": "array",
+            "items": {"type": "string"},
+            "default": [],
+            "description": "Acceptance-criteria strings (Section 7.2 acceptance_criteria).",
+        },
+        "scope": {
+            "type": "array",
+            "items": {"type": "string"},
+            "default": [],
+            "description": (
+                "Repo-relative globs (Section 7.2 target_scope), validated on "
+                "creation (Section 12.3)."
+            ),
+        },
+        "test_command": {
+            "type": "string",
+            "default": "",
+            "maxLength": 500,
+            "description": "The command coders run before submitting (Section 10.6 rule 3).",
+        },
+        "priority": {
+            "type": "string",
+            "enum": _PRIORITY_ENUM,
+            "default": "medium",
+            "description": "FR-TSK-05 priority; default medium.",
+        },
+        "depends_on": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "description": (
+                "Task ids ({PID}-T{index}, Section 7.3) this draft waits on "
+                "(Section 7.1 relation). Same-project ids only; the backend "
+                "rejects unknown, foreign, self or cyclic references with "
+                "VALIDATION_ERROR and rolls the whole create back."
+            ),
+        },
+    },
+    "required": ["title"],
+    "description": (
+        "Decomposer create (Section 10.5 'Decomposer creates draft tasks'): "
+        "no state argument exists — the created task is always `draft` (T1)."
+    ),
+}
+
+
 #: Section 10.5's tools, in the plan's catalog order (WP-2.4's five core
 #: plus WP-2.6's checkpoint/submission pair, which the plan lists between
 #: claim and release; read_task_attachment lands with WP-2.5).
@@ -488,6 +549,25 @@ TOOL_SPECS: Final[tuple[ToolSpec, ...]] = (
             ErrorCode.LEASE_NOT_OWNED,
             ErrorCode.ROLE_NOT_PERMITTED,
             ErrorCode.AUDITOR_SAME_AS_CODER,
+        ),
+    ),
+    ToolSpec(
+        name="create_draft_task",
+        description=(
+            "Create one `draft` task in the bound project (Section 10.5 — "
+            "the decomposer's creation tool, gap G-19). No project id and no "
+            "state argument exist: the session's project is the only target "
+            "and the created task is always `draft` (T1) — publishing (T2) "
+            "stays with the Owner (Section 11.3). `depends_on` names "
+            "same-project task ids; unknown, foreign, self or cyclic "
+            "references are rejected with VALIDATION_ERROR. Role-restricted "
+            "server-side: only a decomposer (or owner/device) token "
+            "succeeds (Section 12.2)."
+        ),
+        input_schema=_CREATE_DRAFT_TASK_SCHEMA,
+        errors=(
+            *READ_ERRORS,
+            ErrorCode.ROLE_NOT_PERMITTED,
         ),
     ),
     ToolSpec(

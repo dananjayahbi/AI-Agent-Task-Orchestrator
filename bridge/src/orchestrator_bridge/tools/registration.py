@@ -36,6 +36,7 @@ from . import (
     checkpoint,
     claim,
     context,
+    create_draft_task,
     release,
     submit,
     task_details,
@@ -59,6 +60,7 @@ _HANDLER_FACTORIES = {
     "submit_task_resolution": submit.make_handler,
     "release_task": release.make_handler,
     "submit_audit_verdict": audit_verdict.make_handler,
+    "create_draft_task": create_draft_task.make_handler,
     "get_project_context": context.make_handler,
 }
 

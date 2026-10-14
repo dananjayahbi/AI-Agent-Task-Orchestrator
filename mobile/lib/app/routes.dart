@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:orchestrator_mobile/orchestrator_mobile.dart';
 
 import '../features/audit_log/audit_log_screen.dart';
 import '../features/board/board_screen.dart';
@@ -7,6 +8,7 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/review/review_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/task_detail/attachment_viewer_screen.dart';
 import '../features/task_detail/task_detail_screen.dart';
 import 'nav_shell.dart';
 
@@ -41,19 +43,39 @@ abstract final class AppRoutes {
 
   /// Route for a Section 14.1 area.
   static String forArea(AppArea area) => area.path;
+
+  /// Attachment viewer (MT-5.7-03) — arguments carry the [Attachment]
+  /// row (deep-link readiness by id is WP-5.9).
+  static const String attachmentViewer = '/attachment-viewer';
 }
 
 /// Builds the [MaterialPageRoute] for [settings.name].
 ///
 /// [AppRoutes.root] renders the navigation shell; every Section 14.1 area also
 /// has its own route so it can be reached directly (deep links, tests).
+/// The task detail route takes the task id as its argument (the board
+/// pushes `arguments: task.id`); the attachment viewer takes the
+/// attachment row.
 Route<dynamic> onGenerateRoute(RouteSettings settings) {
+  if (settings.name == AppRoutes.attachmentViewer) {
+    final Object? arguments = settings.arguments;
+    if (arguments is Attachment) {
+      return MaterialPageRoute<dynamic>(
+        settings: settings,
+        builder: (context) => AttachmentViewerScreen(attachment: arguments),
+      );
+    }
+    return onUnknownRoute(settings);
+  }
   final AppArea? area = _areaForPath(settings.name);
   if (settings.name == AppRoutes.root || area != null) {
     return MaterialPageRoute<dynamic>(
       settings: settings,
-      builder: (context) =>
-          area == null ? const NavShell() : screenForArea(area),
+      builder: (context) => area == null
+          ? const NavShell()
+          : area == AppArea.taskDetail
+              ? TaskDetailScreen(taskId: settings.arguments as String?)
+              : screenForArea(area),
     );
   }
   return onUnknownRoute(settings);
@@ -90,6 +112,9 @@ Widget screenForArea(AppArea area) {
     case AppArea.board:
       return const BoardScreen();
     case AppArea.taskDetail:
+      // The route table passes the task id argument directly; the bare
+      // area mapping (tests, deep-link stub) renders the honest
+      // no-task-selected state.
       return const TaskDetailScreen();
     case AppArea.review:
       return const ReviewScreen();

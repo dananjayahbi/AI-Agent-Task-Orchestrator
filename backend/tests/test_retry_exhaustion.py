@@ -176,7 +176,11 @@ def test_escalation_dispatch_runs_inside_one_transaction() -> None:
 
     # The event emission (and the history write sharing its transaction)
     # happened inside the dispatcher's atomic block (Section 20.4 item 6).
-    transition_records = [r for r in records if r["data"]["to_state"] == TaskState.IN_HUMAN_REVIEW]
+    # The MT-3.9-02 entry event's data carries review_reason/task_version
+    # (no to_state key), so the filter reads the row event only.
+    transition_records = [
+        r for r in records if r["data"].get("to_state") == TaskState.IN_HUMAN_REVIEW
+    ]
     assert len(transition_records) == 1
     assert transition_records[0]["_in_atomic_block"] is True
     assert (

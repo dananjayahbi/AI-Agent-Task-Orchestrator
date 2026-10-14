@@ -13,6 +13,7 @@ Celery settings themselves are the ``CELERY_*`` names defined in
 from __future__ import annotations
 
 from celery import Celery
+from celery.schedules import crontab
 
 app = Celery("orchestrator")
 app.config_from_object("django.conf:settings", namespace="CELERY")
@@ -33,3 +34,27 @@ app.conf.beat_schedule = {
         "schedule": 60.0,
     },
 }
+
+
+@app.on_after_finalize.connect  # type: ignore[untyped-decorator]
+def register_backup_schedule(sender: Celery, **kwargs: object) -> None:
+    """Add the Section 9.9 daily "Backup trigger" (WP-6.2; MT-6.2-03).
+
+    Registered on finalize rather than at module import because the trigger
+    time is configuration (``ORCHESTRATOR_BACKUP_TRIGGER_HOUR``/``_MINUTE``,
+    read through ``apps.core.settings.base``): this module is imported from
+    ``config/__init__.py`` before ``DJANGO_SETTINGS_MODULE`` is guaranteed to
+    resolve on every host path (Section 9.10 lazy-settings discipline). Both
+    the worker and beat processes finalize the app before consuming the
+    schedule, so the entry is always present where it matters. The task name
+    is the canonical one registered in ``apps.backup.tasks``.
+    """
+    from django.conf import settings
+
+    sender.conf.beat_schedule["backup-trigger"] = {
+        "task": "backup.run_daily_backup",
+        "schedule": crontab(
+            hour=settings.BACKUP_TRIGGER_HOUR,
+            minute=settings.BACKUP_TRIGGER_MINUTE,
+        ),
+    }

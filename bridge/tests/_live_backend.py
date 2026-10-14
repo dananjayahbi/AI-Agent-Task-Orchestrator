@@ -103,9 +103,25 @@ for _ in range(5):
         scopes=["coder", "auditor"],
     )
     tokens.append(plaintext)
+# MT-3.8-01/02: one decomposer-scoped token for the live draft-creation proof.
+decomposer_token = "bridge-it-" + secrets.token_hex(24)
+ApiToken.objects.create(
+    kind=TokenKind.AGENT,
+    hash=hashlib.sha256(decomposer_token.encode("utf-8")).hexdigest(),
+    user=owner,
+    project_id=PID,
+    scopes=["decomposer"],
+)
 print(
     "BRIDGE_IT_SEED "
-    + json.dumps({"project_id": PID, "tasks": tasks, "tokens": tokens})
+    + json.dumps(
+        {
+            "project_id": PID,
+            "tasks": tasks,
+            "tokens": tokens,
+            "decomposer_token": decomposer_token,
+        }
+    )
 )
 """
 
@@ -218,6 +234,7 @@ class LiveBackend:
     project_id: str
     tasks: tuple[str, ...]
     tokens: tuple[str, ...]
+    decomposer_token: str | None = None  # MT-3.8-02 live draft-creation proof
     process: subprocess.Popen[str] | None = None
     log_path: Path | None = None
 
@@ -302,6 +319,7 @@ def start_live_backend() -> LiveBackend:
         project_id=payload["project_id"],
         tasks=tuple(payload["tasks"]),
         tokens=tuple(payload["tokens"]),
+        decomposer_token=payload.get("decomposer_token"),
         process=process,
         log_path=log_path,
     )

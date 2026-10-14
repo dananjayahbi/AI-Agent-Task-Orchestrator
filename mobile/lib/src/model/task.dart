@@ -36,7 +36,7 @@ part 'task.g.dart';
 /// * [attemptNumber]
 /// * [auditRequired] - Copied from the project policy at creation (Section 7.2).
 /// * [reviewReason] - Section 8.4 enum | null.
-/// * [latestFeedback]
+/// * [latestFeedback] - Section 7.2: text from auditor/human — the T16 request-changes note shown to the next coder through get_task_details (Section 10.5; MT-3.6-03); empty until the first note, newest note wins.
 /// * [mergeStatus] - none | pending | merging | merged | conflict | failed.
 /// * [archivedAt] - Soft-archive marker; archived tasks stay readable (7.3).
 /// * [createdBy]
@@ -123,6 +123,7 @@ abstract class Task implements Built<Task, TaskBuilder> {
   @BuiltValueField(wireName: r'review_reason')
   String? get reviewReason;
 
+  /// Section 7.2: text from auditor/human — the T16 request-changes note shown to the next coder through get_task_details (Section 10.5; MT-3.6-03); empty until the first note, newest note wins.
   @BuiltValueField(wireName: r'latest_feedback')
   String get latestFeedback;
 

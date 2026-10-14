@@ -47,7 +47,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.permissions import HasProjectScope, IsOwnerSession
+from apps.accounts.permissions import (
+    CanCreateDraftTasks,
+    HasProjectScope,
+    IsOwnerSession,
+)
 from apps.core.idempotency import (
     idempotency_key_of,
     lookup_replay,
@@ -153,10 +157,19 @@ class TaskListCreateView(APIView):
     MT-0.5-04 cursor pagination.
     """
 
-    # Scope first (ADR-004 zero-bleed outranks role errors), then the
-    # Section 9.2 Owner caller / Section 12.2 "Create draft tasks" row's
-    # Owner-only enforcement (deferred cells recorded — module docstring).
+    # Scope first (ADR-004 zero-bleed outranks role errors). Per method:
+    # the GET half stays Section 9.2's Owner caller, while the POST half
+    # answers the Section 12.2 "Create draft tasks" matrix row —
+    # MT-3.8-01 activates its deferred cells by naming the real row
+    # class (owner, decomposer agent role, device; everyone else
+    # ROLE_NOT_PERMITTED — the matrix suite walks the printed grid).
     permission_classes: list[Any] = [HasProjectScope, IsOwnerSession]
+
+    def get_permissions(self) -> list[Any]:
+        """POST = the *Create draft tasks* row; GET stays Owner-only."""
+        if self.request is not None and self.request.method == "POST":
+            return [HasProjectScope(), CanCreateDraftTasks()]
+        return [HasProjectScope(), IsOwnerSession()]
 
     @extend_schema(
         operation_id="list_tasks",
@@ -213,15 +226,18 @@ class TaskListCreateView(APIView):
         responses={status.HTTP_201_CREATED: TaskSerializer, **_CREATE_ERRORS},
         parameters=[_IDEMPOTENCY_PARAMETER],
         description=(
-            "Create a task (Section 9.2 Tasks row; caller: Owner only). "
-            "T1's model-level step: the id is allocated server-side "
-            "(`{PID}-T{index}`, Section 7.3), `state` starts at `draft`, "
-            "`version` starts at 1 (FR-TSK-06), `audit_required` copies the "
-            "project policy, and `target_scope` globs are validated against "
-            "Section 12.3. Accepts the FR-TSK-02 field set only — `state`, "
-            "`version`, `id`, lease/merge fields are rejected as unknown. "
-            "`Idempotency-Key` replays a retry without duplicating the task "
-            "(ADR-012)."
+            "Create a task (Section 9.2 Tasks row; Section 12.2 *Create "
+            "draft tasks* caller: Owner, Decomposer agent role, Device — "
+            "MT-3.8-01). T1's model-level step: the id is allocated "
+            "server-side (`{PID}-T{index}`, Section 7.3), `state` starts "
+            "at `draft`, `version` starts at 1 (FR-TSK-06), "
+            "`audit_required` copies the project policy, and "
+            "`target_scope` globs are validated against Section 12.3. "
+            "Accepts the FR-TSK-02 field set only — `state`, `version`, "
+            "`id`, lease/merge fields are rejected as unknown. Agents of "
+            "every other role answer ROLE_NOT_PERMITTED (403). "
+            "`Idempotency-Key` replays a retry without duplicating the "
+            "task (ADR-012)."
         ),
     )
     def post(self, request: Request, pid: str, *args: Any, **kwargs: Any) -> Response:

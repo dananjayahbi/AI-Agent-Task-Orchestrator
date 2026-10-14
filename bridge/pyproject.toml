@@ -94,3 +94,10 @@ select = [
 python_version = "3.12"
 strict = true
 exclude = ["\\.venv"]
+
+# --- Pytest: markers (WP-3.8 integration expectation tests) --------------------
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: real-backend expectation gated behind ORCHESTRATOR_BRIDGE_LIVE_TESTS=1",
+]

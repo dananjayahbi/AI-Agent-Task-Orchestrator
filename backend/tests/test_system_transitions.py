@@ -262,7 +262,12 @@ def test_retry_exhausted_escalates_with_reason_worker_clearing_and_push(
     assert result.lease_expires_at is None, "Section 8.3 rule 1 (recorded reading)"
     assert result.version == 2
 
-    assert [event["type"] for event in events] == ["task.transitioned"]
+    # The row's own event, then the WP-3.9 review.requested entry event
+    # (MT-3.9-02: one per in_human_review entry, in the same transaction).
+    assert [event["type"] for event in events] == ["task.transitioned", "review.requested"]
+    entry = events[1]
+    assert entry["data"]["review_reason"] == ReviewReason.RETRY_EXHAUSTED
+    assert entry["data"]["task_version"] == result.version
     assert len(pushes) == 1, "Section 9.8: push on in_human_review entry"
     push = pushes[0]
     assert push["task_id"] == task.pk

@@ -26,10 +26,12 @@
 import {
   useCallback,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
+  type Ref,
   type UIEvent,
 } from 'react';
 
@@ -39,6 +41,11 @@ import { cn } from 'cn';
 export const FALLBACK_VIEWPORT_HEIGHT = 480;
 /** Fixed row height in px — must fit a TaskCard without clipping. */
 export const CARD_ROW_HEIGHT = 132;
+
+/** Imperative scroll API (MT-4.7-03 jump-to-file; optional, board-agnostic). */
+export type VirtualListHandle = {
+  scrollToIndex: (index: number) => void;
+};
 
 type VirtualListProps<T> = {
   items: readonly T[];
@@ -52,6 +59,14 @@ type VirtualListProps<T> = {
   label: string;
   testId?: string;
   className?: string;
+  /** Optional imperative scroll (diff jump-to-file); the board passes none. */
+  ref?: Ref<VirtualListHandle>;
+  /**
+   * Fires when the mounted window's start row changes (scroll →
+   * active-row sync). Naturally throttled: one call per row boundary
+   * crossed, never per scroll pixel.
+   */
+  onVisibleRangeChange?: (startIndex: number, endIndex: number) => void;
 };
 
 export function VirtualList<T>({
@@ -64,6 +79,8 @@ export function VirtualList<T>({
   label,
   testId,
   className,
+  ref,
+  onVisibleRangeChange,
 }: VirtualListProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -137,6 +154,38 @@ export function VirtualList<T>({
     items.length,
     Math.ceil((scrollTop + resolvedHeight) / itemHeight) + overscan,
   );
+
+  // Imperative scroll (MT-4.7-03 jump-to-file): clamp, align the
+  // target row to the top, and keep the window state in sync so the
+  // target mounts before any follow-up focus work.
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToIndex: (index: number) => {
+        const container = containerRef.current;
+        if (container === null) return;
+        const clamped = Math.min(Math.max(index, 0), Math.max(items.length - 1, 0));
+        const target = clamped * itemHeight;
+        container.scrollTop = target;
+        setScrollTop(target);
+      },
+    }),
+    [itemHeight, items.length],
+  );
+
+  // Scroll → caller notification (active-row sync), once per window change.
+  const notifyRef = useRef(onVisibleRangeChange);
+  useEffect(() => {
+    notifyRef.current = onVisibleRangeChange;
+  }, [onVisibleRangeChange]);
+  const lastRangeRef = useRef('');
+  useEffect(() => {
+    const key = `${startIndex}:${endIndex}`;
+    if (key === lastRangeRef.current) return;
+    lastRangeRef.current = key;
+    notifyRef.current?.(startIndex, endIndex);
+  }, [startIndex, endIndex]);
+
   const visible: Array<{ item: T; index: number }> = [];
   for (let index = startIndex; index < endIndex; index += 1) {
     const item = items[index];

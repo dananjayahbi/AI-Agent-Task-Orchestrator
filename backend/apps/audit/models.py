@@ -60,6 +60,7 @@ from typing import Any
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from apps.tasks.models import Task, TaskResolution
 
@@ -268,11 +269,171 @@ class AuditReport(models.Model):
         return f"{self.task_id} verdict={self.proposed_verdict} confidence={self.confidence}"
 
 
+# --- Review Decision — Section 7.2 (WP-3.6; FR-AUD-05; MT-3.6-02) -----------
+
+
+class ReviewDecisionValue(models.TextChoices):
+    """Section 7.2 ``decision`` — the three Section 9.2 review actions."""
+
+    APPROVE = "approve", "approve"
+    REQUEST_CHANGES = "request_changes", "request_changes"
+    REASSIGN = "reassign", "reassign"
+
+
+class ReviewVia(models.TextChoices):
+    """Section 7.2 ``decided_via`` — the web board or the mobile sheet."""
+
+    WEB = "web", "web"
+    MOBILE = "mobile", "mobile"
+
+
+class ReviewDecisionImmutable(Exception):
+    """Any attempt to mutate a recorded review decision (Section 12.5)."""
+
+
+class ReviewDecisionQuerySet(models.QuerySet["ReviewDecision"]):
+    """Mutations are refused: a recorded decision is audit history (12.5)."""
+
+    def update(self, *args: Any, **kwargs: Any) -> int:
+        """Refuse in-place edits — decisions are recorded, never edited."""
+        raise ReviewDecisionImmutable("Review Decision rows cannot be updated (Section 12.5).")
+
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """Refuse row deletion — the review trail is never removed."""
+        raise ReviewDecisionImmutable("Review Decision rows cannot be deleted (Section 12.5).")
+
+    def bulk_update(self, *args: Any, **kwargs: Any) -> int:
+        """Refuse bulk edits — no ORM door around the append-only rule."""
+        raise ReviewDecisionImmutable("Review Decision rows cannot be updated (Section 12.5).")
+
+
+class ReviewDecisionManager(models.Manager.from_queryset(ReviewDecisionQuerySet)):  # type: ignore[misc]
+    """The default manager — queryset-level append-only rides through."""
+
+
+class ReviewDecision(models.Model):
+    """One recorded review decision (Section 7.2 "Review Decision").
+
+    Exactly the Section 7.2 field set — none added, dropped or renamed
+    (MT-3.6-02; Section 20.5). T15/T16's side effect writes the row
+    inside the dispatch transaction (Section 8.2 rule 2), and Section
+    12.5's "all decisions are recorded" makes it append-only — the same
+    insert-only discipline ``TaskResolution`` established (P8).
+
+    ``resolution_id`` is **nullable by design**: ``request_changes`` /
+    ``reassign`` may answer a retry-exhaustion escalation (T9) that has
+    no submission to bind, while an ``approve`` without a resolution is
+    impossible — a database check enforces presence for ``approve``
+    (MT-3.6-02's risk note: a silently optional column would disable
+    the stale-resolution protection MT-3.6-04 builds on this FK).
+    """
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text="Section 7.2 ``id`` (UUID) — server-generated, never client-supplied.",
+    )
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.PROTECT,  # decisions are never orphaned (7.3: no deletes)
+        related_name="review_decisions",
+        help_text="Section 7.2 ``task_id`` — the FK column is task_id.",
+    )
+    resolution = models.ForeignKey(
+        TaskResolution,
+        on_delete=models.PROTECT,  # the reviewed submission outlives every read
+        null=True,
+        blank=True,
+        related_name="review_decisions",
+        help_text="Section 7.2 ``resolution_id`` — the FK column is "
+        "resolution_id; the current attempt's resolution the reviewer "
+        "was looking at (mandatory for ``approve`` — MT-3.6-04's binding; "
+        "nullable for note actions that may fire without one, e.g. T9).",
+    )
+    decision = models.CharField(
+        max_length=16,
+        choices=ReviewDecisionValue.choices,
+        help_text="Section 7.2 ``decision``: approve | request_changes | reassign "
+        "(Section 9.2's three review actions — no fourth value).",
+    )
+    note = models.TextField(
+        blank=True,
+        default="",
+        help_text="Section 7.2 ``note`` — mandatory for request_changes "
+        "(T16 guard), optional elsewhere; the request-changes note "
+        "becomes the Task's ``latest_feedback`` (Section 11.5).",
+    )
+    decided_by = models.CharField(
+        max_length=255,
+        help_text="Section 7.2 ``decided_by`` — the acting user/principal "
+        "(owner user id or device id, Section 12.2 Review decisions row).",
+    )
+    decided_via = models.CharField(
+        max_length=8,
+        choices=ReviewVia.choices,
+        help_text="Section 7.2 ``decided_via``: web | mobile — the board or "
+        "the review sheet channel (Sections 13/14).",
+    )
+    decided_at = models.DateTimeField(
+        default=timezone.now,
+        help_text="Server clock at insertion (principle P7); the API never accepts a client value.",
+    )
+
+    objects = ReviewDecisionManager()
+
+    class Meta:
+        """Enum checks plus the approve-requires-resolution pairing (7.4)."""
+
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(decision__in=ReviewDecisionValue.values),
+                name="review_decision_value_canonical",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(decided_via__in=ReviewVia.values),
+                name="review_decision_via_canonical",
+            ),
+            # MT-3.6-02/04: an approve without its resolution binding would
+            # silently disable the stale-resolution guard — refused at the
+            # database, not only at the endpoint.
+            models.CheckConstraint(
+                condition=(~models.Q(decision="approve") | models.Q(resolution__isnull=False)),
+                name="review_decision_approve_needs_resolution",
+            ),
+        ]
+        indexes = [
+            # The review panel reads a task's decisions newest first; the
+            # uuid PK breaks decided_at ties deterministically.
+            models.Index(fields=["task", "decided_at"], name="review_decision_task_time"),
+        ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Append-only: allow the very first write, refuse every later one."""
+        if not self._state.adding:
+            raise ReviewDecisionImmutable("Review Decision rows cannot be updated (Section 12.5).")
+        super().save(*args, **kwargs)
+
+    def delete(self) -> tuple[int, dict[str, int]]:  # type: ignore[override]
+        """Delete is not a verb a recorded decision has (Section 12.5)."""
+        raise ReviewDecisionImmutable("Review Decision rows cannot be deleted (Section 12.5).")
+
+    def __str__(self) -> str:
+        """One readable line for the admin/debug surface (no secrets)."""
+        return f"{self.task_id} {self.decision} via {self.decided_via}"
+
+
 __all__ = [
     "AuditReport",
     "AuditReportQuerySet",
     "POLICY_ENGINE_FIELDS",
     "PolicyDecisionValue",
     "PolicyFieldsImmutable",
+    "ReviewDecision",
+    "ReviewDecisionImmutable",
+    "ReviewDecisionManager",
+    "ReviewDecisionQuerySet",
+    "ReviewDecisionValue",
+    "ReviewVia",
     "VerdictChoice",
 ]

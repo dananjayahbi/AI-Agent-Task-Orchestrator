@@ -12,13 +12,13 @@ const TOTAL_DOCS = 330; // +MT-1.6-09 (sessions), +MT-1.15-06 (dashboard endpoin
 const waves = [
   { id: 1, name: "Foundations",            total: 22, done: 22, status: "done" },
   { id: 2, name: "Backend foundation",     total: 23, done: 23, status: "done" },
-  { id: 3, name: "State machine & leases", total: 28, done: 28, status: "done" },
+  { id: 3, name: "State machine & leases", total: 28, done: 27, status: "active" },
   { id: 4, name: "Events, attachments",    total: 32, done: 32, status: "done" },
-  { id: 5, name: "Bridge skeleton & web",  total: 33, done: 31, status: "active" },
+  { id: 5, name: "Bridge skeleton & web",  total: 33, done: 33, status: "done" },
   { id: 6, name: "Bridge core tools",      total: 36, done: 36, status: "done" },
-  { id: 7, name: "Policy core & Kanban",   total: 34, done: 15, status: "active" },
-  { id: 8, name: "Agent loop completion",  total: 42, done: 12, status: "active" },
-  { id: 9, name: "Merge & review UIs",     total: 40, done: 0,  status: "pending" },
+  { id: 7, name: "Policy core & Kanban",   total: 34, done: 33, status: "active" },
+  { id: 8, name: "Agent loop completion",  total: 42, done: 32, status: "active" },
+  { id: 9, name: "Merge & review UIs",     total: 40, done: 15, status: "active" },
   { id: 10, name: "Release & hardening",   total: 40, done: 0,  status: "pending" },
 ];
 
@@ -50,15 +50,26 @@ const timeline = [
       "ErrorEnvelope contract reconciled to nested 9.2 wire shape.",
   },
   {
-    date: "2026-10-13",
+    date: "2026-10-14",
     status: "active",
-    event: "Batch 6 complete (post-storm recovery) — 199/330 micro-docs (60%)",
+    event: "Batch 7 complete — 219/330 micro-docs (66%); Wave 5 DONE",
     detail:
-      "Storm pause #2 recovered via fresh agents with embedded pause state. Landed: wp-1.13+1.14 " +
-      "descriptions/retrieval (10), wp-3.3 auditor API (5, AUDITOR_SAME_AS_CODER independence), " +
-      "wp-1.15 hardening MT-01..03 (3, shared race harness; OQ-17/18 recorded), wp-2.6 submit tools " +
-      "(6, persist-before-network spool; inspector = 7 tools), wp-4.5 task modal (6, web 197 tests). " +
-      "Gate: backend 1326, bridge 626+live, flutter 165, clients byte-stable via new schema hook.",
+      "Landed: wp-3.4 policy engine (R1-R9 deterministic, table-driven combos, invariant-4 wiring), " +
+      "wp-1.15 finish (9.2 authz suite + coverage gates: SM 97.1%, leases 94.3%), wp-2.5 attachment " +
+      "tool + wp-3.5 verdict schema/evidence (inspector = 9 tools, bridge 684), wp-4.6 task detail " +
+      "(live checkpoint feed, attachment viewer; web 234). Gates: backend 1388 + PG, all clients synced.",
+  },
+  {
+    date: "2026-10-14",
+    status: "active",
+    event: "Batch 8 complete — 253/330 micro-docs (76.7%)",
+    detail:
+      "Landed: wp-4.7 diff viewer (client patch parser, virtualized unified/split views, file tree, " +
+      "large-diff fallback), wp-5.7 mobile task detail (checkpoint feed, attachments, untrusted-content " +
+      "banner), wp-2.8 MCP prompts + MT-3.8-02 draft-task tool, wp-6.2 backup drill (restore drill PASS " +
+      "over 15 phases after fixing a drill-check stdout-banner flaw), wp-3.6+3.8-01+3.9 review decisions, " +
+      "decomposer permissions and escalation payloads. Gates: backend 1467 + 27 PG, bridge 711 + live, " +
+      "web 287, mobile 199; web OpenAPI client regenerated to match schemas/openapi.yaml.",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

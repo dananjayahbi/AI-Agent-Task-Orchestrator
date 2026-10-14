@@ -55,6 +55,14 @@ _VALID_FIXTURES: dict[str, dict[str, Any]] = {
         },
         "acceptance_criteria_results": [{"criterion": "Export runs green", "met": True}],
     },
+    "create_draft_task": {
+        "title": "Wire the export endpoint",
+        "criteria": ["Export runs green"],
+        "scope": ["src/export/**"],
+        "test_command": "uv run pytest -q tests/export",
+        "priority": "high",
+        "depends_on": ["PID00007-T003"],
+    },
     "get_project_context": {},
 }
 
@@ -76,6 +84,7 @@ def test_exact_tools_in_plan_catalog_order() -> None:
         "submit_task_resolution",
         "release_task",
         "submit_audit_verdict",
+        "create_draft_task",
         "get_project_context",
     )
 
@@ -109,6 +118,15 @@ def test_key_inputs_match_the_section_10_5_table() -> None:
         "notes",
         "evidence",
         "acceptance_criteria_results",
+    }
+    assert properties["create_draft_task"] == {
+        "title",
+        "description",
+        "criteria",
+        "scope",
+        "test_command",
+        "priority",
+        "depends_on",
     }
     assert properties["get_project_context"] == set()
 

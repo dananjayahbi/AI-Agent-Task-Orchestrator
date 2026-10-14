@@ -39,6 +39,8 @@ import 'package:orchestrator_mobile/src/model/claim_request.dart';
 import 'package:orchestrator_mobile/src/model/claim_response.dart';
 import 'package:orchestrator_mobile/src/model/code_enum.dart';
 import 'package:orchestrator_mobile/src/model/dashboard_summary.dart';
+import 'package:orchestrator_mobile/src/model/decided_via_enum.dart';
+import 'package:orchestrator_mobile/src/model/decision_enum.dart';
 import 'package:orchestrator_mobile/src/model/device_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/device_register_request.dart';
 import 'package:orchestrator_mobile/src/model/device_register_response.dart';
@@ -80,6 +82,9 @@ import 'package:orchestrator_mobile/src/model/resolution_patch.dart';
 import 'package:orchestrator_mobile/src/model/resolution_submit.dart';
 import 'package:orchestrator_mobile/src/model/resolution_task_state.dart';
 import 'package:orchestrator_mobile/src/model/resolution_write_response.dart';
+import 'package:orchestrator_mobile/src/model/review_decision_record.dart';
+import 'package:orchestrator_mobile/src/model/review_decision_request.dart';
+import 'package:orchestrator_mobile/src/model/review_decision_response.dart';
 import 'package:orchestrator_mobile/src/model/revoked.dart';
 import 'package:orchestrator_mobile/src/model/role_enum.dart';
 import 'package:orchestrator_mobile/src/model/rules_block.dart';
@@ -123,6 +128,8 @@ part 'serializers.g.dart';
   ClaimResponse,
   CodeEnum,
   DashboardSummary,
+  DecidedViaEnum,
+  DecisionEnum,
   DeviceListEnvelope,
   DeviceRegisterRequest,
   DeviceRegisterResponse,
@@ -164,6 +171,9 @@ part 'serializers.g.dart';
   ResolutionSubmit,
   ResolutionTaskState,
   ResolutionWriteResponse,
+  ReviewDecisionRecord,
+  ReviewDecisionRequest,
+  ReviewDecisionResponse,
   Revoked,
   RoleEnum,
   RulesBlock,

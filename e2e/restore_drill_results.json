@@ -1,0 +1,165 @@
+{
+  "artifacts": {
+    "dump": {
+      "mtime_utc": "2026-10-14T03:16:35Z",
+      "name": "orchestrator-20261014T031634Z.dump",
+      "sha256": "fb8dec8a7c4dc65adaf0a9ba6a16ae455aaeee09dd5c643147c8fd45376e6992",
+      "size_bytes": 92112
+    },
+    "media_marker_key": "objects/16/163cf7f579f2732dd3e32d67a359d1d50a6d6ea19149ec87b983417dbc0882d4",
+    "media_marker_mirrored": true
+  },
+  "backup_dir": "E:\\My_GitHub_Repos\\AI-Agent-Task-Orchestrator\\infra\\compose\\backup-data",
+  "backup_task_summary_raw": "23e23038-2141-44c1-b10e-5cbeb39f88cd",
+  "beat_schedule_entry": "<crontab: 0 2 * * * (m/h/dM/MY/d)>",
+  "drill": "wp-6.2-restore-drill",
+  "duration_seconds": 206.2,
+  "environment": {
+    "compose": "Docker Compose version v5.4.0",
+    "host_os": "Windows",
+    "python": "3.14.0"
+  },
+  "findings": [],
+  "finished_utc": "2026-10-14T03:18:37Z",
+  "freshness": {
+    "media_marker_before_restore": false,
+    "public_tables_before_restore": 0,
+    "restore_volumes": [
+      "wp62-drill-restore-20261014-031510_postgres_data",
+      "wp62-drill-restore-20261014-031510_redis_data"
+    ]
+  },
+  "marker_id": "drill-marker-20261014-031510",
+  "outcome": "pass",
+  "phases": [
+    {
+      "duration_seconds": 11.8,
+      "phase": "preflight",
+      "started_utc": "2026-10-14T03:15:10Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 48.9,
+      "phase": "source_stack_up",
+      "started_utc": "2026-10-14T03:15:22Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 16.0,
+      "phase": "seed_markers",
+      "started_utc": "2026-10-14T03:16:11Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 6.7,
+      "phase": "backup_trigger_run",
+      "started_utc": "2026-10-14T03:16:27Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 5.9,
+      "phase": "beat_schedule_check",
+      "started_utc": "2026-10-14T03:16:34Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 0.0,
+      "phase": "collect_artifacts",
+      "started_utc": "2026-10-14T03:16:40Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 10.1,
+      "phase": "source_teardown_with_volumes",
+      "started_utc": "2026-10-14T03:16:40Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 7.7,
+      "phase": "restore_stack_up_fresh",
+      "started_utc": "2026-10-14T03:16:50Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 2.7,
+      "phase": "freshness_proof",
+      "started_utc": "2026-10-14T03:16:58Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 3.2,
+      "phase": "restore_database",
+      "started_utc": "2026-10-14T03:17:00Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 2.2,
+      "phase": "restore_media",
+      "started_utc": "2026-10-14T03:17:04Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 48.7,
+      "phase": "restore_stack_full_up",
+      "started_utc": "2026-10-14T03:17:06Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 2.1,
+      "phase": "smoke_http",
+      "started_utc": "2026-10-14T03:17:54Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 30.4,
+      "phase": "smoke_data_controls",
+      "started_utc": "2026-10-14T03:17:57Z",
+      "status": "pass"
+    },
+    {
+      "duration_seconds": 9.7,
+      "phase": "restore_teardown",
+      "started_utc": "2026-10-14T03:18:27Z",
+      "status": "pass"
+    }
+  ],
+  "projects": {
+    "restore": "wp62-drill-restore-20261014-031510",
+    "restore_will_be": "wp62-drill-restore-20261014-031510",
+    "source": "wp62-drill-src"
+  },
+  "restore_up_output_tail": "",
+  "smoke": [
+    {
+      "check": "/health/live",
+      "detail": "HTTP 200",
+      "status": "pass"
+    },
+    {
+      "check": "/health/ready",
+      "detail": "HTTP 200",
+      "status": "pass"
+    },
+    {
+      "check": "/api/v1/schema",
+      "detail": "HTTP 200",
+      "status": "pass"
+    },
+    {
+      "check": "marker row restored",
+      "detail": "marker user count after restore = '1' (raw stdout: '1')",
+      "status": "pass"
+    },
+    {
+      "check": "media object restored",
+      "detail": "media marker content = 'drill-marker-20261014-031510'",
+      "status": "pass"
+    },
+    {
+      "check": "worker ping",
+      "detail": "->  celery@6786392cb5ab: OK\n        pong\n\n1 node online.",
+      "status": "pass"
+    }
+  ],
+  "started_utc": "2026-10-14T03:15:10Z"
+}

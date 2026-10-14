@@ -45,7 +45,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.permissions import CanSubmitAuditVerdict
+from apps.accounts.models import ApiToken, Device, TokenKind
+from apps.accounts.permissions import CanReviewDecisions, CanSubmitAuditVerdict
 from apps.core.idempotency import (
     idempotency_key_of,
     lookup_replay,
@@ -54,17 +55,21 @@ from apps.core.idempotency import (
 )
 from apps.core.pagination import parse_page_size
 from apps.core.serializers import ErrorEnvelopeSerializer
-from apps.core.throttling import AgentEndpointThrottle
+from apps.core.throttling import AgentEndpointThrottle, DeviceEndpointThrottle
 from apps.tasks.permissions import HasTaskProjectScope
 from apps.tasks.serializers.resolutions import task_state_payload
 from apps.tasks.services.tasks import get_task_or_404
 
+from .models import ReviewVia
 from .permissions import CanReadAuditReports
+from .review import submit_review_decision
 from .serializers import (
     AuditReportListEnvelopeSerializer,
     AuditReportListQuerySerializer,
     AuditVerdictRequestSerializer,
     AuditVerdictResponseSerializer,
+    ReviewDecisionRequestSerializer,
+    ReviewDecisionResponseSerializer,
 )
 from .services import (
     decode_report_cursor,
@@ -266,4 +271,110 @@ class AuditReportListView(APIView):
         )
 
 
-__all__ = ["AuditReportListView", "AuditVerdictView"]
+def _review_identity(request: Request) -> tuple[str, str]:
+    """(decided_by, decided_via) derived server-side from the credential.
+
+    Section 7.2's two channels, never a client-supplied value: the
+    owner-session token decides ``web`` as the user id; the device token
+    decides ``mobile`` as the device id (the Section 8.2 legend reads
+    *O = Owner (web/mobile)* — the device is the owner's proxy, one
+    actor column, two channels).
+    """
+    token = request.auth
+    if isinstance(token, ApiToken) and token.kind == TokenKind.DEVICE:
+        device = Device.objects.filter(token=token).values_list("id", flat=True).first()
+        return (str(device) if device is not None else str(token.pk)), ReviewVia.MOBILE
+    user_id = getattr(request.user, "pk", None)
+    return str(user_id) if user_id is not None else str(token.pk), ReviewVia.WEB
+
+
+class ReviewDecisionView(APIView):
+    """``POST /tasks/{id}/review`` — approve / request_changes / reassign."""
+
+    # Scope first (ADR-004 zero-bleed outranks role errors), then the
+    # Section 12.2 *Review decisions* row (Owner, Device; everyone else
+    # ROLE_NOT_PERMITTED — MT-3.8-01 re-checks the decomposer column).
+    permission_classes: list[Any] = [HasTaskProjectScope, CanReviewDecisions]
+    # The row's non-owner cell is Device (mobile), so the device scope
+    # guards it; an owner request rides the same per-token budget — the
+    # shared-row recording of WP-1.8/WP-3.2/WP-3.3, once more here.
+    throttle_classes = [DeviceEndpointThrottle]
+
+    @extend_schema(
+        operation_id="submit_review_decision",
+        request=ReviewDecisionRequestSerializer,
+        responses={status.HTTP_201_CREATED: ReviewDecisionResponseSerializer, **_VERDICT_ERRORS},
+        parameters=[_IDEMPOTENCY_PARAMETER],
+        description=(
+            "Record one human review decision (Section 9.2 Review row; "
+            "caller: Owner / Device — §12.2). `decision` is one of the "
+            "three plan values; `version` is the optimistic-lock token "
+            "(a stale value answers VERSION_CONFLICT, 409). "
+            "**approve** (T15) requires the `resolution_id` the reviewer "
+            "saw (Section 14.2 approve safety): the server compares it "
+            "to the task's current-attempt resolution under the row lock "
+            "and rejects an outdated binding with VERSION_CONFLICT and "
+            "zero side effects (MT-3.6-04); a pass sets `merge_status = "
+            "pending` (the Section 8.1 sub-status WP-3.7's queue picks "
+            "up) and records the decision. **request_changes** (T16) "
+            "requires a `note` (VALIDATION_ERROR otherwise) which "
+            "becomes the task's `latest_feedback` for the next coder, "
+            "preserves `attempt_number` and returns the task to "
+            "`pending`; **reassign** (T16) also returns to `pending` and "
+            "clears the worker. Each decision writes the Transition "
+            "row, the `review.decided` event (§9.6) and the Section 7.2 "
+            "Review Decision record in one transaction (§8.2 rule 2). "
+            "`Idempotency-Key` replays a retried decision without a "
+            "second record or a second transition. Rejections: "
+            "VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / "
+            "AUTH_FORBIDDEN_PROJECT (403), TASK_NOT_FOUND (404), "
+            "TASK_STATE_CONFLICT / VERSION_CONFLICT (409)."
+        ),
+    )
+    def post(self, request: Request, id: str, *args: Any, **kwargs: Any) -> Response:
+        """Validate one decision, dispatch T15/T16, return the record."""
+        replayed = _replay_or_none(request)
+        if replayed is not None:
+            return replayed
+
+        input_serializer = ReviewDecisionRequestSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        validated = cast(dict[str, Any], input_serializer.validated_data)
+
+        decided_by, decided_via = _review_identity(request)
+        token = request.auth
+        caller_project_id = getattr(token, "project_id", None)
+        outcome = submit_review_decision(
+            id,
+            decision=str(validated["decision"]),
+            note=str(validated.get("note", "")),
+            resolution_id=validated.get("resolution_id"),
+            version=int(validated["version"]),
+            decided_by=decided_by,
+            decided_via=decided_via,
+            caller_project_id=str(caller_project_id) if caller_project_id is not None else None,
+        )
+        record = outcome.decision
+        response = Response(
+            ReviewDecisionResponseSerializer(
+                {
+                    "decision": {
+                        "id": record.pk,
+                        "task_id": record.task_id,
+                        "resolution_id": record.resolution_id,
+                        "decision": record.decision,
+                        "note": record.note,
+                        "decided_by": record.decided_by,
+                        "decided_via": record.decided_via,
+                        "decided_at": record.decided_at,
+                    },
+                    "task": task_state_payload(outcome.task),
+                }
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+        _store_outcome(request, response)
+        return response
+
+
+__all__ = ["AuditReportListView", "AuditVerdictView", "ReviewDecisionView"]

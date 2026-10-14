@@ -131,10 +131,10 @@ void main() {
       final NavigatorState navigator =
           tester.state<NavigatorState>(find.byType(Navigator));
 
-      // Onboarding is fully implemented (MT-5.5-06), so it is excluded
-      // from the placeholder list and checked below.
+      // Onboarding is fully implemented (MT-5.5-06) and task detail is
+      // real since WP-5.7 (MT-5.7-01), so both are excluded from the
+      // placeholder list and checked below.
       const List<AppArea> pushedAreas = <AppArea>[
-        AppArea.taskDetail,
         AppArea.review,
         AppArea.auditLog,
       ];
@@ -146,6 +146,26 @@ void main() {
         navigator.pop();
         await tester.pumpAndSettle();
       }
+    });
+
+    testWidgets(
+        'the task detail route renders the real screen (WP-5.7): an '
+        'honest no-task state without an id argument', (tester) async {
+      await pumpApp(tester);
+      final NavigatorState navigator =
+          tester.state<NavigatorState>(find.byType(Navigator));
+
+      navigator.pushNamed(AppArea.taskDetail.path);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Task detail'), findsOneWidget);
+      expect(find.textContaining('Not implemented yet'), findsNothing);
+      expect(
+        find.byKey(const ValueKey<String>('task-detail-no-task')),
+        findsOneWidget,
+      );
+      navigator.pop();
+      await tester.pumpAndSettle();
     });
 
     testWidgets(

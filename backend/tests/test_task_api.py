@@ -456,18 +456,20 @@ def test_anonymous_callers_get_auth_required(client: APIClient, project: Project
         assert _envelope(response)["code"] == "AUTH_REQUIRED"
 
 
-@pytest.mark.parametrize("role", ["coder", "decomposer", "merge_executor"])
+@pytest.mark.parametrize("role", ["coder", "merge_executor"])
 def test_agent_tokens_are_refused_creates_but_read_detail(
     owner_client: APIClient, project: Project, role: str
 ) -> None:
-    """Owner-only create; §9.2/§10.5's agent read cell on the detail GET.
+    """Owner/decomposer/device create; §9.2/§10.5's agent read cell on the detail GET.
 
-    The Decomposer/Device cells of Section 12.2's "Create draft tasks"
-    row are deferred to WP-2.x/M5 (MT-1.4-03 risk note) — recorded
-    explicitly in the authorization-matrix suite, asserted here on the
-    real route. The detail read is the activated WP-2.x read cell: a
-    token scoped to the task's project reads the row (the bridge's
-    `get_task_details`), while the write half stays Owner-only.
+    The Decomposer and Device cells of Section 12.2's "Create draft
+    tasks" row were deferred to WP-2.x/M5 (MT-1.4-03 risk note) and are
+    **active since MT-3.8-01** (WP-3.8) — asserted on the real route in
+    the two activation tests below and in the authorization-matrix
+    suite. The remaining agent roles stay refused here. The detail read
+    is the activated WP-2.x read cell: a token scoped to the task's
+    project reads the row (the bridge's `get_task_details`), while the
+    write half stays outside every agent role's cells.
     """
     Task.objects.create(id="PID00001-T001", project=project, title="Detail read")
     token = _issue_agent_token(owner_client, "PID00001", role=role)
@@ -491,14 +493,44 @@ def test_agent_tokens_are_refused_creates_but_read_detail(
     assert _envelope(patched)["code"] == "ROLE_NOT_PERMITTED"
 
 
-def test_device_tokens_get_role_not_permitted(owner_client: APIClient, project: Project) -> None:
-    """The Device cell of "Create draft tasks" is deferred with Decomposer."""
+def test_decomposer_token_creates_drafts_and_nothing_else(
+    owner_client: APIClient, project: Project
+) -> None:
+    """MT-3.8-01: the activated Decomposer cell — T1 draft, read, no write."""
+    Task.objects.create(id="PID00001-T001", project=project, title="Detail read")
+    Project.objects.filter(pk=project.pk).update(task_counter=1)
+    token = _issue_agent_token(owner_client, "PID00001", role="decomposer")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create = APIClient().post("/api/v1/projects/PID00001/tasks", VALID_CREATE, headers=headers)
+    assert create.status_code == 201, create.content
+    payload = create.json()
+    assert payload["state"] == "draft", "Section 19 WP-3.8: created tasks are draft"
+    assert payload["id"] == "PID00001-T002"
+
+    detail = APIClient().get("/api/v1/tasks/PID00001-T002", headers=headers)
+    assert detail.status_code == 200
+
+    patched = APIClient().patch(
+        "/api/v1/tasks/PID00001-T002",
+        {"title": "Nope", "version": 1},
+        headers=headers,
+        format="json",
+    )
+    assert patched.status_code == 403
+    assert _envelope(patched)["code"] == "ROLE_NOT_PERMITTED"
+
+
+def test_device_tokens_create_drafts_per_the_recorded_could_grant(
+    owner_client: APIClient, project: Project
+) -> None:
+    """The Device cell of "Create draft tasks" rode the MT-3.8-01 activation."""
     token = _register_device(owner_client)
     headers = {"Authorization": f"Bearer {token}"}
 
     response = APIClient().post("/api/v1/projects/PID00001/tasks", VALID_CREATE, headers=headers)
-    assert response.status_code == 403
-    assert _envelope(response)["code"] == "ROLE_NOT_PERMITTED"
+    assert response.status_code == 201, response.content
+    assert response.json()["state"] == "draft"
 
 
 def test_pid00001_agent_token_is_forbidden_on_pid00002_tasks(

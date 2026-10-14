@@ -54,6 +54,27 @@ def get_int(name: str, default: int) -> int:
     return parsed
 
 
+def get_nonnegative_int(name: str, default: int) -> int:
+    """Return the non-negative-integer environment value for *name*, or *default*.
+
+    Same contract as :func:`get_int` for the sections of the metadata rules
+    that legitimately include zero — clock fields above all (a daily trigger
+    at ``ORCHESTRATOR_BACKUP_TRIGGER_MINUTE=0`` is the documented default,
+    and midnight is ``_HOUR=0``; WP-6.2). Ranges tighter than ``>= 0`` are
+    validated by the settings module that consumes the value.
+    """
+    value = get_str(name, "")
+    if not value:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a non-negative integer (got {value!r})") from exc
+    if parsed < 0:
+        raise ValueError(f"{name} must be a non-negative integer (got {parsed})")
+    return parsed
+
+
 def get_list(name: str, default: list[str]) -> list[str]:
     """Return a comma-separated environment value as a list of non-empty items.
 

@@ -29,7 +29,7 @@ from rest_framework import serializers
 from apps.core.pagination import MAX_PAGE_SIZE
 from apps.core.serializers import StrictSerializerMixin
 
-from .models import PolicyDecisionValue, VerdictChoice
+from .models import PolicyDecisionValue, ReviewDecisionValue, ReviewVia, VerdictChoice
 from .services import VERDICT_VALUES
 
 
@@ -266,6 +266,102 @@ class AuditReportListQuerySerializer(serializers.Serializer[Any]):
     )
 
 
+# --- WP-3.6 review decisions (Section 9.2 Review row; MT-3.6-01) ---------------
+
+
+class ReviewDecisionRecordSerializer(serializers.Serializer[Any]):
+    """One recorded Section 7.2 Review Decision row, field for field."""
+
+    id = serializers.UUIDField(help_text="Server-generated UUID (MT-3.6-02).")
+    task_id = serializers.CharField(help_text="Section 7.2 ``task_id``.")
+    resolution_id = serializers.UUIDField(
+        allow_null=True,
+        help_text="Section 7.2 ``resolution_id`` — the current attempt's "
+        "resolution the reviewer saw (mandatory for approve, MT-3.6-04; "
+        "null for note actions on a review that never had a submission, "
+        "e.g. T9).",
+    )
+    decision = serializers.ChoiceField(
+        choices=ReviewDecisionValue.choices,
+        help_text="approve | request_changes | reassign (Section 9.2's three).",
+    )
+    note = serializers.CharField(
+        allow_blank=True,
+        help_text="The reviewer's note — mandatory for request_changes (T16 "
+        "guard); it becomes the Task's latest_feedback (Section 11.5).",
+    )
+    decided_by = serializers.CharField(
+        help_text="The acting principal: owner user id (web) or device id (mobile).",
+    )
+    decided_via = serializers.ChoiceField(
+        choices=ReviewVia.choices,
+        help_text="web | mobile — Section 7.2's two review channels (13/14).",
+    )
+    decided_at = serializers.DateTimeField(help_text="Server clock at insertion (P7).")
+
+
+class ReviewDecisionRequestSerializer(StrictSerializerMixin, serializers.Serializer[Any]):
+    """``POST /tasks/{id}/review`` input (Section 9.2 Review row)."""
+
+    decision = serializers.ChoiceField(
+        choices=ReviewDecisionValue.choices,
+        help_text="approve | request_changes | reassign — the only three the "
+        "plan accepts; anything else is VALIDATION_ERROR (MT-3.6-01 risk "
+        "note: never inferred from UI intent).",
+    )
+    note = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="The reviewer's note — mandatory for request_changes (T16 "
+        "guard), optional for reassign (it then becomes latest_feedback, "
+        "Section 11.5), carried onto the approve record too.",
+    )
+    resolution_id = serializers.UUIDField(
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text="The resolution id the reviewer was looking at — **required "
+        "for approve** (Section 14.2 approve safety; MT-3.6-04 binds the "
+        "decision to it server-side and rejects an outdated id with "
+        "VERSION_CONFLICT).",
+    )
+    version = serializers.IntegerField(
+        min_value=1,
+        help_text="The task ``version`` the client saw (FR-TSK-06) — a stale "
+        "value answers VERSION_CONFLICT (409) and changes nothing.",
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Approve carries its resolution binding (MT-3.6-04's input half)."""
+        if (
+            attrs.get("decision") == ReviewDecisionValue.APPROVE
+            and attrs.get("resolution_id") is None
+        ):
+            raise serializers.ValidationError(
+                {
+                    "resolution_id": (
+                        "approve binds the resolution the reviewer saw "
+                        "(Section 14.2) — send the resolution_id from the "
+                        "task details you approved."
+                    )
+                }
+            )
+        return attrs
+
+
+class ReviewDecisionResponseSerializer(serializers.Serializer[Any]):
+    """The frozen review response — the record + post-transition identity."""
+
+    decision = ReviewDecisionRecordSerializer(
+        help_text="The recorded Section 7.2 row (all decisions are recorded, Section 11.5).",
+    )
+    task = VerdictTaskStateSerializer(
+        help_text="Post-transition task identity — merge_status pending marks "
+        "T15's merge-pending sub-status; state pending is T16's return.",
+    )
+
+
 __all__ = [
     "AuditDecisionSerializer",
     "AuditReportListEnvelopeSerializer",
@@ -273,5 +369,8 @@ __all__ = [
     "AuditReportSerializer",
     "AuditVerdictRequestSerializer",
     "AuditVerdictResponseSerializer",
+    "ReviewDecisionRecordSerializer",
+    "ReviewDecisionRequestSerializer",
+    "ReviewDecisionResponseSerializer",
     "VerdictTaskStateSerializer",
 ]

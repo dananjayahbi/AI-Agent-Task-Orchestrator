@@ -26,6 +26,16 @@ key ``event type, task id, state version`` rides the payload). WP-5.4
 registers the FCM dispatcher with ``set_review_push_hook``; this module
 performs no delivery, only the in-process trigger (MT-1.5-03 scope).
 
+**Review-requested rule-details seam (WP-3.9; MT-3.9-01/02).** The
+dispatcher emits exactly one ``review.requested`` Event row on every
+``in_human_review`` entry, carrying the canonical ``review_reason`` and
+``task_version``; the Policy Engine's persisted rule results ride along
+only where an engine decided (T14) — the audit app registers the
+reader of ``policy_rule_results`` with
+``set_default_review_rule_details_hook`` from
+``AuditConfig.ready()``; rows without a policy evaluation (T8/T9/T18)
+express absence by the empty mapping, never a fabricated rule set.
+
 Both hooks replaceable: ``set_event_hook`` layers a test recorder over
 the production default (cleared with ``None``), and
 ``set_review_push_hook(None)`` restores the no-op push seam — test
@@ -39,10 +49,18 @@ from typing import Any
 
 type EventHook = Callable[[Mapping[str, Any]], None]
 type ReviewPushHook = Callable[[Mapping[str, Any]], None]
+#: MT-3.9-01: the rule-details half of the ``review.requested`` ``data``
+#: payload — ``(task, transition_id)`` in, the Policy Engine's persisted
+#: ``policy_rule_results`` mapping (WP-3.4's shape) out; empty mapping
+#: when the row carried no policy evaluation (T8/T9/T18 by design —
+#: absence is expressible, never fabricated).
+type ReviewRuleDetailsHook = Callable[[Any, str], Mapping[str, Any]]
 
 _default_event_hook: EventHook | None = None
 _event_hook: EventHook | None = None
 _review_push_hook: ReviewPushHook | None = None
+_default_review_rule_details_hook: ReviewRuleDetailsHook | None = None
+_review_rule_details_hook: ReviewRuleDetailsHook | None = None
 
 
 def set_default_event_hook(hook: EventHook | None) -> None:
@@ -83,3 +101,34 @@ def trigger_review_push(payload: Mapping[str, Any]) -> None:
     """Signal an ``in_human_review`` entry for push — no delivery here."""
     if _review_push_hook is not None:
         _review_push_hook(payload)
+
+
+def set_default_review_rule_details_hook(hook: ReviewRuleDetailsHook | None) -> None:
+    """Install (or remove) the Policy Engine's rule-details provider (WP-3.9).
+
+    Called once from ``apps.audit.apps.AuditConfig.ready()`` with the
+    reader of the persisted ``policy_rule_results`` (MT-3.9-01's rule
+    details); until an audit app is configured the default is ``None``
+    and ``review.requested`` payloads carry the reason without rule
+    details (MT-3.9-02: absence is expressible, never fabricated).
+    """
+    global _default_review_rule_details_hook
+    _default_review_rule_details_hook = hook
+
+
+def set_review_rule_details_hook(hook: ReviewRuleDetailsHook | None) -> None:
+    """Override the rule-details provider (test seam); ``None`` clears it."""
+    global _review_rule_details_hook
+    _review_rule_details_hook = hook
+
+
+def review_rule_details(task: Any, transition_id: str) -> Mapping[str, Any]:
+    """The ``review.requested`` data additions for one entry — override, else default."""
+    hook = (
+        _review_rule_details_hook
+        if _review_rule_details_hook is not None
+        else _default_review_rule_details_hook
+    )
+    if hook is None:
+        return {}
+    return hook(task, transition_id)

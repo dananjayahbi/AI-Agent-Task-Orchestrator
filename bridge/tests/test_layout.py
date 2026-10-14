@@ -59,6 +59,7 @@ def test_tools_registry_lists_the_catalog_tools() -> None:
         "submit_task_resolution",
         "release_task",
         "submit_audit_verdict",
+        "create_draft_task",
         "get_project_context",
     }
 

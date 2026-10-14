@@ -17,6 +17,7 @@ import 'package:orchestrator_mobile/orchestrator_mobile.dart';
 
 import '../dashboard/dashboard_test_support.dart';
 import '../realtime/realtime_test_support.dart';
+import '../task_detail/task_detail_test_support.dart';
 import 'board_test_support.dart';
 
 /// MT-5.6-03 widget battery: the horizontally paged six-state board —
@@ -38,7 +39,10 @@ void main() {
     transport = FakeSseTransport();
   });
 
-  Future<ProviderContainer> pumpBoard(WidgetTester tester) async {
+  Future<ProviderContainer> pumpBoard(
+    WidgetTester tester, {
+    FakeTaskDetailRepository? taskDetail,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: boardOverrides(
@@ -46,6 +50,7 @@ void main() {
           board: board,
           cache: cache,
           sseClient: buildTestSseClient(transport: transport),
+          taskDetail: taskDetail,
         ),
         child: MaterialApp(
           onGenerateRoute: onGenerateRoute,
@@ -248,13 +253,17 @@ void main() {
       );
     });
 
-    testWidgets(
-        'tapping a card hands off to the task detail route (WP-5.7 stub)',
+    testWidgets('tapping a card hands off to the task detail screen (WP-5.7)',
         (WidgetTester tester) async {
-      board.tasksByProject['PID00001'] = <Task>[
-        makeTask(id: 'PID00001-T1', state: StateEnum.draft),
-      ];
-      await pumpBoard(tester);
+      final Task cardTask = makeTask(
+        id: 'PID00001-T1',
+        state: StateEnum.draft,
+        title: 'Handoff task',
+      );
+      board.tasksByProject['PID00001'] = <Task>[cardTask];
+      final FakeTaskDetailRepository taskDetail = FakeTaskDetailRepository()
+        ..tasks['PID00001-T1'] = cardTask;
+      await pumpBoard(tester, taskDetail: taskDetail);
 
       await tester.tap(
         find.byKey(const ValueKey<String>('board-card-PID00001-T1')),
@@ -262,8 +271,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Task detail'), findsOneWidget,
-          reason: 'the WP-5.7 placeholder route must be pushed');
-      expect(find.textContaining('Not implemented yet'), findsOneWidget);
+          reason: 'the WP-5.7 detail route must be pushed with the task id');
+      expect(find.textContaining('Not implemented yet'), findsNothing);
+      expect(
+        find.byKey(const ValueKey<String>('task-detail-title')),
+        findsOneWidget,
+        reason: 'the real detail screen renders the pushed task id',
+      );
+      expect(find.text('Handoff task'), findsOneWidget);
     });
   });
 

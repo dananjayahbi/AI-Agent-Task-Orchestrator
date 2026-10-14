@@ -40,3 +40,10 @@ build/
 Thumbs.db
 .idea/
 .vscode/
+
+# --- Backups (WP-6.2; Section 12.4): database dumps and the media mirror
+# contain hashed tokens and audit rows — never staged. The default host
+# directory the worker's /backups mount resolves to (see .env.example);
+# ORCHESTRATOR_BACKUP_HOST_DIR can point elsewhere, but this default must
+# stay untracked even when the directory exists locally.
+infra/compose/backup-data/

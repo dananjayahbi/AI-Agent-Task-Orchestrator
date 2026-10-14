@@ -24,7 +24,9 @@ same expired set, so the chaos proofs live here:
 
 After every scenario the invariants are asserted: non-``in_progress``
 tasks carry no coder lease (invariant 1), nothing reached ``completed``
-(invariant 2), and history rows match event rows one-to-one.
+(invariant 2), and history rows match event rows one-to-one per
+transition (plus one ``review.requested`` per ``in_human_review``
+entry — MT-3.9-02).
 
 Skipped automatically outside the integration layer or when Postgres is
 unreachable — the skip reason carries the exact command:
@@ -90,7 +92,7 @@ def _held_expired_task(project: Any, index: int) -> tuple[Task, str]:
 
 
 def _assert_scenario_invariants(*tasks: Task) -> None:
-    """Section 8.3 invariants 1/2 plus history ↔ events one-to-one."""
+    """Section 8.3 invariants 1/2 plus history ↔ events (per entry) parity."""
     for task in tasks:
         task.refresh_from_db()
         if task.state == TaskState.IN_PROGRESS:
@@ -105,11 +107,15 @@ def _assert_scenario_invariants(*tasks: Task) -> None:
             assert task.lease_expires_at is None, f"{task.pk}: stale expiry in {task.state}"
         # Invariant 2: this suite never completes anything.
         assert task.state != TaskState.COMPLETED, f"{task.pk}: unexpected completed"
-        # Every dispatch wrote exactly one history row and one event row.
+        # Every dispatch wrote exactly one history row and one event row
+        # (WP-1.9) — plus exactly one MT-3.9-02 `review.requested` per
+        # entry into `in_human_review` (the T9 escalations this suite
+        # drives: one entry event per entry, never one per task).
+        entry_events = Event.objects.filter(task_id=task.pk, type="review.requested").count()
         assert (
-            TaskTransition.objects.filter(task=task).count()
+            TaskTransition.objects.filter(task=task).count() + entry_events
             == Event.objects.filter(task_id=task.pk).count()
-        ), f"{task.pk}: history rows do not match events one-to-one"
+        ), f"{task.pk}: history rows do not match events (per entry) one-to-one"
 
 
 # --- scenarios ---------------------------------------------------------------

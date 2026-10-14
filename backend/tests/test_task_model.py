@@ -136,6 +136,9 @@ def test_task_model_field_set_matches_section_7_2_exactly(project: Project) -> N
     # WP-3.3 adds `audit_reports` (AuditReport's FK, Section 7.2's Audit
     # Report relation) — same reading again; the `audit_retry_count`
     # column above is T12's counter (MT-3.3-03's §7.2 gap fill).
+    # WP-3.6 adds `review_decisions` (ReviewDecision's FK, Section 7.2's
+    # Review Decision relation) — same reading: relation metadata the
+    # review history attaches, recorded in the WP-3.6 changelog.
     assert reverse == {
         "attachments",
         "audit_reports",
@@ -143,6 +146,7 @@ def test_task_model_field_set_matches_section_7_2_exactly(project: Project) -> N
         "dependency_edges",
         "dependent_edges",
         "resolutions",
+        "review_decisions",
         "transitions",
     }, sorted(reverse)
 

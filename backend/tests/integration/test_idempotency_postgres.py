@@ -27,12 +27,11 @@ Coverage map (what proves what — nothing below is re-implemented):
   same-key storm (one 201 body or a catalog ``TASK_STATE_CONFLICT`` 409
   — never a second completion side effect; the Section 9.1 repeat-submit
   reading is recorded in the WP changelog).
-* **decision** — deferred: no decision endpoint exists yet
-  (``/api/v1/tasks/{id}/review`` remains in
-  ``tests/test_authorization_matrix.py::DEFERRED_ENDPOINTS`` until
-  WP-3.6 M3); the changelog records the deferral rather than inventing
-  a surface (MT-1.15-03 do-not-invent rule — MT-1.6-07's
-  duplicate-decision assertions have nothing to adopt until then).
+* **decision** — landed with WP-3.6: the review endpoint's sequential
+  and concurrent same-key replays (plus the MT-3.6-04 races) now live
+  in ``test_review_decision_postgres.py`` — adopted there, never
+  re-implemented here (the deferral this bullet used to carry is
+  closed by that file).
 
 Skipped automatically outside the integration layer or when Postgres is
 unreachable — the skip reason carries the exact command:

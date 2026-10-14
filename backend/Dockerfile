@@ -30,6 +30,23 @@ COPY --from=uv-bin /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev
 
+# pg_dump for the Section 9.9 backup trigger (WP-6.2). The dump runs in the
+# worker container against the Postgres 16 service, and pg_dump's major must
+# be >= the server's — Debian's own repository ships an older client, so the
+# client comes from the PGDG apt repository pinned to the server major.
+# Installed in the shared backend image (one image per Section 16.1) so any
+# backend-family container can take or restore a dump.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg; \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg; \
+    echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt trixie-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends postgresql-client-16; \
+    rm -rf /var/lib/apt/lists/*
+
 # Application source (a .dockerignore keeps caches, venvs and env files out —
 # Section 20.4 item 3: no secrets or host paths enter the image).
 COPY . .

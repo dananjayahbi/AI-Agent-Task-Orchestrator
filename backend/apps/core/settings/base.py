@@ -13,7 +13,7 @@ from urllib.parse import quote, unquote, urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 
-from .env import get_bool, get_int, get_list, get_str
+from .env import get_bool, get_int, get_list, get_nonnegative_int, get_str
 
 # backend/ directory (settings/ -> core/ -> apps/ -> backend/).
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -135,6 +135,36 @@ STORAGE_S3_ENDPOINT = get_str("ORCHESTRATOR_STORAGE_S3_ENDPOINT", "")
 STORAGE_S3_BUCKET = get_str("ORCHESTRATOR_STORAGE_S3_BUCKET", "")
 STORAGE_S3_ACCESS_KEY_ID = get_str("ORCHESTRATOR_STORAGE_S3_ACCESS_KEY_ID", "")
 STORAGE_S3_SECRET_ACCESS_KEY = get_str("ORCHESTRATOR_STORAGE_S3_SECRET_ACCESS_KEY", "")
+
+# --- Section 9.10 group: backup trigger (Section 9.9; NFR-05; WP-6.2) -------
+# The second location the daily dump and media sync land in (Section 16.5):
+# a directory outside the Postgres data volume and the media volume, so
+# losing either volume never loses the backup. Compose mounts the host
+# directory (ORCHESTRATOR_BACKUP_HOST_DIR) at this in-container path on the
+# worker; the dump and media halves read it through this one setting.
+BACKUP_ROOT = get_str("ORCHESTRATOR_BACKUP_ROOT", "/backups")
+# Backup retention (MT-6.2-03 decision, recorded in
+# docs/plan/wp-6.2-backup-retention-decision.md next to OQ-10 and flagged
+# for plan-owner confirmation — the plan names no backup retention): keep
+# BACKUP_MIN_KEEP newest dumps regardless of age, and dumps older than
+# BACKUP_RETENTION_DAYS beyond that floor are pruned by the daily trigger.
+BACKUP_RETENTION_DAYS = get_int("ORCHESTRATOR_BACKUP_RETENTION_DAYS", 14)
+BACKUP_MIN_KEEP = get_int("ORCHESTRATOR_BACKUP_MIN_KEEP", 7)
+# Daily trigger time (UTC — CELERY_TIMEZONE above; Section 9.9 says "daily"
+# without an hour, so the window is configuration, not a literal). Zero is
+# meaningful here (minute 0 is the default; midnight is hour 0), hence the
+# non-negative reader — the 0-23/0-59 range is enforced right below.
+BACKUP_TRIGGER_HOUR = get_nonnegative_int("ORCHESTRATOR_BACKUP_TRIGGER_HOUR", 2)
+BACKUP_TRIGGER_MINUTE = get_nonnegative_int("ORCHESTRATOR_BACKUP_TRIGGER_MINUTE", 0)
+if not 0 <= BACKUP_TRIGGER_HOUR <= 23:
+    raise ImproperlyConfigured(
+        f"ORCHESTRATOR_BACKUP_TRIGGER_HOUR must be within 0-23 (got {BACKUP_TRIGGER_HOUR})."
+    )
+if not 0 <= BACKUP_TRIGGER_MINUTE <= 59:
+    raise ImproperlyConfigured(
+        f"ORCHESTRATOR_BACKUP_TRIGGER_MINUTE must be within 0-59 (got {BACKUP_TRIGGER_MINUTE})."
+    )
+
 
 # --- Section 9.10 group: attachment limits (Section 9.5) ---------------------
 # The Section 9.5 defaults, environment-overridable; unit suffixes live in
@@ -359,6 +389,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.projects",
     "apps.tasks",
+    "apps.backup",  # no models — Section 9.9 backup trigger tasks (WP-6.2)
 ]
 
 # --- Structured logging (Section 17; MT-1.1-02) -----------------------------

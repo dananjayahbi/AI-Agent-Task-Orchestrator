@@ -84,4 +84,11 @@ export const queryKeys = {
   /** Latest checkpoint percent per task, populated from `task.checkpoint` events (MT-4.3-05). */
   boardCheckpointProgress: (pid: string) =>
     ['projects', pid, 'tasks', 'checkpoint-progress'] as const,
+  /**
+   * Stored patch body for one resolution (MT-4.7-02; Section 9.2
+   * `GET /resolutions/{id}/patch`). Artifacts are immutable (Section
+   * 7.2 sha256), so the entry is long-lived; keyed by resolution id —
+   * sibling of the task blocks above, independent of the pid.
+   */
+  resolutionPatch: (resolutionId: string) => ['resolutions', resolutionId, 'patch'] as const,
 };

@@ -8,21 +8,32 @@ three universal rules inside one ``transaction.atomic()``:
    written, so an unmapped ``(from_state, trigger)`` changes nothing.
 2. **One transaction** writes the state change (and every side effect),
    the ``version`` increment, **exactly one** Task Transition history
-   row (FR-TSK-04) and **exactly one** Section 9.6 Event row via the
-   single in-transaction hook (``hooks.emit_transition_event`` — WP-1.9
-   registers the writer; until then the seam is a no-op, never a second
-   mechanism). A failure anywhere — guard, invariant, or the hook
-   itself — rolls the whole dispatch back.
+   row (FR-TSK-04) and **exactly one** Section 9.6 Event row per
+   registered row event via the single in-transaction hook
+   (``hooks.emit_transition_event`` — WP-1.9 registers the writer;
+   until then the seam is a no-op, never a second mechanism) — plus,
+   on ``in_human_review`` entry only, the WP-3.9 ``review.requested``
+   event (MT-3.9-02: one per entry, same transaction, published
+   post-commit like every other event). A failure anywhere — guard,
+   invariant, or the hook itself — rolls the whole dispatch back.
 3. **Optimistic version**: ``expected_version`` (what the UI saw) is
    compared against the locked row; a stale value answers
    ``VERSION_CONFLICT`` (409) and changes nothing.
 
+Section 8.3 invariants are enforced as dispatch-time assertions where
+they are checkable here: never reach ``completed`` without
+``merge_status = merged`` (rule 2, with the OQ-06/ADR-008 no-merge-step
+exception), and the coder lease lives only in ``in_progress`` (rule 1).
+Rules 3 and 4 belong to WP-3.x (auditor sessions, Policy Engine) and
+are not yet enforceable at dispatch time.
+
 Resolution order is deliberate and testable: **state pair → actor →
 wired → guard → side effects → invariants → persist → history → event →
-push**. State first (Section 8.2 rule 1 makes every illegal pair a
-conflict regardless of who asks), then the Actor column
-(``TransitionActorForbidden`` — 403 ``ROLE_NOT_PERMITTED``), then the
-MT-1.5-04 stub refusal (nothing written), then the row's own guards.
+review.requested (entry only) → push**. State first (Section 8.2 rule 1
+makes every illegal pair a conflict regardless of who asks), then the
+Actor column (``TransitionActorForbidden`` — 403 ``ROLE_NOT_PERMITTED``),
+then the MT-1.5-04 stub refusal (nothing written), then the row's own
+guards.
 
 T1 (create) is **exempt from the registry by design**, recorded per
 MT-1.5-01's risk note: T1's From column is "*(new)*" — no row, no
@@ -33,13 +44,6 @@ already implemented as ``T1's model-level step`` by WP-1.4's
 through this dispatcher would fake a from-state the table does not
 have; the ``task.created`` event point stays in ``create_task`` for
 WP-1.9 (same seam).
-
-Section 8.3 invariants are enforced as dispatch-time assertions where
-they are checkable here: never reach ``completed`` without
-``merge_status = merged`` (rule 2, with the OQ-06/ADR-008 no-merge-step
-exception), and the coder lease lives only in ``in_progress`` (rule 1).
-Rules 3 and 4 belong to WP-3.x (auditor sessions, Policy Engine) and
-are not yet enforceable at dispatch time.
 """
 
 from __future__ import annotations
@@ -57,8 +61,16 @@ from ..exceptions import (
     TransitionNotWired,
     VersionConflict,
 )
-from ..models import ClaimedRole, MergeStatus, Task, TaskState, TaskTransition, TransitionReason
-from .hooks import emit_transition_event, trigger_review_push
+from ..models import (
+    ClaimedRole,
+    MergeStatus,
+    ReviewReason,
+    Task,
+    TaskState,
+    TaskTransition,
+    TransitionReason,
+)
+from .hooks import emit_transition_event, review_rule_details, trigger_review_push
 from .loader import ensure_registered
 from .registry import ACTOR_TYPES, DEFAULT_REGISTRY, TransitionContext, TransitionSpec
 
@@ -175,9 +187,44 @@ def dispatch_transition(
             }
         )
         if spec.to_state == TaskState.IN_HUMAN_REVIEW:
+            # WP-3.9 (MT-3.9-01/02): exactly one ``review.requested``
+            # event per ``in_human_review`` entry (Section 9.8's push
+            # trigger — T8/T9/T14 today, T18 when WP-3.7 wires it, and
+            # any fifth entry path by the same hook rule). The ``data``
+            # contract: the canonical Section 8.4 ``review_reason`` the
+            # row's side effect set, the dedupe key's ``task_version``
+            # (Section 9.8), and — only where the Policy Engine decided
+            # (T14 via the audit app's rule-details provider) — the
+            # persisted ``policy_rule_results``; T8/T9/T18 carry their
+            # reason with no rule-details key at all (absence is
+            # expressible, never a fabricated rule set). An entry row
+            # that never set a reason is a wiring bug — a programming
+            # error (``ValueError``), never a silent payload.
+            review_reason = task.review_reason
+            if review_reason not in set(ReviewReason.values):
+                raise ValueError(
+                    f"review_reason {review_reason!r} is not a Section 8.4 member — "
+                    f"{spec.transition_id} must set it before entry (MT-3.9-01)."
+                )
+            review_data: dict[str, Any] = {
+                "review_reason": review_reason,
+                "task_version": task.version,
+            }
+            review_data.update(review_rule_details(task, spec.transition_id))
+            emit_transition_event(
+                {
+                    "type": "review.requested",
+                    "project_id": task.project_id,
+                    "task_id": task.pk,
+                    "occurred_at": timezone.now(),
+                    "actor": {"type": actor_type, "ref": actor_ref},
+                    "data": review_data,
+                }
+            )
             # Section 9.8: push on `in_human_review` entry (all reasons) —
             # the dedupe key (event type, task id, state version) rides the
-            # payload for WP-5.4's dispatcher.
+            # payload for WP-5.4's dispatcher. The push is a downstream
+            # consumer of this one entry signal, never a second writer.
             trigger_review_push(
                 {
                     "event_type": spec.event_type,

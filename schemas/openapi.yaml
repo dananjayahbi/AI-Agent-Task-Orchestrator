@@ -1212,13 +1212,14 @@ paths:
           description: ''
     post:
       operationId: create_task
-      description: 'Create a task (Section 9.2 Tasks row; caller: Owner only). T1''s
-        model-level step: the id is allocated server-side (`{PID}-T{index}`, Section
-        7.3), `state` starts at `draft`, `version` starts at 1 (FR-TSK-06), `audit_required`
-        copies the project policy, and `target_scope` globs are validated against
-        Section 12.3. Accepts the FR-TSK-02 field set only — `state`, `version`, `id`,
-        lease/merge fields are rejected as unknown. `Idempotency-Key` replays a retry
-        without duplicating the task (ADR-012).'
+      description: 'Create a task (Section 9.2 Tasks row; Section 12.2 *Create draft
+        tasks* caller: Owner, Decomposer agent role, Device — MT-3.8-01). T1''s model-level
+        step: the id is allocated server-side (`{PID}-T{index}`, Section 7.3), `state`
+        starts at `draft`, `version` starts at 1 (FR-TSK-06), `audit_required` copies
+        the project policy, and `target_scope` globs are validated against Section
+        12.3. Accepts the FR-TSK-02 field set only — `state`, `version`, `id`, lease/merge
+        fields are rejected as unknown. Agents of every other role answer ROLE_NOT_PERMITTED
+        (403). `Idempotency-Key` replays a retry without duplicating the task (ADR-012).'
       parameters:
       - in: header
         name: Idempotency-Key
@@ -2349,6 +2350,99 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/tasks/{id}/review:
+    post:
+      operationId: submit_review_decision
+      description: 'Record one human review decision (Section 9.2 Review row; caller:
+        Owner / Device — §12.2). `decision` is one of the three plan values; `version`
+        is the optimistic-lock token (a stale value answers VERSION_CONFLICT, 409).
+        **approve** (T15) requires the `resolution_id` the reviewer saw (Section 14.2
+        approve safety): the server compares it to the task''s current-attempt resolution
+        under the row lock and rejects an outdated binding with VERSION_CONFLICT and
+        zero side effects (MT-3.6-04); a pass sets `merge_status = pending` (the Section
+        8.1 sub-status WP-3.7''s queue picks up) and records the decision. **request_changes**
+        (T16) requires a `note` (VALIDATION_ERROR otherwise) which becomes the task''s
+        `latest_feedback` for the next coder, preserves `attempt_number` and returns
+        the task to `pending`; **reassign** (T16) also returns to `pending` and clears
+        the worker. Each decision writes the Transition row, the `review.decided`
+        event (§9.6) and the Section 7.2 Review Decision record in one transaction
+        (§8.2 rule 2). `Idempotency-Key` replays a retried decision without a second
+        record or a second transition. Rejections: VALIDATION_ERROR (400), ROLE_NOT_PERMITTED
+        / AUTH_FORBIDDEN_PROJECT (403), TASK_NOT_FOUND (404), TASK_STATE_CONFLICT
+        / VERSION_CONFLICT (409).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of storing
+          a second Audit Report or firing a second transition.
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDecisionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReviewDecisionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReviewDecisionRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDecisionResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/tokens:
     get:
       operationId: api_v1_tokens_retrieve
@@ -3266,6 +3360,24 @@ components:
             no projects exist. Single-resource GET — no cursor pagination (pagination.md).
       required:
       - projects
+    DecidedViaEnum:
+      enum:
+      - web
+      - mobile
+      type: string
+      description: |-
+        * `web` - web
+        * `mobile` - mobile
+    DecisionEnum:
+      enum:
+      - approve
+      - request_changes
+      - reassign
+      type: string
+      description: |-
+        * `approve` - approve
+        * `request_changes` - request_changes
+        * `reassign` - reassign
     DeviceListEnvelope:
       type: object
       description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
@@ -4413,6 +4525,112 @@ components:
       - scope_violations
       - task
       - trigger
+    ReviewDecisionRecord:
+      type: object
+      description: One recorded Section 7.2 Review Decision row, field for field.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Server-generated UUID (MT-3.6-02).
+        task_id:
+          type: string
+          description: Section 7.2 ``task_id``.
+        resolution_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Section 7.2 ``resolution_id`` — the current attempt's resolution
+            the reviewer saw (mandatory for approve, MT-3.6-04; null for note actions
+            on a review that never had a submission, e.g. T9).
+        decision:
+          allOf:
+          - $ref: '#/components/schemas/DecisionEnum'
+          description: |-
+            approve | request_changes | reassign (Section 9.2's three).
+
+            * `approve` - approve
+            * `request_changes` - request_changes
+            * `reassign` - reassign
+        note:
+          type: string
+          description: The reviewer's note — mandatory for request_changes (T16 guard);
+            it becomes the Task's latest_feedback (Section 11.5).
+        decided_by:
+          type: string
+          description: 'The acting principal: owner user id (web) or device id (mobile).'
+        decided_via:
+          allOf:
+          - $ref: '#/components/schemas/DecidedViaEnum'
+          description: |-
+            web | mobile — Section 7.2's two review channels (13/14).
+
+            * `web` - web
+            * `mobile` - mobile
+        decided_at:
+          type: string
+          format: date-time
+          description: Server clock at insertion (P7).
+      required:
+      - decided_at
+      - decided_by
+      - decided_via
+      - decision
+      - id
+      - note
+      - resolution_id
+      - task_id
+    ReviewDecisionRequest:
+      type: object
+      description: '``POST /tasks/{id}/review`` input (Section 9.2 Review row).'
+      properties:
+        decision:
+          allOf:
+          - $ref: '#/components/schemas/DecisionEnum'
+          description: |-
+            approve | request_changes | reassign — the only three the plan accepts; anything else is VALIDATION_ERROR (MT-3.6-01 risk note: never inferred from UI intent).
+
+            * `approve` - approve
+            * `request_changes` - request_changes
+            * `reassign` - reassign
+        note:
+          type: string
+          default: ''
+          description: The reviewer's note — mandatory for request_changes (T16 guard),
+            optional for reassign (it then becomes latest_feedback, Section 11.5),
+            carried onto the approve record too.
+        resolution_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The resolution id the reviewer was looking at — **required
+            for approve** (Section 14.2 approve safety; MT-3.6-04 binds the decision
+            to it server-side and rejects an outdated id with VERSION_CONFLICT).
+        version:
+          type: integer
+          minimum: 1
+          description: The task ``version`` the client saw (FR-TSK-06) — a stale value
+            answers VERSION_CONFLICT (409) and changes nothing.
+      required:
+      - decision
+      - version
+    ReviewDecisionResponse:
+      type: object
+      description: The frozen review response — the record + post-transition identity.
+      properties:
+        decision:
+          allOf:
+          - $ref: '#/components/schemas/ReviewDecisionRecord'
+          description: The recorded Section 7.2 row (all decisions are recorded, Section
+            11.5).
+        task:
+          allOf:
+          - $ref: '#/components/schemas/VerdictTaskState'
+          description: Post-transition task identity — merge_status pending marks
+            T15's merge-pending sub-status; state pending is T16's return.
+      required:
+      - decision
+      - task
     Revoked:
       type: object
       description: 'POST /auth/logout: the instant the session token stopped working.'
@@ -4613,6 +4831,9 @@ components:
         latest_feedback:
           type: string
           readOnly: true
+          description: 'Section 7.2: text from auditor/human — the T16 request-changes
+            note shown to the next coder through get_task_details (Section 10.5; MT-3.6-03);
+            empty until the first note, newest note wins.'
         merge_status:
           type: string
           readOnly: true

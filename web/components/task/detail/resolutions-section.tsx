@@ -23,6 +23,7 @@
  */
 import { useState } from 'react';
 
+import { DiffPanel } from '@/components/diff/diff-panel';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/errors/error-state';
 import { EmptyState } from '@/components/states/empty-state';
@@ -121,6 +122,9 @@ function ResolutionEntry({
   resolution: Resolution;
   report: AuditReport | undefined;
 }) {
+  // Diff viewer (WP-4.7): mount-on-open, same fetch-on-expand
+  // discipline as the section itself (Section 13.3/13.4, RISK-13).
+  const [diffOpen, setDiffOpen] = useState(false);
   return (
     <li
       data-testid="resolution-entry"
@@ -159,6 +163,24 @@ function ResolutionEntry({
         <AuditReportSummary report={report} />
       ) : (
         <p className="text-xs text-muted-foreground">No audit report for this attempt.</p>
+      )}
+      <div>
+        <Button
+          size="sm"
+          variant="ghost"
+          data-testid={`resolution-diff-toggle-${resolution.id}`}
+          aria-expanded={diffOpen}
+          onClick={() => setDiffOpen((open) => !open)}
+        >
+          {diffOpen ? 'Hide diff' : 'View diff'}
+        </Button>
+      </div>
+      {diffOpen && (
+        <DiffPanel
+          resolution={resolution}
+          report={report}
+          testId={`resolution-diff-${resolution.id}`}
+        />
       )}
     </li>
   );

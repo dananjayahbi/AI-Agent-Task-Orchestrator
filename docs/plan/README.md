@@ -12,6 +12,8 @@ This directory holds planning documentation that lives with the repository.
 | [Error conventions](conventions/error-envelope.md) | Canonical error envelope and the 19-code catalog — WP-0.5 (MT-0.5-02), from parent plan Section 9.2. |
 | [Header conventions](conventions/headers.md) | Correlation id and idempotency key headers — WP-0.5 (MT-0.5-03), from parent plan Sections 9.2/9.6/17. |
 | [Pagination conventions](conventions/pagination.md) | Cursor-based pagination for all list endpoints, plus the Section 9.5 attachment `content` exception — WP-0.5 (MT-0.5-04). |
+| [Backup retention decision](wp-6.2-backup-retention-decision.md) | Dump retention policy (14 days, keep-floor 7) and media-mirror stance — WP-6.2 (MT-6.2-03), the sibling decision to Section 22's OQ-10, flagged for plan-owner confirmation. |
+| [Restore drill record](wp-6.2-restore-drill-2026-10-14.md) | The WP-6.2 (MT-6.2-04) drill record: date, artifacts, environment, steps, smoke result, duration, findings — one record per rehearsal, dated by file name. |
 
 Notes:
 

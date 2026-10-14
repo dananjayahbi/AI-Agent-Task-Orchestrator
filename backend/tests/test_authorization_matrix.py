@@ -9,8 +9,12 @@ kind — owner session, agent token per role, device token, anonymous:
   *Manage projects/policy* row moved onto ``GET /api/v1/projects`` when
   WP-1.3 landed the registry; *Create draft tasks* moved onto
   ``POST /api/v1/projects/{pid}/tasks`` when WP-1.4 landed the task
-  routes — its printed Decomposer/Device cells are recorded, still
-  denied, in ``DEFERRED_MATRIX_CELLS`` per MT-1.4-03's risk note); rows
+  routes — its printed Decomposer/Device cells were recorded, still
+  denied, in ``DEFERRED_MATRIX_CELLS`` per MT-1.4-03's risk note, and
+  MT-3.8-01 activated them by swapping the view's POST half onto the
+  ``CanCreateDraftTasks`` row class — the deferred list is empty again,
+  its mechanism intact; *Review decisions* moved onto
+  ``POST /api/v1/tasks/{id}/review`` with WP-3.6); rows
   without an endpoint keep probe routes
   that mount the real permission classes of ``apps.accounts.permissions``.
   Every still-deferred route is asserted **absent**: the first WP that lands
@@ -57,7 +61,6 @@ from apps.accounts.permissions import (
     CanOperateMergeQueue,
     CanPublishTasks,
     CanReadMergeQueue,
-    CanReviewDecisions,
 )
 from apps.core.errors import (
     AUTH_FORBIDDEN_PROJECT,
@@ -133,8 +136,9 @@ urlpatterns = [
     # *Manage projects/policy* left this list in WP-1.3 (its row runs on
     # the real ``GET /api/v1/projects`` below) and *Create draft tasks*
     # left it in WP-1.4 — that row now runs on the real
-    # ``POST /api/v1/projects/{pid}/tasks`` route with its Decomposer and
-    # Device cells recorded as deferred in ``DEFERRED_MATRIX_CELLS``.
+    # ``POST /api/v1/projects/{pid}/tasks`` route: MT-3.8-01 activated
+    # its Decomposer cell, and the still-deferred Device half stays
+    # recorded in ``DEFERRED_MATRIX_CELLS``.
     # WP-1.6 (MT-1.6-07) moved both *Claim* rows onto the real claim
     # route — their probe paths retired with them. WP-3.2 moved
     # *Submit resolution* onto the real submission route (its probe path
@@ -143,7 +147,13 @@ urlpatterns = [
     # WP-3.3 retired the *Submit verdict* probe: the row now runs on
     # the real ``POST /api/v1/tasks/{id}/audit-verdict`` below (its
     # permission class is the accounts row the probe used to mount).
-    path("probe/review", _probe_view(CanReviewDecisions).as_view()),
+    # WP-3.6 retired the *Review decisions* probe the same way: the row
+    # now runs on the real ``POST /api/v1/tasks/{id}/review`` route.
+    # The row has two allowed actors but one mutable task per request,
+    # so the real route carries **two** probes — one per actor, each
+    # bound to its own seeded ``in_human_review`` task (the fixture
+    # seeds T004/T005 below); the row-level union keeps every actor
+    # covered exactly once (traceability test above).
     path("probe/merge-queue", _probe_view(CanReadMergeQueue).as_view()),
     path("probe/merge-queue/start", _probe_view(CanOperateMergeQueue).as_view()),
     # WP-1.10 (MT-1.10-05) removed the *Read events* probe: the row now
@@ -200,17 +210,18 @@ PROBES: tuple[_Probe, ...] = (
     # *Manage projects/policy* runs on the real WP-1.3 route (GET list — the
     # row is exercised where the endpoint actually exists; MT-1.2-07).
     _Probe("Manage projects/policy", "/api/v1/projects", "GET", _cells(owner=True)),
-    # *Create draft tasks* runs on the real WP-1.4 route (MT-1.4-03). The
-    # printed Section 12.2 cells are Owner / Decomposer / Device (Could) —
-    # the latter two are **deferred** (MT-1.4-03 risk note: no distinct
-    # decomposer token kind yet) and recorded, still-denied, in
-    # DEFERRED_MATRIX_CELLS below; the full printed row stays covered at
-    # class level in tests/test_permission_classes.py (CanCreateDraftTasks).
+    # *Create draft tasks* runs on the real WP-1.4 route (MT-1.4-03).
+    # MT-3.8-01 (WP-3.8) activates the Decomposer cell by swapping the
+    # view's POST half onto the real row class (``CanCreateDraftTasks``)
+    # — the sanctioned activation the deferred-cells note prescribes.
+    # That class also carries the recorded Device "Yes (Could)" grant
+    # (WP-1.4's decision, cell-tested in test_permission_classes), so
+    # both formerly-deferred cells are walked here as allowed.
     _Probe(
         "Create draft tasks",
         f"/api/v1/projects/{PID_ONE}/tasks",
         "POST",
-        _cells(owner=True),
+        _cells(owner=True, decomposer=True, device=True),
         payload={"title": "Matrix draft"},
         ok=(201,),
     ),
@@ -278,7 +289,33 @@ PROBES: tuple[_Probe, ...] = (
         },
         ok=(201,),
     ),
-    _Probe("Review decisions", "/probe/review", "POST", _cells(owner=True, device=True)),
+    # *Review decisions* runs on the real WP-3.6 route (its probe path
+    # retired with the deferred entry below): two probes, one per
+    # allowed actor, each bound to its own seeded ``in_human_review``
+    # task so the mutable request never double-fires on one row — the
+    # owner cell lands T16 request_changes (201), the device cell lands
+    # T16 reassign (201); denied actors never reach the service (403).
+    # Device is *omitted* from the owner probe's grants (not marked
+    # denied): its printed cell is Yes, so walking it there would
+    # demand a 403 the matrix does not print — its allowed case runs on
+    # the second probe instead, keeping every actor x row cell asserted
+    # exactly once (the traceability test unions both probes).
+    _Probe(
+        "Review decisions",
+        f"/api/v1/tasks/{PID_ONE}-T004/review",
+        "POST",
+        {actor: allowed for actor, allowed in _cells(owner=True).items() if actor != "device"},
+        payload={"decision": "request_changes", "note": "matrix review", "version": 1},
+        ok=(201,),
+    ),
+    _Probe(
+        "Review decisions",
+        f"/api/v1/tasks/{PID_ONE}-T005/review",
+        "POST",
+        {actor: allowed for actor, allowed in _cells(device=True).items() if actor != "owner"},
+        payload={"decision": "reassign", "version": 1},
+        ok=(201,),
+    ),
     # Merge queue: Owner's cell is *Read* — the write half is the executor's.
     _Probe("Merge queue", "/probe/merge-queue", "GET", _cells(owner=True, merge_executor=True)),
     _Probe(
@@ -395,10 +432,30 @@ def matrix(owner_client: APIClient, tmp_path: Path) -> Iterator[_Authz]:
         execution_summary="matrix audit probe submission",
         submitted_by_session="sess-matrix-coder-sub",
     )
-    # The seeds occupy indices 1-2: advance the allocator's counter (it
-    # lives on the project row) so the Create-drafts probe's first
-    # allocation lands on T003 instead of colliding with T001.
-    Project.objects.filter(id=PID_ONE).update(task_counter=2)
+    # WP-3.6's Review-row seeds: two ``in_human_review`` tasks, each with
+    # its current-attempt resolution (the T15 binding input) — one per
+    # allowed actor's probe, because a mutable request never shares a row.
+    for review_index in (4, 5):
+        review_probe = Task.objects.create(
+            id=f"{PID_ONE}-T{review_index:03d}",
+            project=project,
+            title=f"Review probe (in_human_review {review_index})",
+            state=TaskState.IN_HUMAN_REVIEW,
+            attempt_number=1,
+        )
+        TaskResolution.objects.create(
+            task=review_probe,
+            attempt_number=1,
+            branch_name=f"feat/{PID_ONE}-T{review_index:03d}",
+            commit_sha="0123456789abcdef0123456789abcdef01234567",  # pragma: allowlist secret
+            execution_summary="matrix review probe submission",
+            submitted_by_session="sess-matrix-review-coder",
+        )
+    # The seeds occupy indices 1-2 and 4-5 (the Review row's two tasks):
+    # advance the allocator's counter (it lives on the project row) so
+    # the Create-drafts probe's first allocation lands on T006 instead
+    # of colliding with a seed.
+    Project.objects.filter(id=PID_ONE).update(task_counter=5)
 
     def _headers(actor: str) -> dict[str, str] | None:
         if actor in AGENT_ROLES:
@@ -488,13 +545,13 @@ def test_pid00001_agent_token_is_forbidden_on_pid00002_resources(
     Now on the **real** task routes (MT-1.4-03 landed them): the scope
     guard runs first on both shapes — the project-addressed create (PID
     in the URL) and the task-addressed detail (PID inside the task id) —
-    while the own-project create falls through to the Owner-only role
-    check (the deferred Decomposer cell, recorded in
-    ``DEFERRED_MATRIX_CELLS``).
+    and MT-3.8-01 sharpened the proof: the own-project create now
+    succeeds for the decomposer role (the cell is no longer deferred),
+    so the very same caller's refusal on PID00002 is scope alone
+    (Zero-Bleed outranks the granted role).
     """
     own = matrix.post("decomposer", f"/api/v1/projects/{PID_ONE}/tasks", {"title": "Own"})
-    assert own.status_code == 403
-    assert _code(own) == ROLE_NOT_PERMITTED  # deferred cell: owner-only today
+    assert own.status_code == 201, own.content  # MT-3.8-01: decomposer cell active
 
     other = matrix.post("decomposer", f"/api/v1/projects/{PID_TWO}/tasks", {"title": "Other"})
     assert other.status_code == 403
@@ -541,12 +598,13 @@ def test_body_supplied_project_id_cannot_widen_the_token_scope(
     assert _code(widen) == AUTH_FORBIDDEN_PROJECT
 
     # Mirror: a body claiming PID00002 neither narrows nor redirects the
-    # check — the URL's PID and the token agree, so scope passes and the
-    # Owner-only role check answers (if the body *had* redirected scope,
-    # this would be AUTH_FORBIDDEN_PROJECT instead).
+    # check — the URL's PID and the token agree, so scope passes, the
+    # MT-3.8-01 decomposer role passes, and the request dies at the
+    # strict serializer's unknown-field door instead (if the body *had*
+    # redirected scope, this would be AUTH_FORBIDDEN_PROJECT).
     narrow = matrix.post("decomposer", f"/api/v1/projects/{PID_ONE}/tasks", {"project_id": PID_TWO})
-    assert narrow.status_code == 403
-    assert _code(narrow) == ROLE_NOT_PERMITTED
+    assert narrow.status_code == 400
+    assert _code(narrow) == VALIDATION_ERROR
 
     # Positive proof on the allowed caller: the created row's project
     # comes from the URL — `project_id` is not client-settable at all
@@ -1181,6 +1239,33 @@ def test_wp33_landed_audit_routes_enforce_their_callers(matrix: _Authz) -> None:
     assert len(auditor_list.json()["results"]) == 1
 
 
+# --- WP-3.6 landing: the Review row's real callers (deferred retired) --------
+
+
+def test_wp36_landed_review_route_enforces_its_callers(matrix: _Authz) -> None:
+    """Real-route cases for review POST (removed deferred entry).
+
+    Section 9.2 prints Owner; Section 12.2's *Review decisions* row adds
+    Device. Anonymous 401 ``AUTH_REQUIRED``; every agent role 403
+    ``ROLE_NOT_PERMITTED`` (decomposer included — MT-3.8-01 re-checked
+    its column against this route too); the allowed cells land on the
+    real service in the PROBES walk above (request_changes on T004 for
+    the owner, reassign on T005 for the device), and the catalog of
+    service-level refusals lives in ``tests/test_review_endpoint.py``.
+    """
+    review = f"/api/v1/tasks/{PID_ONE}-T004/review"
+    body = {"decision": "reassign", "version": 1}
+
+    anon = matrix.call("anonymous", "POST", review)
+    assert anon.status_code == 401
+    assert _code(anon) == AUTH_REQUIRED
+
+    for denied in ("coder", "auditor", "decomposer", "merge_executor"):
+        refused = matrix.post(denied, review, body)
+        assert refused.status_code == 403, denied
+        assert _code(refused) == ROLE_NOT_PERMITTED, denied
+
+
 # --- deferred routes: an untested row must never be silently green ----------
 
 
@@ -1222,7 +1307,10 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     # and test_wp33_landed_audit_routes_enforce_their_callers below
     # carries the verdict/reports per-caller cases (leak-guard: the
     # rows are now asserted live, never left untested — MT-1.2-07).
-    "/api/v1/tasks/1/review",  # Review decisions (WP-1.5/1.6)
+    # WP-3.6 removed /api/v1/tasks/1/review as it landed the Review row:
+    # the *Review decisions* matrix row now runs on the real route in
+    # PROBES above (two probes — one per allowed actor), so the route is
+    # asserted live instead of absent.
     "/api/v1/merge/pending",  # Merge queue read (WP-3.x)
     "/api/v1/merge/1/start",  # Merge queue write (WP-3.x)
     "/api/v1/merge/1/result",  # Merge queue write (WP-3.x)
@@ -1249,21 +1337,19 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
 # --- deferred matrix cells: recorded, still denied, never silently green ----
 
 DEFERRED_MATRIX_CELLS: tuple[tuple[str, str], ...] = (
-    # MT-1.4-03 risk note, made executable: the real task routes enforce
-    # Owner-only **today**, while Section 12.2 prints these cells for
-    # "Create draft tasks" — Decomposer = Yes, Device = Yes (Could). With
-    # no distinct decomposer token kind yet (MT-1.2-05 risk), WP-2.x/M5
-    # must revisit them; activation means swapping the view's permission
-    # class to CanCreateDraftTasks (already implemented and cell-tested in
-    # tests/test_permission_classes.py) and flipping these rows to
-    # allowed — nothing here may be deleted to make a test pass.
-    ("Create draft tasks", "decomposer"),
-    ("Create draft tasks", "device"),
+    # Empty as of MT-3.8-01 (WP-3.8): the sanctioned activation path —
+    # "swapping the view's permission class to CanCreateDraftTasks … and
+    # flipping these rows to allowed" — activated **both** formerly
+    # deferred "Create draft tasks" cells (Decomposer and Device, the
+    # latter's recorded Yes-Could grant riding the same class). The
+    # tuple and its test stay in place: a future deferred cell lands
+    # here, recorded and still-denied, never silently green
+    # (MT-1.2-07; nothing was deleted to make a test pass).
 )
 
 
 def test_deferred_matrix_cells_are_recorded_and_still_denied(matrix: _Authz) -> None:
-    """The two deferred cells assert their CURRENT denial on the REAL route."""
+    """The remaining deferred cell asserts its CURRENT denial on the REAL route."""
     assert {row for row, _actor in DEFERRED_MATRIX_CELLS} <= set(MATRIX_ROWS)
 
     for row, actor in DEFERRED_MATRIX_CELLS:

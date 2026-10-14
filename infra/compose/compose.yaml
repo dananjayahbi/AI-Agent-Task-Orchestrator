@@ -82,6 +82,14 @@ services:
       # prod.py still refuses a loopback-ONLY list (real hostnames required).
       ORCHESTRATOR_ALLOWED_HOSTS: ${ORCHESTRATOR_ALLOWED_HOSTS:-localhost,127.0.0.1}
       ORCHESTRATOR_STORAGE_MEDIA_ROOT: ${ORCHESTRATOR_STORAGE_MEDIA_ROOT:-/media}
+      # Section 9.9 backup trigger (WP-6.2): the worker is the only service
+      # that writes here, so only the worker gets the mount (below); the other
+      # backend-family services inherit the name without the directory.
+      ORCHESTRATOR_BACKUP_ROOT: ${ORCHESTRATOR_BACKUP_ROOT:-/backups}
+      ORCHESTRATOR_BACKUP_TRIGGER_HOUR: ${ORCHESTRATOR_BACKUP_TRIGGER_HOUR:-2}
+      ORCHESTRATOR_BACKUP_TRIGGER_MINUTE: ${ORCHESTRATOR_BACKUP_TRIGGER_MINUTE:-0}
+      ORCHESTRATOR_BACKUP_RETENTION_DAYS: ${ORCHESTRATOR_BACKUP_RETENTION_DAYS:-14}
+      ORCHESTRATOR_BACKUP_MIN_KEEP: ${ORCHESTRATOR_BACKUP_MIN_KEEP:-7}
     networks: [internal]
     depends_on:
       postgres:
@@ -145,6 +153,14 @@ services:
     environment: *backend-env
     volumes:
       - backend_media:/media
+      # Section 16.5 second location for the daily dump + media sync (WP-6.2):
+      # a host directory OUTSIDE every Docker volume, so losing postgres_data
+      # or backend_media never loses the backup. The default is relative to
+      # this compose file (infra/compose/backup-data/); point
+      # ORCHESTRATOR_BACKUP_HOST_DIR at a second disk or network mount for
+      # real off-host durability. Dumps contain the whole database (hashed
+      # tokens, audit rows — Section 12.4): the directory stays out of Git.
+      - ${ORCHESTRATOR_BACKUP_HOST_DIR:-./backup-data}:/backups
     networks: [internal]
     healthcheck: # Section 16.1: worker liveness via worker-ping (WP-1.7)
       # `inspect ping` is answered by the worker itself through the broker;

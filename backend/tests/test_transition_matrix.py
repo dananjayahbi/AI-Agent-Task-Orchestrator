@@ -280,9 +280,15 @@ def test_legal_pair_dispatches_with_side_effects_and_one_history_row(
     assert row.reason_code == spec.reason_code
     assert row.timestamp is not None
 
-    assert len(events) == 1, "exactly one event per transition"
+    # One event per transition row, plus the WP-3.9 review.requested on
+    # in_human_review entry (MT-3.9-02 — exactly one per entry).
+    expected_events = 2 if spec.to_state == TaskState.IN_HUMAN_REVIEW else 1
+    assert len(events) == expected_events, "one event per transition (+ entry event)"
     assert events[0]["type"] == spec.event_type
     assert events[0]["data"]["task_version"] == 2
+    if spec.to_state == TaskState.IN_HUMAN_REVIEW:
+        assert events[1]["type"] == "review.requested", "MT-3.9-02 exactly one per entry"
+        assert events[1]["_in_atomic_block"] is True
 
     expected_pushes = 1 if spec.to_state == TaskState.IN_HUMAN_REVIEW else 0
     assert len(pushes) == expected_pushes, "Section 9.8: push on in_human_review entry"
