@@ -54,7 +54,9 @@ _SEED_SCRIPT = """
 import hashlib, json, secrets
 from apps.accounts.models import ApiToken, TokenKind, User
 from apps.projects.models import Project, ProjectPolicy
-from apps.tasks.models import Task, TaskState
+from apps.tasks.models import Task, TaskResolution, TaskState
+from apps.tasks.services.patch_parse import parse_unified_diff
+from apps.tasks.services.resolutions import store_patch_artifact
 
 PID = "PID00007"
 owner, _ = User.objects.get_or_create(username="bridge-it-owner", defaults={})
@@ -92,6 +94,72 @@ tasks = [
     make_task(2, "Bridge IT: two-bridge race task"),
     make_task(3, "Bridge IT: fifty-way race task"),
 ]
+
+# MT-3.5-03/04: one to_be_audited task carrying its attempt-1 resolution and a
+# *stored* clean patch artifact, so an independent auditor session can claim it
+# (T11) and the Policy Engine can scan added lines (R5b) for a T13 approve. The
+# coder session is fixed; the auditor session is bridge-minted and always
+# differs, so the session half of the independence rule (G-20) passes.
+CLEAN_PATCH = (
+    "diff --git a/src/app.py b/src/app.py\\n"
+    "index 1111111..2222222 100644\\n"
+    "--- a/src/app.py\\n"
+    "+++ b/src/app.py\\n"
+    "@@ -1,1 +1,2 @@\\n"
+    " context-line\\n"
+    "+print('hello')\\n"
+)
+AUDIT_INDEX = 4
+auditable_task_id = f"{PID}-T{AUDIT_INDEX:03d}"
+coder_session = "sess-live-coder"
+parsed = parse_unified_diff(CLEAN_PATCH)
+_task, _created = Task.objects.get_or_create(
+    id=auditable_task_id,
+    project=project,
+    defaults={
+        "title": "Bridge IT: auditable task",
+        "state": TaskState.TO_BE_AUDITED,
+        "attempt_number": 1,
+        "audit_required": True,
+        "target_scope": ["src/**"],
+        "test_command": "pytest -q",
+    },
+)
+# Reset to a clean auditable baseline on every seed run (idempotent re-runs).
+Task.objects.filter(id=auditable_task_id).update(
+    state=TaskState.TO_BE_AUDITED,
+    attempt_number=1,
+    audit_required=True,
+    target_scope=["src/**"],
+    test_command="pytest -q",
+    worker_agent_id=None,
+    worker_session_id=None,
+    claimed_role=None,
+    lease_acquired_at=None,
+    lease_expires_at=None,
+    merge_status="none",
+    review_reason=None,
+    archived_at=None,
+)
+Project.objects.filter(pk=PID, task_counter__lt=AUDIT_INDEX).update(task_counter=AUDIT_INDEX)
+resolution, _ = TaskResolution.objects.get_or_create(
+    task_id=auditable_task_id,
+    attempt_number=1,
+    defaults={
+        "branch_name": f"feat/{PID}-T{AUDIT_INDEX:03d}",
+        "commit_sha": "0123456789abcdef0123456789abcdef01234567",  # pragma: allowlist secret
+        "execution_summary": "live auditor-flow seed submission",
+        "submitted_by_session": coder_session,
+        "changed_files": list(parsed.changed_files),
+        "diff_summary": parsed.as_diff_summary(),
+    },
+)
+# Store the patch body so R5(b) can scan added lines (stored artifact row).
+# Idempotent re-runs: artifact_one_per_resolution_kind means a re-seed of the
+# same resolution must not create a second patch artifact.
+if not resolution.artifacts.filter(kind="patch").exists():
+    store_patch_artifact(resolution, CLEAN_PATCH)
+
 tokens = []
 for _ in range(5):
     plaintext = "bridge-it-" + secrets.token_hex(24)
@@ -120,6 +188,9 @@ print(
             "tasks": tasks,
             "tokens": tokens,
             "decomposer_token": decomposer_token,
+            # MT-3.5-03/04: the to_be_audited task the live auditor chain claims.
+            "auditable_task": auditable_task_id,
+            "auditor_coder_session": coder_session,
         }
     )
 )
@@ -181,6 +252,10 @@ def _subprocess_env() -> dict[str, str]:
                 "ORCHESTRATOR_BRIDGE_LIVE_CACHE_URL", DEFAULT_CACHE_URL
             ),
             "ORCHESTRATOR_SECRET_KEY": dev_secret,
+            # MT-3.5-03/04: the auditable seed stores a patch artifact, so the
+            # media root must be a writable local dir (never the /media default,
+            # which is not writable on every host).
+            "ORCHESTRATOR_STORAGE_MEDIA_ROOT": str(Path(__file__).resolve().parent / ".live-media"),
         }
     )
     return env
@@ -235,6 +310,8 @@ class LiveBackend:
     tasks: tuple[str, ...]
     tokens: tuple[str, ...]
     decomposer_token: str | None = None  # MT-3.8-02 live draft-creation proof
+    auditable_task: str | None = None  # MT-3.5-03/04 to_be_audited chain task
+    auditor_coder_session: str | None = None  # the seed's independent coder session
     process: subprocess.Popen[str] | None = None
     log_path: Path | None = None
 
@@ -320,6 +397,8 @@ def start_live_backend() -> LiveBackend:
         tasks=tuple(payload["tasks"]),
         tokens=tuple(payload["tokens"]),
         decomposer_token=payload.get("decomposer_token"),
+        auditable_task=payload.get("auditable_task"),
+        auditor_coder_session=payload.get("auditor_coder_session"),
         process=process,
         log_path=log_path,
     )

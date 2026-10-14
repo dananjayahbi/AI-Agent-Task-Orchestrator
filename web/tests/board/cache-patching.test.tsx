@@ -382,9 +382,9 @@ describe('Board cache patching (MT-4.3-05)', () => {
       2,
       makeEventEnvelope({
         id: 2,
-        type: 'review.decided',
+        type: 'audit.escalated',
         task_id: 'PID00001-T001',
-        data: { decision: 'approve' },
+        data: { review_reason: 'auditor_flagged' },
       }),
     );
     streams[0].heartbeat();

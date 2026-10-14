@@ -38,8 +38,13 @@ import { isCatalogEventType } from '@/lib/stream/event-catalog';
 export type StreamStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
 export type UseEventStreamOptions = {
-  /** Section 9.6 `project` filter — fixed for the subscription. */
-  project: string;
+  /**
+   * Section 9.6 `project` filter — fixed for the subscription. Omit for
+   * a cross-project subscription (the filters are optional in
+   * Section 9.6; authorization still scopes the feed — MT-4.8-01's
+   * review queue is the current consumer).
+   */
+  project?: string;
   /** Subscriber sink; kept in a ref so it never re-opens the stream. */
   onEvent: (event: EventEnvelope) => void;
   /** Reconnect backoff base (exponential, capped at 30 s). Test knob. */
@@ -108,7 +113,7 @@ export function useEventStream(options: UseEventStreamOptions): {
         safeSetStatus(resumeFrom === null ? 'connecting' : 'reconnecting');
         try {
           const { stream } = await apiV1EventsStreamRetrieve({
-            query: { project },
+            ...(project !== undefined && project !== '' ? { query: { project } } : {}),
             ...(resumeFrom !== null ? { headers: { 'Last-Event-ID': String(resumeFrom) } } : {}),
             signal: controller.signal,
             // One backoff authority: the hook loop below, not the client.

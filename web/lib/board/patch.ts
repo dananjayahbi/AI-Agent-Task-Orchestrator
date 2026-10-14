@@ -20,6 +20,10 @@
  *  | task.claimed / task.released| pure patch of state+version, plus a          |
  *  |                             | **targeted single-task refetch** for the     |
  *  |                             | worker/lease fields the payload omits        |
+ *  | review.decided              | **targeted single-task refetch** (MT-4.4-04: |
+ *  |                             | settles the optimistic decision with the     |
+ *  |                             | row — T15's merge_status, T16's state/worker |
+ *  |                             | — idempotently against the HTTP response)    |
  *  | task.created / task.updated | **targeted single-task refetch** (payload has |
  *  |                             | no row data / changed field values)          |
  *  | audit.passed, merge.*       | **targeted single-task refetch** (merge       |
@@ -61,6 +65,10 @@ const REFETCH_EVENTS = new Set([
   'task.claimed',
   'task.released',
   'audit.passed',
+  // MT-4.4-04: a recorded review decision supersedes/confirms the
+  // optimistic dialog patch with the server row (merge_status for T15,
+  // state/worker for T16) — one writer after confirmation.
+  'review.decided',
   'merge.started',
   'merge.succeeded',
   'merge.failed',
@@ -194,9 +202,9 @@ export function applyEventToBoard(
     return { tasks, refetchTaskIds: [taskId] };
   }
 
-  // Out of board scope (project.*, attachment.*, audit.* other, review.*,
-  // agent.*, system.alert): ignore without breaking the stream
-  // (Section 20.4 item 6).
+  // Out of board scope (project.*, attachment.*, audit.* other,
+  // review.requested, agent.*, system.alert): ignore without breaking the
+  // stream (Section 20.4 item 6).
   return { tasks, refetchTaskIds: [] };
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Resolutions section (MT-4.6-03, available part; Section 9.2
+ * Resolutions section (MT-4.6-03; Section 9.2
  * `GET /tasks/{id}/resolutions` + `GET /tasks/{id}/audit-reports`;
  * Section 7.2 Task Resolution / Audit Report fields).
  *
@@ -14,12 +14,9 @@
  * without one, Section 8.5). Fetch-on-expand keeps the first load light
  * (Section 13.3/13.4).
  *
- * Deferred (see WP changelog): the transitions-history rows — Section
- * 9.2 exposes no `GET /tasks/{id}/transitions`, so the region renders
- * an explicit notice instead of inventing an endpoint; and
- * `latest_feedback` propagation from WP-3.6 (Wave 8) — the block renders
- * the Task field as-is today and gains review-context copy when the
- * backend starts populating it.
+ * Deferred (see WP changelog): none of this block — the transition
+ * history lives in its own section (`transitions-section.tsx`, sourced
+ * from the published `GET /events` history).
  */
 import { useState } from 'react';
 
@@ -244,28 +241,6 @@ export function ResolutionsSection({ pid, taskId }: ResolutionsSectionProps) {
           ))}
         </ul>
       )}
-    </section>
-  );
-}
-
-/**
- * Transition history region (deferred — MT-4.6-03; see WP changelog).
- * Section 9.2 lists no transitions endpoint, so the block renders an
- * explicit notice instead of inventing one (WP-4.4 precedent: never a
- * silent no-op, never a fabricated contract).
- */
-export function TransitionsHistorySection() {
-  return (
-    <section
-      data-testid="task-detail-section-transitions"
-      aria-label="Transition history"
-      className="grid gap-2"
-    >
-      <h2 className="text-sm font-semibold text-foreground">Transition history</h2>
-      <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-        Transition history needs a task-transitions endpoint that is not part of the published API
-        yet. It will appear here once the backend exposes it.
-      </p>
     </section>
   );
 }

@@ -11,11 +11,14 @@ import 'package:orchestrator_mobile/core/security/biometric_authenticator.dart';
 import 'package:orchestrator_mobile/core/security/secure_token_store.dart';
 import 'package:orchestrator_mobile/features/board/board_repository.dart';
 import 'package:orchestrator_mobile/features/board/projects_repository.dart';
+import 'package:orchestrator_mobile/features/audit_log/audit_log_repository.dart'
+    show auditLogRepositoryProvider;
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary.dart';
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary_source.dart';
 import 'package:orchestrator_mobile/orchestrator_mobile.dart'
     hide DashboardSummary, ProjectDashboardCard;
 
+import 'audit_log/audit_log_test_support.dart' show FakeAuditLogRepository;
 import 'board/board_test_support.dart';
 import 'dashboard/dashboard_test_support.dart';
 import 'realtime/realtime_test_support.dart';
@@ -52,6 +55,10 @@ void main() {
           projectsRepositoryProvider
               .overrideWithValue(FakeProjectsRepository()),
           boardRepositoryProvider.overrideWithValue(FakeBoardRepository()),
+          // Audit log (MT-5.9-04) loads on mount — fake the seam so the
+          // route-table sweep never touches flavor/HTTP configuration.
+          auditLogRepositoryProvider
+              .overrideWithValue(FakeAuditLogRepository()),
           sseClientProvider.overrideWithValue(
             buildTestSseClient(transport: FakeSseTransport()),
           ),
@@ -126,26 +133,34 @@ void main() {
   });
 
   group('Section 14.1 routes', () {
-    testWidgets('each pushed area renders its placeholder', (tester) async {
+    testWidgets(
+        'the pushed areas render their real screens (review sheet WP-5.8, '
+        'audit log MT-5.9-04), not placeholders', (tester) async {
       await pumpApp(tester);
       final NavigatorState navigator =
           tester.state<NavigatorState>(find.byType(Navigator));
 
-      // Onboarding is fully implemented (MT-5.5-06) and task detail is
-      // real since WP-5.7 (MT-5.7-01), so both are excluded from the
-      // placeholder list and checked below.
-      const List<AppArea> pushedAreas = <AppArea>[
-        AppArea.review,
-        AppArea.auditLog,
-      ];
-      for (final AppArea area in pushedAreas) {
-        navigator.pushNamed(area.path);
-        await tester.pumpAndSettle();
-        expect(find.text(area.label), findsOneWidget);
-        expect(find.textContaining('Not implemented yet'), findsOneWidget);
-        navigator.pop();
-        await tester.pumpAndSettle();
-      }
+      // Onboarding (MT-5.5-06), task detail (WP-5.7), the review sheet
+      // (WP-5.8) and the audit log (MT-5.9-04) are all real now: each
+      // must render content with no "Not implemented yet" banner. The
+      // review route pushed without an id shows its honest no-task state.
+      navigator.pushNamed(AppArea.review.path);
+      await tester.pumpAndSettle();
+      expect(find.text(AppArea.review.label), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('review-no-task')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Not implemented yet'), findsNothing);
+      navigator.pop();
+      await tester.pumpAndSettle();
+
+      navigator.pushNamed(AppArea.auditLog.path);
+      await tester.pumpAndSettle();
+      expect(find.text(AppArea.auditLog.label), findsOneWidget);
+      expect(find.textContaining('Not implemented yet'), findsNothing);
+      navigator.pop();
+      await tester.pumpAndSettle();
     });
 
     testWidgets(

@@ -78,6 +78,11 @@ BRIDGE_ENDPOINTS: Final[tuple[Endpoint, ...]] = (
     Endpoint("project_policy", "GET", "/api/v1/projects/{pid}/policy"),
     Endpoint("manifest_read", "GET", "/api/v1/projects/{pid}/manifest"),
     Endpoint("task_create_draft", "POST", "/api/v1/projects/{pid}/tasks"),
+    # WP-3.7 (MT-3.7-01): the Section 9.2 Merge queue row, in the document —
+    # the executor's whole backend surface (MT-3.7-02 consumes it).
+    Endpoint("merge_pending", "GET", "/api/v1/merge/pending"),
+    Endpoint("merge_start", "POST", "/api/v1/merge/{task}/start"),
+    Endpoint("merge_result", "POST", "/api/v1/merge/{task}/result"),
     Endpoint("health_live", "GET", "/health/live"),
 )
 

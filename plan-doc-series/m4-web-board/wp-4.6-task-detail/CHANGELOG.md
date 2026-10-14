@@ -106,6 +106,34 @@
   field; the detail view already renders the field when set
   (MT-4.6-01), so no web change is needed beyond the backend landing.
   Tests: `web/tests/task/resolutions-section.test.tsx` (6).
+- **MT-4.6-03 — transition history completed (done; supersedes the
+  deferral above).** The remaining half — the append-only transition
+  record — now ships from the **published `GET /events` history**
+  (Section 9.2 Events row, task filter; still no
+  `GET /tasks/{id}/transitions` in the schema — the OQ below is answered
+  by using a documented contract, never an invented endpoint): every
+  state-machine dispatch writes both the Transition row and its Section
+  9.6 event with the same `{from_state, to_state, reason_code,
+  task_version}` payload plus `actor` and the server `occurred_at`
+  (Section 8.2 rule 2), so `lib/queries/transitions.ts` collects the
+  task-filtered cursor pages through the generated client (NFR-11),
+  keeps only transition-shaped envelopes (checkpoints and
+  `review.requested` payloads fail the gate), and serves them newest
+  first. `components/task/detail/transitions-section.tsx` replaces the
+  endpoint-gap stub: fetch-on-expand (Section 13.3/13.4 —
+  `fetchAllPages`' page cap bounds long tasks, RISK-13), read-only rows
+  with actor (type: ref), from → to state labels next to canonical
+  keys, the reason code **verbatim** (Section 8.2 / 20.5) and the server
+  timestamp; loading / empty / error states distinct with catalog-only
+  copy. `latest_feedback` visibility was already delivered by MT-4.6-01
+  and is unchanged.
+  Tests: `web/tests/task/transitions-section.test.tsx` (4) —
+  fetch-on-expand + `task=` filter shape, newest-first ordering with
+  verbatim reason codes and actor/timestamp, non-transition envelopes
+  excluded, empty and catalog-mapped error states (the superseded
+  endpoint-gap stub test was removed with the stub).
+  Battery: 307 web tests green; `tsc --noEmit` / `eslint .` /
+  `prettier --check .` clean.
 - **Shared fixtures:** `web/tests/helpers/task-detail.ts` adds
   contract-complete factories for `Checkpoint`, `Attachment`,
   `AttachmentContent`, `Resolution` and `AuditReport` (mirroring the

@@ -58,6 +58,40 @@
 - Device create-draft stays the recorded WP-1.4 "Yes (Could)" grant
   (not part of the decomposer role; §12.2 marks it Could).
 
+**MT-3.8-03 — Write decomposer restriction tests (cannot publish or claim) (done).**
+`backend/tests/test_decomposer_restriction.py` walks the Section 12.2
+Decomposer column against the real routes with a real `decomposer`-scoped
+agent token — one asserting test per **No** cell, catalog codes only:
+manage projects/policy (both PATCHes), publish/unpublish, claim `pending`
+(T4), claim `to_be_audited` (T11), submit resolution, submit verdict,
+review decisions (T15/T16 entry), merge queue (`GET /merge/pending`
+**and** `POST /merge/{task}/start`), and read events. Scope extras ride
+in the same suite: the positive control (draft create → 201, `draft`,
+`task.created`) and work listing — `role=decomposer` answers
+`VALIDATION_ERROR` (§10.5 has only coder/auditor listing roles) and every
+offer a decomposer *can* see is refused on claim, so nothing is
+claimable. Regression controls in the same run prove the denials are
+role-scoped: Owner's publish probe still 200, coder claim of `pending`
+and auditor claim of `to_be_audited` still 200.
+`bridge/tests/test_create_draft_task_restriction.py` carries the
+tool-path half: a `create_draft_task` draft positive control, claim
+(T4/T11) and `submit_audit_verdict` denials surfacing verbatim
+`ROLE_NOT_PERMITTED` `ToolFailure`s (code, hint, next action — the
+Section 10.5 error rule), and the declared-errors contract for all three
+tools.
+Recorded readings: no HTTP publish route exists yet (the service owns
+T2/T3), so the suite mounts the real `CanPublishTasks` class at a
+module-local probe exactly as `test_authorization_matrix.py` does — T3
+shares that class because the catalog has no separate unpublish
+permission (none invented); policy *read* stays §9.2's agent read (only
+manage is the Owner cell); work listing is an agent surface
+(`IsAgentToken`), so "no decomposer listing role" is proven
+behaviorally (invalid role + claim refusal) rather than as a 403.
+Tests: `uv run pytest backend/tests/ -k decomposer_restriction -q` →
+10 passed; `uv run pytest bridge/tests/ -k create_draft_task -q` → 16
+passed, 1 skipped (the live integration case); full backend and bridge
+gates green.
+
 ## 2026-10-14 — Bridge half: MT-3.8-02 (create_draft_task tool)
 
 ### Delivered
@@ -124,15 +158,10 @@ smuggled-`state` rejection, plus the live end-to-end above.
 
 ### Deferred
 
-* **MT-3.8-03 (decomposer restriction tests)** — deferred per the
-  assignment: the Section 12.2 "No"-cell restriction suite needs
-  both MT-3.8-01 (landed) and MT-3.8-02 (this entry) fully merged
-  and re-based on the final backend surface; the positive-control
-  half (create succeeds, row is `draft`) is already covered by the
-  live test above. Re-assign for the denial suite: publish,
-  unpublish, claim `pending`/`to_be_audited`, resolution, verdict,
-  review decisions, merge queue — backend half to the backend
-  agent, tool-path half to the bridge owner.
+* **MT-3.8-03** — landed 2026-10-14 (entry under `## Unreleased` above):
+  the Section 12.2 "No"-cell restriction suite — backend half
+  `backend/tests/test_decomposer_restriction.py`, tool-path half
+  `bridge/tests/test_create_draft_task_restriction.py`.
 
 ### Files (bridge half)
 

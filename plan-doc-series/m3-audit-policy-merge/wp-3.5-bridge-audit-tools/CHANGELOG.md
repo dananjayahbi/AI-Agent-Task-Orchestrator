@@ -50,11 +50,10 @@ endpoint; this WP delivers the bridge-side gate.
 
 ## Deferred (roadmap 4a)
 
-* **MT-3.5-03 (auditor flow)** — deferred: needs WP-2.8's
-  `orchestrator:audit` prompt and WP-3.4's policy engine landing
-  concurrently.
-* **MT-3.5-04 (auditor tests)** — deferred: depends on MT-3.5-03 and
-  WP-3.4.
+*None — the two roadmap-4a items (MT-3.5-03, MT-3.5-04) were lifted on
+2026-10-14 (WP-2.8's `orchestrator:audit` prompt and WP-3.4's policy
+engine landed in earlier batches) and are delivered under
+`## Unreleased`; no WP-3.5 item remains blocked.*
 
 ## Files
 
@@ -74,3 +73,64 @@ endpoint; this WP delivers the bridge-side gate.
 ### Convergence gate (2026-10-14)
 
 - Bridge suite at convergence: **684 passed, 7 skipped**; `test_openapi_contract` 13/13 green against the authoritative regen (`4026FFCA…`).
+
+## Unreleased
+
+**MT-3.5-03 — Implement the auditor flow with auditor rules integration (done).**
+
+The bridge now carries the auditor flow end to end. The `claim_task` wire
+body gained the `role` field (WP-3.3's `ClaimRequest`), so an auditor claim
+reaches the backend's T11 half instead of defaulting to coder; the tool
+schema description was updated to match. Connect-time rules delivery now
+renders **both** Section 10.6 blocks — the coder standard rules and the
+auditor obligations — via a new shared `rules.render_connect_rules` helper,
+used identically by the initialize instructions (`server._initialize_instructions`)
+and `get_project_context` (byte-identity preserved, G-08); the auditor rules
+are therefore visible before any claim, satisfying the "initialize
+instructions" acceptance. The read-only checkout requirement is exercised
+through the Section 10.8 helper (`create_or_switch_branch` + the `run_git`
+capability guard refusing push/reset). Outcome honesty is pinned: the verdict
+tool reports the backend's own task state/`merge_status`/`review_reason`
+(T13 merge-pending vs T14 `in_human_review`) and never marks outcomes itself
+(ADR-009).
+
+New `tests/test_auditor_flow.py` (`-k auditor_flow`): role-on-the-wire +
+auditor-rules claim, auditor list filter, both-blocks instructions,
+byte-identical context, read-only checkout refusal sentinel, verdict
+fencing-pair + backend-decided outcome, T12 `LEASE_EXPIRED` stop-and-re-claim,
+and a live-gated list→claim→checkout→verdict chain against the real backend
+(the `_live_backend` seed gained an auditable T004 with a stored clean patch
+and a media root). Test evidence: `uv run pytest tests/test_auditor_flow.py -q`
+→ **8 passed** (unit; live chain gated on `ORCHESTRATOR_BRIDGE_LIVE_TESTS=1`).
+Full-suite verification (2026-10-14): `uv run pytest -q` → **775 passed,
+10 skipped**; every failure sits in `tests/test_merge_executor_worktree.py`
+(concurrent WP-3.7 WIP, outside this WP) — zero failures in this WP's files;
+scoped `ruff check`/`ruff format --check`/`mypy` clean for them.
+
+**MT-3.5-04 — Write auditor tool tests incl. invalid evidence guidance (done).**
+
+New `tests/test_audit_tools.py` (`-k audit_tools`) pins WP-3.5's behavioral
+acceptance. A malformed-evidence matrix asserts every rejection carries the
+full three-element contract — Section 9.2 `VALIDATION_ERROR` code, non-empty
+hint, non-empty next action — **and names the offending field**:
+missing `evidence`, empty `evidence.commands`, a command missing
+`label`/`command`/`exit_code`, `confidence` 0 and 6, a verdict outside
+`pass|flag_risk|fail`, a criterion without `met`, and a blank criterion
+string. Cross-role and lease-owner rejections are exercised at the tool
+level (`ROLE_NOT_PERMITTED` on a coder claim of a `to_be_audited` task,
+`AUDITOR_SAME_AS_CODER`, `LEASE_NOT_OWNED`), plus T12's `LEASE_EXPIRED`
+stop-and-re-claim guidance. T13 *and* T14 both appear: the merge-pending
+report (T13) in `test_auditor_flow.py` and a rule-fail `flag_risk` verdict
+reporting the backend's `in_human_review` + enumerated `review_reason`
+(T14, ADR-009 — reported, never chosen). The schema contract reuses
+MT-3.5-01's snapshot (re-imported and re-run) and asserts only catalog codes
+are declared. Test evidence: `uv run pytest tests/test_audit_tools.py -q`
+→ **18 passed**; scoped `ruff check`/`ruff format --check`/`mypy` clean
+(full-suite numbers as in the MT-3.5-03 entry above).
+
+Shared-file edits (conflict-awareness): `tools/claim.py` (role on the wire),
+`tools/schemas.py` (claim role description only — the verdict schema is
+untouched), `rules.py` (new `render_connect_rules`), `server.py` +
+`tools/context.py` (single-line switch to the connect render),
+`tests/_live_backend.py` (auditable seed + media root),
+`tests/test_claim_task.py` (wire-body pin updated to include `role`).

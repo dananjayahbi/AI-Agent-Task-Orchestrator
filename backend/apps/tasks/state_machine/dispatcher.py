@@ -178,12 +178,7 @@ def dispatch_transition(
                 "task_id": task.pk,
                 "occurred_at": timezone.now(),
                 "actor": {"type": actor_type, "ref": actor_ref},
-                "data": {
-                    "from_state": from_state,
-                    "to_state": task.state,
-                    "reason_code": reason,
-                    "task_version": task.version,
-                },
+                "data": _event_data(context, from_state=from_state, task=task, reason=reason),
             }
         )
         if spec.to_state == TaskState.IN_HUMAN_REVIEW:
@@ -235,6 +230,37 @@ def dispatch_transition(
                 }
             )
     return task
+
+
+def _event_data(
+    context: TransitionContext,
+    *,
+    from_state: str,
+    task: Task,
+    reason: str,
+) -> dict[str, Any]:
+    """Build the Section 9.6 event ``data`` payload for one dispatch.
+
+    The four core keys are fixed by the Section 9.6 contract (WP-1.5's
+    exact-equality probe pins them), so row-specific additions the caller
+    parked in ``extra["event_data"]`` (a plain mapping — WP-3.7's merge
+    rows carry the resulting ``sha``) merge *underneath* them and cannot
+    shadow the core fields. Rows that pass nothing get the original
+    four-key payload unchanged.
+    """
+    additions = context.extra.get("event_data") if context.extra else None
+    if additions is not None and not isinstance(additions, Mapping):
+        raise ValueError("extra['event_data'] must be a plain mapping when provided")
+    data: dict[str, Any] = dict(additions) if isinstance(additions, Mapping) else {}
+    data.update(
+        {
+            "from_state": from_state,
+            "to_state": task.state,
+            "reason_code": reason,
+            "task_version": task.version,
+        }
+    )
+    return data
 
 
 def _assert_completed_invariant(task: Task) -> None:

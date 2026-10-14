@@ -35,6 +35,11 @@ import 'package:orchestrator_mobile/src/model/device_register_response.dart';
 import 'package:orchestrator_mobile/src/model/error_envelope.dart';
 import 'package:orchestrator_mobile/src/model/event_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/login_request.dart';
+import 'package:orchestrator_mobile/src/model/merge_queue_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/merge_result_request.dart';
+import 'package:orchestrator_mobile/src/model/merge_result_response.dart';
+import 'package:orchestrator_mobile/src/model/merge_start_request.dart';
+import 'package:orchestrator_mobile/src/model/merge_start_response.dart';
 import 'package:orchestrator_mobile/src/model/orchestrator_manifest.dart';
 import 'package:orchestrator_mobile/src/model/owner_session.dart';
 import 'package:orchestrator_mobile/src/model/patched_project_policy.dart';
@@ -2087,6 +2092,106 @@ class ApiApi {
     );
   }
 
+  /// listMergePending
+  /// Tasks awaiting a merge (Section 9.2 Merge queue row; caller: Merge Executor, Owner read-only — §12.2). The queue is every live task with &#x60;merge_status &#x3D; pending&#x60; in a carrier state (&#x60;in_human_review&#x60; from T15&#39;s approve, &#x60;to_be_audited&#x60; from the engine-approved T10/T13 branches — Section 8.1&#39;s sub-status, never a seventh state). Cursor pagination per pagination.md: &#x60;page_size&#x60; (default 25, maximum 100, clamped), the opaque &#x60;cursor&#x60; from the previous &#x60;next_cursor&#x60;, FIFO by task id so polling is stable. An agent token sees only its own project&#39;s queue (ADR-004 zero-bleed); the Owner sees every project. Coder/auditor/decomposer agents and devices answer ROLE_NOT_PERMITTED (403); anonymous AUTH_REQUIRED (401).
+  ///
+  /// Parameters:
+  /// * [cursor] - Opaque cursor from the previous page's next_cursor; FIFO by task id so polling is stable (pagination.md rule 1).
+  /// * [pageSize] - Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults).
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [MergeQueueListEnvelope] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<MergeQueueListEnvelope>> listMergePending({
+    String? cursor,
+    int? pageSize,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/merge/pending';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (cursor != null)
+        r'cursor':
+            encodeQueryParameter(_serializers, cursor, const FullType(String)),
+      if (pageSize != null)
+        r'page_size':
+            encodeQueryParameter(_serializers, pageSize, const FullType(int)),
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    MergeQueueListEnvelope? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(MergeQueueListEnvelope),
+            ) as MergeQueueListEnvelope;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<MergeQueueListEnvelope>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// listProjects
   /// List registered projects. Sort: project id ascending — PID generation order, i.e. creation order (zero-padded Section 7.3 ids make lexicographic order deterministic; pagination.md rule 2). Pagination: cursor-based — pass &#x60;cursor&#x60; from the previous &#x60;next_cursor&#x60;; &#x60;page_size&#x60; defaults to 25, clamped to 100. Caller: Owner only — the list spans every project, so agent tokens are refused here (ROLE_NOT_PERMITTED); an agent reads its own project through &#x60;GET /projects/{pid}&#x60; instead.
   ///
@@ -3209,6 +3314,122 @@ class ApiApi {
     );
   }
 
+  /// reportMergeResult
+  /// Report one merge outcome (Section 9.2 Merge queue row; caller: Merge Executor — §12.2). &#x60;succeeded&#x60; dispatches T17 → &#x60;completed&#x60; + &#x60;merge_status &#x3D; merged&#x60; (ADR-008: completed only when the result is reported), carrying the required &#x60;sha&#x60; in the payload, the history note and the &#x60;merge.succeeded&#x60; event data (Section 7.2 has no sha column — the three carriers are the contract). &#x60;conflict&#x60;/&#x60;failed&#x60; dispatch T18 → &#x60;in_human_review&#x60; with &#x60;review_reason &#x3D; merge_conflict&#x60; (Section 8.4) and the Section 9.8 push, emitting &#x60;merge.failed&#x60;. Exactly one row applies: a repeat report on an exited task answers TASK_STATE_CONFLICT (409). &#x60;Idempotency-Key&#x60; replays a retried report with no second transition. Rejections: VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT (403), TASK_NOT_FOUND (404), TASK_STATE_CONFLICT / VERSION_CONFLICT (409), RATE_LIMITED (429).
+  ///
+  /// Parameters:
+  /// * [task]
+  /// * [mergeResultRequest]
+  /// * [idempotencyKey] - Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second claim or applying a second merge result.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [MergeResultResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<MergeResultResponse>> reportMergeResult({
+    required String task,
+    required MergeResultRequest mergeResultRequest,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/merge/{task}/result'.replaceAll(
+        '{' r'task' '}',
+        encodeQueryParameter(_serializers, task, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(MergeResultRequest);
+      _bodyData =
+          _serializers.serialize(mergeResultRequest, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    MergeResultResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(MergeResultResponse),
+            ) as MergeResultResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<MergeResultResponse>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// retrieveAttachment
   /// Read one attachment descriptor by id (Section 9.2; caller: Owner or an agent token scoped to the attachment&#39;s project). &#x60;token_count&#x60; and &#x60;short_description&#x60; are null until the WP-1.12 pipeline fills them (FR-ATT-03/07). Foreign agent tokens answer AUTH_FORBIDDEN_PROJECT (403); unknown or malformed ids answer VALIDATION_ERROR (400 — the catalog has no attachment not-found code; recorded mapping).
   ///
@@ -3843,6 +4064,123 @@ class ApiApi {
     }
 
     return Response<Task>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// startMerge
+  /// Claim one pending task for merging (Section 9.2 Merge queue row; caller: Merge Executor — §12.2). One transaction: verify the task is live, in a carrier state and still &#x60;merge_status &#x3D; pending&#x60; (anything else answers TASK_STATE_CONFLICT, 409 — a second executor&#39;s claim or an exited task changes nothing), optional &#x60;version&#x60; CAS (VERSION_CONFLICT, 409), then set &#x60;merging&#x60;, increment &#x60;version&#x60; and write the &#x60;merge.started&#x60; event (Section 9.6) — published after commit. Not a dispatch: Section 8.2 has no start row (recorded reading). &#x60;Idempotency-Key&#x60; replays a retried claim with no second event. Rejections: VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT (403), TASK_NOT_FOUND (404), TASK_STATE_CONFLICT / VERSION_CONFLICT (409), RATE_LIMITED (429).
+  ///
+  /// Parameters:
+  /// * [task]
+  /// * [idempotencyKey] - Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second claim or applying a second merge result.
+  /// * [mergeStartRequest]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [MergeStartResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<MergeStartResponse>> startMerge({
+    required String task,
+    String? idempotencyKey,
+    MergeStartRequest? mergeStartRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/merge/{task}/start'.replaceAll(
+        '{' r'task' '}',
+        encodeQueryParameter(_serializers, task, const FullType(String))
+            .toString());
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(MergeStartRequest);
+      _bodyData = mergeStartRequest == null
+          ? null
+          : _serializers.serialize(mergeStartRequest, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    MergeStartResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(MergeStartResponse),
+            ) as MergeStartResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<MergeStartResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -65,10 +65,69 @@ files, including the 141 pre-existing WP-4.1/4.2/4.3 tests) and
   rejected pick; hover-affordance lifecycle; explicit deferred-seam
   notices (never a silent no-op); virtualization intact with DnD wired.
 
+- **MT-4.4-03 — approve-merge and request-changes/reassign dialogs
+  (done; consumes WP-3.6's `POST /tasks/{id}/review`, landed Wave 8).**
+  Both `dialog` verdicts now open a real confirmation instead of the
+  deferred notice — the board renders `components/review/review-move-dialogs.tsx`
+  by default (the `onDialog` seam still interceptable for tests).
+  `approve-merge-dialog.tsx` (T15): surfaces task id, title, the
+  Section 8.4 escalation reason (verbatim code + friendly label from
+  `lib/review/review-reasons.ts`) and **the resolution being approved** —
+  attempt/branch/commit loaded via the existing fetch-on-expand
+  `useTaskResolutionsQuery`, newest attempt first; the submitted
+  `resolution_id` binds to exactly that displayed row (Section 14.2 /
+  MT-3.6-04 stale protection), and with no resolution the confirm button
+  is blocked with T15's reason. Outcome copy is honest to Section 8.1:
+  approval → "approved, merging" badge, never a completed column.
+  `request-changes-dialog.tsx` (T16): note **mandatory** and validated
+  client-side before any request (`noteValidationError` — the server
+  guard stays the gate), `reassign` optional-note; both send the
+  `version` the dialog saw. Both dialogs keep open on endpoint failure
+  with catalog-mapped copy (Section 13.3; G-07 — raw envelope text never
+  rendered), and are Radix-backed (focus trap, Escape, focus return —
+  Section 13.4), reachable from the keyboard/touch destination picker.
+  **Tests:** `tests/review/review-dialogs.test.tsx` (7) — dialog routing
+  for both verdicts (card never moves on open), `resolution_id` + version
+  binding to the *displayed* attempt, T15 no-resolution block, note
+  guard before any request, reassign body, failure-stays-open with
+  catalog copy + rollback refresh, keyboard-only path (picker → dialog →
+  focus-in → Escape, zero calls).
+- **MT-4.4-04 — optimistic update with rollback (done on the review
+  path; the `allowed`-move sender stays behind the seam — endpoint gap
+  below, unchanged).** `lib/review/optimistic.ts` (pure reducers) +
+  `lib/queries/review-decision.ts` (one `useMutation`): `onMutate`
+  patches the exact board cache entry the dialog opened from — T16
+  previews the return to `pending` with lease fields cleared (Section
+  8.3 invariant 1), T15 only flips `merge_status` to `pending`
+  (merge-pending is a sub-status — the card never leaves the review
+  column); the POST carries the version the dialog saw (Section 8.2 rule
+  3). `onSuccess` settles from the response's post-transition identity
+  (`VerdictTaskState`), re-applying the active server filters;
+  `onError` rolls back to **server truth** — a targeted
+  `GET /tasks/{id}` refresh (refresh beats restore-from-memory), with
+  the snapshot only as fallback — and announces the catalog-mapped
+  message; `VERSION_CONFLICT` and `TASK_STATE_CONFLICT` map to distinct
+  copy plus a "board refreshed" note. Stream reconciliation: WP-4.3's
+  cache patcher now routes `review.decided` to a targeted single-task
+  refetch (the `task.claimed` precedent), so the confirming event and
+  the HTTP response settle the same row idempotently in either arrival
+  order — one writer after confirmation, no double move. The one
+  behavior pin that changed with this wiring: `cache-patching.test.tsx`'s
+  "out-of-scope events" fixture now uses `audit.escalated`
+  (`review.decided` is in scope), and `drag-drop.test.tsx`'s
+  deferred-seam test asserts the dialog opening instead of the
+  hand-off notice (`moveSendUnavailableNotice` stays for `allowed`).
+  **Tests:** `tests/board/optimistic-rollback.test.tsx` (5) — instant
+  move before the response, event-before-response and response-after
+  settlement with no oscillation, approve staying in review, both
+  conflict codes rolling back to server truth with distinct messages,
+  filters intact. Full battery: 307 passed (37 files); `tsc --noEmit`,
+  `eslint .`, `prettier --check .` green.
+
 ### Deferrals (recorded per roadmap §4a rule 1)
 
-- **MT-4.4-03 (deferred):** approve-and-merge and request-changes/reassign dialogs wait on `POST /tasks/{id}/review` (WP-3.6, Wave 8) — both `dialog` verdicts already route to the `onDialog` seam with mocked tests.
-- **MT-4.4-04 (deferred):** optimistic update with rollback waits on MT-4.4-03 (dialog outcomes) and the transition endpoint — the `onMove` seam already carries `{task (with version), target, action}` with mocked tests.
+- **MT-4.4-03 (superseded historical note):** approve-and-merge and request-changes/reassign dialogs wait on `POST /tasks/{id}/review` (WP-3.6, Wave 8) — both `dialog` verdicts already route to the `onDialog` seam with mocked tests. **Superseded: delivered above once WP-3.6 landed the endpoint; authoritative status is the bold entry under `## Unreleased`.**
+- **MT-4.4-04 (deferred):** optimistic update with rollback waits on MT-4.4-03 (dialog outcomes) and the transition endpoint — the `onMove` seam already carries `{task (with version), target, action}` with mocked tests. **Partially superseded: the dialog-driven optimistic/rollback path is delivered above; the `allowed`-move sender still waits on the transition endpoint (below).**
 
 ### Endpoint gap — `POST /tasks/{id}/transition` is unowned in the schema
 

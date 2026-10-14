@@ -439,6 +439,25 @@ class _TaskCard extends StatelessWidget {
                 key: ValueKey<String>('board-card-worker-${task.id}'),
                 style: theme.textTheme.bodySmall,
               ),
+              if (task.state == StateEnum.inHumanReview) ...<Widget>[
+                const SizedBox(height: 8),
+                // "Needs review" affordance → the review sheet by task
+                // id (MT-5.8-01 entry point; the deep-link routing
+                // itself stays WP-5.9).
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    key: ValueKey<String>('board-card-review-${task.id}'),
+                    onPressed: () => Navigator.pushNamed(
+                      context,
+                      AppArea.review.path,
+                      arguments: task.id,
+                    ),
+                    icon: const Icon(Icons.rate_review_outlined, size: 18),
+                    label: const Text('Open review sheet'),
+                  ),
+                ),
+              ],
               if (mergePending) ...<Widget>[
                 const SizedBox(height: 8),
                 Container(

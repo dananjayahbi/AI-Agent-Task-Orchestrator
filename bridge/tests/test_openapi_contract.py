@@ -307,6 +307,24 @@ RESPONSE_SAMPLES["attachment_content"] = {
     "token_count": 412,
 }
 
+#: WP-3.7 (MT-3.7-01) queue listing: the ``results`` + ``next_cursor``
+#: envelope (pagination.md) with one Section 7.2 pending row.
+RESPONSE_SAMPLES["merge_pending"] = {
+    "results": [
+        {
+            "id": "PID00007-T004",
+            "project_id": "PID00007",
+            "title": "Add invoice export",
+            "state": "in_human_review",
+            "version": 6,
+            "merge_status": "pending",
+            "branch_name": "feat/PID00007-T004",
+            "merge_strategy": "squash",
+        }
+    ],
+    "next_cursor": None,
+}
+
 #: WP-3.2's frozen 201 body for ``POST /tasks/{id}/resolution`` — the
 #: Section 10.5 outcome reporting half (the suite schema-checks responses
 #: for declared GETs; a mutating endpoint's response sample here documents
@@ -398,6 +416,16 @@ REQUEST_SAMPLES: dict[str, Any] = {
             "lint_clean": True,
         },
         "acceptance_criteria_results": [{"criterion": "Export runs green", "met": True}],
+    },
+    # WP-3.7's merge-queue mutations (Section 9.2): the CAS version the
+    # executor saw in the listing rides both claims (FR-TSK-06); a stale
+    # value answers VERSION_CONFLICT and applies nothing.
+    "merge_start": {"version": 6},
+    "merge_result": {
+        "result": "succeeded",
+        "sha": "0123456789abcdef0123456789abcdef01234567",  # pragma: allowlist secret
+        "details": "fast-forwarded feat/PID00007-T004 into main",
+        "version": 7,
     },
 }
 

@@ -16,10 +16,10 @@ const waves = [
   { id: 4, name: "Events, attachments",    total: 32, done: 32, status: "done" },
   { id: 5, name: "Bridge skeleton & web",  total: 33, done: 33, status: "done" },
   { id: 6, name: "Bridge core tools",      total: 36, done: 36, status: "done" },
-  { id: 7, name: "Policy core & Kanban",   total: 34, done: 33, status: "active" },
-  { id: 8, name: "Agent loop completion",  total: 42, done: 32, status: "active" },
-  { id: 9, name: "Merge & review UIs",     total: 40, done: 15, status: "active" },
-  { id: 10, name: "Release & hardening",   total: 40, done: 0,  status: "pending" },
+  { id: 7, name: "Policy core & Kanban",   total: 34, done: 34, status: "done" },
+  { id: 8, name: "Agent loop completion",  total: 42, done: 36, status: "active" },
+  { id: 9, name: "Merge & review UIs",     total: 40, done: 37, status: "active" },
+  { id: 10, name: "Release & hardening",   total: 40, done: 4,  status: "active" },
 ];
 
 /** Timeline of execution (append newest at the bottom; mark status). */
@@ -70,6 +70,17 @@ const timeline = [
       "over 15 phases after fixing a drill-check stdout-banner flaw), wp-3.6+3.8-01+3.9 review decisions, " +
       "decomposer permissions and escalation payloads. Gates: backend 1467 + 27 PG, bridge 711 + live, " +
       "web 287, mobile 199; web OpenAPI client regenerated to match schemas/openapi.yaml.",
+  },
+  {
+    date: "2026-10-14",
+    status: "active",
+    event: "Batch 9 complete — 284/330 micro-docs (86.1%)",
+    detail:
+      "Parallel implementation (6 agents) + power-cut recovery (3 fresh finishers) + first parallel gate (backend/bridge/web/mobile/hygiene). " +
+      "Landed: merge executor wp-3.7 (strategies, journal/recovery, live e2e) + mt-3.8-03, bridge conformance harness mt-2.11-01, " +
+      "auditor-flow mt-3.5-03/04, metrics scaffold mt-6.4-01, web review dialogs/queue/optimistic + agents/audit/policy panels (362 tests), " +
+      "mobile review sheet + audit log + release signing (243 tests). Gates: backend 1512 + 27 PG, bridge 834 incl. live, web 362, " +
+      "mobile 243; OpenAPI regenerated (+405 lines).",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

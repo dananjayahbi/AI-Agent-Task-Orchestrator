@@ -66,6 +66,12 @@ def cli(argv: Sequence[str] | None = None, *, explicit_mode: RunMode | None = No
         help="run mode; explicit invocation beats ORCHESTRATOR_BRIDGE_MODE, "
         "which beats the default (stdio)",
     )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="merge-executor only: process the current queue snapshot once and "
+        "exit (the on-demand launch form of Section 10.2)",
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
     explicit = explicit_mode
     if explicit is None and args.mode is not None:
@@ -78,19 +84,30 @@ def cli(argv: Sequence[str] | None = None, *, explicit_mode: RunMode | None = No
         return EXIT_CONFIG_ERROR
 
     mode = resolve_mode(explicit, settings)
+    if args.once and mode is not RunMode.MERGE_EXECUTOR:
+        print(
+            f"configuration error: --once is only valid for the "
+            f"{RunMode.MERGE_EXECUTOR.value} mode (got '{mode.value}')",
+            file=sys.stderr,
+        )
+        return EXIT_CONFIG_ERROR
     configure_logging(settings, mode=mode)
     init_from_env()
     if mode is RunMode.MERGE_EXECUTOR:
-        # Stub boundary first: WP-3.7 validates mode-required config (e.g.
-        # merge_repo_paths) when it implements the executor.
         from . import executor
 
         try:
-            executor.run(settings)
+            # WP-3.7: validate_for_mode requires merge_repo_paths (Section
+            # 10.2); resolve_merge_step returns the composed worktree +
+            # strategy step (MT-3.7-03/04) — the NotImplementedError
+            # backstop below is never hit once those have landed.
+            return executor.run(settings, once=args.once)
+        except ConfigError as exc:
+            print(f"configuration error: {exc}", file=sys.stderr)
+            return EXIT_CONFIG_ERROR
         except NotImplementedError as exc:
             print(str(exc), file=sys.stderr)
             return EXIT_NOT_IMPLEMENTED
-        return EXIT_OK
 
     validate_for_mode(settings, mode)  # STDIO/HTTP: no required keys today
     if mode is RunMode.HTTP:

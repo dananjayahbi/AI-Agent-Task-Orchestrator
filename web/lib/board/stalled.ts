@@ -17,7 +17,22 @@ import type { Task } from '@/lib/api/generated/types.gen';
 /** Section 7.2 documented default for `stalled_after_minutes`. */
 export const DEFAULT_STALLED_AFTER_MINUTES = 20;
 
-export function isTaskStalled(task: Task, stalledAfterMinutes: number, nowMs: number): boolean {
+/**
+ * Exactly the columns the Section 8.6 derivation reads. Widened from the
+ * full `Task` (MT-4.9-03) so a task/lease join row — which carries these
+ * same Section 7.2 fields — can share this one derivation instead of
+ * duplicating it; passing a whole `Task` stays valid.
+ */
+export type StallSubject = Pick<
+  Task,
+  'state' | 'lease_expires_at' | 'last_checkpoint_at' | 'lease_acquired_at' | 'created_at'
+>;
+
+export function isTaskStalled(
+  task: StallSubject,
+  stalledAfterMinutes: number,
+  nowMs: number,
+): boolean {
   // A coder lease exists only in in_progress (Section 8.3 invariant 1) —
   // everywhere else the question does not arise.
   if (task.state !== 'in_progress') {

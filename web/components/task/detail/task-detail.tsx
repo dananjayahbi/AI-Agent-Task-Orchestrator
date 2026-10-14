@@ -36,10 +36,8 @@ import Link from 'next/link';
 
 import { AttachmentViewer } from '@/components/task/detail/attachment-viewer';
 import { CheckpointFeed } from '@/components/task/detail/checkpoint-feed';
-import {
-  ResolutionsSection,
-  TransitionsHistorySection,
-} from '@/components/task/detail/resolutions-section';
+import { ResolutionsSection } from '@/components/task/detail/resolutions-section';
+import { TransitionsHistorySection } from '@/components/task/detail/transitions-section';
 import { PriorityChip } from '@/components/board/priority-chip';
 import { ErrorState } from '@/components/errors/error-state';
 import { LoadingState } from '@/components/states/loading-state';
@@ -239,7 +237,7 @@ export function TaskDetail({ pid, taskId }: TaskDetailProps) {
       </section>
 
       <ResolutionsSection pid={pid} taskId={taskId} />
-      <TransitionsHistorySection />
+      <TransitionsHistorySection pid={pid} taskId={taskId} />
     </article>
   );
 }

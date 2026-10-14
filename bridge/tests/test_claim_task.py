@@ -103,11 +103,13 @@ def test_wire_body_is_the_claim_request_contract_only() -> None:
     fake, _ = _backend()
     claim_task(build_runtime(fake), task_id="PID00007-T004", agent_identifier="coder-1")
     (call,) = fake.calls_to("POST", _CLAIM_PATH)
-    # Exactly the backend's ClaimRequest — no role field (token scopes decide
-    # per Section 12.2), no project_id (Section 10.3).
-    assert set(call.body) == {"session_id", "worker_agent_id"}
+    # Exactly the backend's ClaimRequest — role rides so the backend can gate
+    # coder/auditor claimable states (WP-3.3; MT-3.5-03), no project_id
+    # (Section 10.3).
+    assert set(call.body) == {"session_id", "worker_agent_id", "role"}
     assert call.body["session_id"] == "fixture-session-0001"
     assert call.body["worker_agent_id"] == "coder-1"
+    assert call.body["role"] == "coder"  # default role travels as coder
     assert call.headers["Idempotency-Key"]  # NFR-12 / ADR-012
 
 

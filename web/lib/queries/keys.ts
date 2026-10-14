@@ -75,12 +75,28 @@ export const queryKeys = {
   taskAuditReports: (pid: string, taskId: string) =>
     ['projects', pid, 'tasks', taskId, 'audit-reports'] as const,
   /**
+   * Transition history rows (MT-4.6-03): derived from the task-filtered
+   * `GET /events` history (Section 9.2 Events row — the published
+   * append-only source; no `GET /tasks/{id}/transitions` endpoint
+   * exists). Fetch-on-expand like the sibling blocks.
+   */
+  taskTransitions: (pid: string, taskId: string) =>
+    ['projects', pid, 'tasks', taskId, 'transitions'] as const,
+  /**
    * Attachment content pages (MT-4.6-04; Section 9.5): one cache entry
    * per attachment × format × page — never preloaded, fetched when the
    * viewer addresses the page (RISK-13: one page per request).
    */
   attachmentContent: (attachmentId: string, format: string, page: number | null) =>
     ['attachments', attachmentId, 'content', format, page] as const,
+  /**
+   * Cross-project review queue (MT-4.8-01; Section 13.1): all
+   * `in_human_review` tasks across projects — one entry, independent of
+   * any single project's board lists; live rows arrive via
+   * `review.requested` / transition events patched in (Sections 9.6,
+   * 13.3).
+   */
+  reviewQueue: ['review', 'queue'] as const,
   /** Latest checkpoint percent per task, populated from `task.checkpoint` events (MT-4.3-05). */
   boardCheckpointProgress: (pid: string) =>
     ['projects', pid, 'tasks', 'checkpoint-progress'] as const,
@@ -91,4 +107,19 @@ export const queryKeys = {
    * sibling of the task blocks above, independent of the pid.
    */
   resolutionPatch: (resolutionId: string) => ['resolutions', resolutionId, 'patch'] as const,
+  /**
+   * Agents panel sessions (MT-4.9-01; Section 13.1): task-derived
+   * session rows for one project — the Owner-facing read surface (no
+   * `GET /agent-sessions` exists; Section 9.2 Sessions row is bridge
+   * POST-only). Live rows arrive via `agent.session_*` and task lease
+   * events patched in through the WP-4.3 hook.
+   */
+  agentSessions: (pid: string) => ['projects', pid, 'agent-sessions'] as const,
+  /**
+   * Audit-log history pages (MT-4.10-01; Section 13.1, Principle P8):
+   * one entry per filter set — cursor pages accumulate under it; a
+   * filter change is a new key so pagination resets (MT-4.10-02).
+   */
+  auditEvents: (filters: { project: string | null; task: string | null }) =>
+    ['events', 'history', filters] as const,
 };

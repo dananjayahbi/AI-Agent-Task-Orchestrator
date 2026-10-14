@@ -54,17 +54,14 @@ GAPS: frozenset[tuple[str, str]] = frozenset({("GET", "/api/v1/devices")})
 
 #: Rows whose endpoints print in Section 9.2 but do not exist yet. Their
 #: "proof" is exactly the adopted drift guard: the sample path below must be a
-#: member of ``adopted.DEFERRED_ENDPOINTS`` and must not resolve. The five
-#: literals mirror the adopted file's entries; membership is asserted, so an
+#: member of ``adopted.DEFERRED_ENDPOINTS`` and must not resolve. The literal
+#: mirrors the adopted file's entry; membership is asserted, so an
 #: edit there without an edit here fails both directions.
+#: (WP-3.6 removed the review row; WP-3.7 removed its three merge rows —
+#: all four landed on real routes and carry PROOF pointers below.)
 DEFERRED_ROWS: frozenset[tuple[str, str]] = frozenset(
     {
         ("POST", "/api/v1/tasks/{id}/transition"),
-        # WP-3.6 removed the review row from this set: POST /tasks/{id}/review
-        # landed and its caller cells run on the real route (PROOF below).
-        ("GET", "/api/v1/merge/pending"),
-        ("POST", "/api/v1/merge/{task}/start"),
-        ("POST", "/api/v1/merge/{task}/result"),
     }
 )
 
@@ -198,6 +195,22 @@ PROOF: dict[tuple[str, str], tuple[str, str]] = {
     ("POST", "/api/v1/tasks/{id}/review"): (
         "tests.test_authorization_matrix",
         "test_wp36_landed_review_route_enforces_its_callers",
+    ),
+    # --- Merge queue row (Merge Executor; the Owner cell is Read) — WP-3.7
+    # landed the routes (MT-3.7-01); caller cells run on the real routes in
+    # the adopted matrix's landed cases and the queue's service catalog
+    # lives in tests/test_merge_queue.
+    ("GET", "/api/v1/merge/pending"): (
+        "tests.test_authorization_matrix",
+        "test_wp37_landed_merge_routes_enforce_their_callers",
+    ),
+    ("POST", "/api/v1/merge/{task}/start"): (
+        "tests.test_authorization_matrix",
+        "test_wp37_landed_merge_routes_enforce_their_callers",
+    ),
+    ("POST", "/api/v1/merge/{task}/result"): (
+        "tests.test_authorization_matrix",
+        "test_wp37_landed_merge_routes_enforce_their_callers",
     ),
     # --- Attachments row (Owner / Agent (read)) — the WP-1.11/1.13/1.14
     # landing cases in the adopted matrix; the negative token paths on these

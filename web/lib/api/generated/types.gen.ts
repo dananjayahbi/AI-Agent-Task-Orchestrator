@@ -803,6 +803,123 @@ export type LoginRequest = {
 };
 
 /**
+ * One pending task in the queue (Section 9.2 GET /merge/pending).
+ */
+export type MergeQueueItem = {
+    /**
+     * Section 7.3 task id — the `{task}` path segment.
+     */
+    id: string;
+    /**
+     * Project the entry belongs to (ADR-004 scope).
+     */
+    project_id: string;
+    /**
+     * Section 7.2 title — the queue's human label.
+     */
+    title: string;
+    /**
+     * Carrier state: in_human_review (T15 approve) or to_be_audited (T10/T13 engine-approved) — Section 8.1's sub-status rides these two.
+     */
+    state: string;
+    /**
+     * Optimistic-lock version (7.2) — chain it onto start/result.
+     */
+    version: number;
+    /**
+     * Always 'pending' in this listing (the Section 8.1 sub-status).
+     */
+    merge_status: string;
+    /**
+     * Current attempt's branch (Section 7.2) the executor merges into the default branch; null only if the carrier somehow lost its resolution.
+     */
+    branch_name: string | null;
+    /**
+     * The project policy's Section 7.2 strategy riding the row (squash | merge_commit | fast_forward_only; default squash) — the executor never configures strategy itself; manual entries are resolved by the queue-side guard and never appear here (OQ-06).
+     */
+    merge_strategy: string;
+};
+
+/**
+ * pagination.md envelope: exactly ``results`` + ``next_cursor``.
+ */
+export type MergeQueueListEnvelope = {
+    results: Array<MergeQueueItem>;
+    /**
+     * Opaque cursor for the next page; null = end of list.
+     */
+    next_cursor: string | null;
+};
+
+/**
+ * ``POST /merge/{task}/result`` input (Section 9.2; MT-3.7-01).
+ */
+export type MergeResultRequest = {
+    /**
+     * succeeded | conflict | failed — the executor's reported outcome; succeeded applies T17, the other two apply T18 with that flavor (Section 7.2 values, never inferred).
+     *
+     * * `succeeded` - succeeded
+     * * `conflict` - conflict
+     * * `failed` - failed
+     */
+    result: ResultEnum;
+    /**
+     * The resulting merge sha — **required for succeeded** (T17's Guard column; Section 11.4). Section 7.2 has no sha column, so it rides this payload, the history note and the event data (recorded reading; no silent schema change).
+     */
+    sha?: string;
+    /**
+     * Free-text outcome detail (conflict file list, error summary) — carried into the history note and the merge.failed event data.
+     */
+    details?: string;
+    /**
+     * Optional task ``version`` the executor saw at start (FR-TSK-06) — a stale value answers VERSION_CONFLICT (409) and applies nothing.
+     */
+    version?: number;
+};
+
+/**
+ * Result's response — the post-transition identity plus the echo.
+ */
+export type MergeResultResponse = {
+    /**
+     * completed + merged (T17) or in_human_review + conflict/failed with review_reason merge_conflict (T18).
+     */
+    task: QueueTaskState;
+    /**
+     * The reported outcome, echoed.
+     *
+     * * `succeeded` - succeeded
+     * * `conflict` - conflict
+     * * `failed` - failed
+     */
+    result: ResultEnum;
+    /**
+     * The resulting sha on success; null on the T18 failure branches.
+     */
+    sha: string | null;
+};
+
+/**
+ * ``POST /merge/{task}/start`` input — no required fields (claim is id-less).
+ */
+export type MergeStartRequest = {
+    /**
+     * Optional task ``version`` the executor saw in the listing (FR-TSK-06) — a stale value answers VERSION_CONFLICT (409) and claims nothing.
+     */
+    version?: number;
+};
+
+/**
+ * Start's response — the post-claim identity the executor chains on.
+ */
+export type MergeStartResponse = {
+    /**
+     * merge_status is now 'merging' and version incremented (7.2).
+     */
+    task: QueueTaskState;
+};
+
+/**
  * * `squash` - squash
  * * `merge_commit` - merge commit
  * * `fast_forward_only` - fast forward only
@@ -1166,6 +1283,32 @@ export type ProjectPolicy = {
 export type ProposedVerdictEnum = 'pass' | 'flag_risk' | 'fail';
 
 /**
+ * The post-mutation task identity the start/result responses carry.
+ */
+export type QueueTaskState = {
+    /**
+     * Section 7.3 task id.
+     */
+    id: string;
+    /**
+     * Canonical state after the mutation — in_human_review or to_be_audited on start; completed (T17) or in_human_review (T18) after a result.
+     */
+    state: string;
+    /**
+     * Optimistic-lock version after the row (7.2).
+     */
+    version: number;
+    /**
+     * Section 8.4 member — merge_conflict after T18, else unchanged.
+     */
+    review_reason: string | null;
+    /**
+     * none | pending | merging | merged | conflict | failed (7.2).
+     */
+    merge_status: string;
+};
+
+/**
  * POST /auth/refresh: the extended expiry (same lifetime settings).
  */
 export type Refreshed = {
@@ -1376,6 +1519,13 @@ export type ResolutionWriteResponse = {
      */
     scope_violations: Array<string>;
 };
+
+/**
+ * * `succeeded` - succeeded
+ * * `conflict` - conflict
+ * * `failed` - failed
+ */
+export type ResultEnum = 'succeeded' | 'conflict' | 'failed';
 
 /**
  * One recorded Section 7.2 Review Decision row, field for field.
@@ -2343,6 +2493,100 @@ export type ApiV1EventsStreamRetrieveResponses = {
 };
 
 export type ApiV1EventsStreamRetrieveResponse = ApiV1EventsStreamRetrieveResponses[keyof ApiV1EventsStreamRetrieveResponses];
+
+export type ReportMergeResultData = {
+    body: MergeResultRequest;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second claim or applying a second merge result.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        task: string;
+    };
+    query?: never;
+    url: '/api/v1/merge/{task}/result';
+};
+
+export type ReportMergeResultErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type ReportMergeResultError = ReportMergeResultErrors[keyof ReportMergeResultErrors];
+
+export type ReportMergeResultResponses = {
+    200: MergeResultResponse;
+};
+
+export type ReportMergeResultResponse = ReportMergeResultResponses[keyof ReportMergeResultResponses];
+
+export type StartMergeData = {
+    body?: MergeStartRequest;
+    headers?: {
+        /**
+         * Caller-derived key making retries safe (ADR-012; NFR-12). Reusing the key with the same request replays the original outcome instead of storing a second claim or applying a second merge result.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path: {
+        task: string;
+    };
+    query?: never;
+    url: '/api/v1/merge/{task}/start';
+};
+
+export type StartMergeErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+    404: ErrorEnvelope;
+    409: ErrorEnvelope;
+    429: ErrorEnvelope;
+};
+
+export type StartMergeError = StartMergeErrors[keyof StartMergeErrors];
+
+export type StartMergeResponses = {
+    200: MergeStartResponse;
+};
+
+export type StartMergeResponse = StartMergeResponses[keyof StartMergeResponses];
+
+export type ListMergePendingData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Opaque cursor from the previous page's next_cursor; FIFO by task id so polling is stable (pagination.md rule 1).
+         */
+        cursor?: string;
+        /**
+         * Items per page (default 25, maximum 100; values above the maximum are clamped — pagination.md documented defaults).
+         */
+        page_size?: number;
+    };
+    url: '/api/v1/merge/pending';
+};
+
+export type ListMergePendingErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type ListMergePendingError = ListMergePendingErrors[keyof ListMergePendingErrors];
+
+export type ListMergePendingResponses = {
+    200: MergeQueueListEnvelope;
+};
+
+export type ListMergePendingResponse = ListMergePendingResponses[keyof ListMergePendingResponses];
 
 export type ListProjectsData = {
     body?: never;

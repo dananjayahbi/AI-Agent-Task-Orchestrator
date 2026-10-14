@@ -41,6 +41,13 @@ Thumbs.db
 .idea/
 .vscode/
 
+# --- Bridge live-test media root ---
+# tests/_live_backend.py points ORCHESTRATOR_STORAGE_MEDIA_ROOT at
+# bridge/tests/.live-media/ so live/integration seeds can stage attachment
+# bytes next to the tests. Test-seed runtime data, recreated per run —
+# never staged.
+bridge/tests/.live-media/
+
 # --- Backups (WP-6.2; Section 12.4): database dumps and the media mirror
 # contain hashed tokens and audit rows — never staged. The default host
 # directory the worker's /backups mount resolves to (see .env.example);

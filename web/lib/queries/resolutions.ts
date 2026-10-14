@@ -9,9 +9,10 @@
  * resolutions by `resolution_id`; a resolution without a report is
  * valid (auditor-less flows, Section 8.5) and renders without one.
  *
- * Deferred per the WP changelog: the transition-history rows have no
- * `GET /tasks/{id}/transitions` endpoint in Section 9.2 or the
- * published schema — see the WP changelog's endpoint-gap note.
+ * The transition history has its own fetch-on-expand entry
+ * (`lib/queries/transitions.ts`, MT-4.6-03) — the published
+ * `GET /events` history is its source; no `GET /tasks/{id}/transitions`
+ * endpoint exists in Section 9.2 or the schema.
  */
 import { useQuery } from '@tanstack/react-query';
 

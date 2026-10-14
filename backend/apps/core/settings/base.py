@@ -278,6 +278,12 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = get_int("ORCHESTRATOR_REQUEST_BODY_MAX_BYTES", 32 
 # consumer; this list is the resolved, documented value.
 FEATURE_FLAGS = get_list("ORCHESTRATOR_FEATURE_FLAGS", [])
 
+# --- Section 9.10 group: observability (Section 17; NFR-10; WP-6.4) ----------
+# The /metrics endpoint is JSON-format and internal/LAN-only (like Health, off
+# the tunnel allowlist). The flag turns its body on/off without changing the
+# surface; default on so the unit layer and a LAN scrape both see it.
+METRICS_ENABLED = get_bool("ORCHESTRATOR_METRICS_ENABLED", True)
+
 # --- Section 9.10 group: token lifetimes ------------------------------------
 # Documented defaults fixed by WP-1.2 (configuration.md per-setting rows);
 # unit suffix lives in the environment name. Lifetime values are read here so

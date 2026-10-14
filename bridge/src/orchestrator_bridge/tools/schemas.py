@@ -123,7 +123,9 @@ _CLAIM_TASK_SCHEMA: Final[dict[str, Any]] = {
             "description": (
                 "Claiming role (Section 12.2). The backend derives what each "
                 "token role may claim from the token's scopes; the wire body "
-                "carries no role field (ClaimRequest contract)."
+                "carries this role so the backend can gate coder→pending (T4) "
+                "vs auditor→to_be_audited (T11) (ClaimRequest contract; "
+                "WP-3.3/MT-3.5-03)."
             ),
         },
     },

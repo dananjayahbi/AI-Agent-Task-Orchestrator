@@ -16,7 +16,7 @@
  *  - columns render through the MT-4.3-06 windowed list; one shared clock
  *    (`useNow`) drives every lease countdown and stalled marker.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 
 import { BoardColumn } from '@/components/board/board-column';
 import { BoardFiltersBar } from '@/components/board/board-filters';
@@ -25,6 +25,7 @@ import {
   type BoardDragSession,
   type BoardMoveController,
 } from '@/components/board/move-context';
+import { ReviewMoveDialogs } from '@/components/review/review-move-dialogs';
 import { StreamStatusIndicator } from '@/components/board/stream-status';
 import { TaskFormModal } from '@/components/task/task-form-modal';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ import {
   type MoveDialogHandler,
   type MoveActionHandler,
 } from '@/lib/board/move-routing';
+import type { MoveDialog } from '@/lib/board/move-map';
 import { BOARD_STATES, groupTasksByState } from '@/lib/board/states';
 import { DEFAULT_STALLED_AFTER_MINUTES } from '@/lib/board/stalled';
 import { useNow } from '@/lib/board/use-now';
@@ -72,7 +74,8 @@ type BoardProps = {
   /**
    * MT-4.4-03 seam (`dialog` verdicts): opens the approve-and-merge /
    * request-changes layer (Section 9.2 `POST /tasks/{id}/review`).
-   * Deferred with WP-3.6 — the verdicts never become plain moves.
+   * The board renders `ReviewMoveDialogs` itself when no handler is
+   * passed (production wiring); tests may intercept the seam.
    */
   onDialog?: MoveDialogHandler;
 };
@@ -81,6 +84,10 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
   const [filters, setFilters] = useState<BoardFilters>(defaultFilters);
   const [drag, setDrag] = useState<BoardDragSession | null>(null);
   const [moveNotice, setMoveNotice] = useState<{ message: string; rejected: boolean } | null>(null);
+  // MT-4.4-03: the active `dialog` verdict (T15/T16 hand-off). The card
+  // never moves on a dialog verdict — the layer decides via the review
+  // endpoint (Section 13.2).
+  const [reviewDialog, setReviewDialog] = useState<{ task: Task; dialog: MoveDialog } | null>(null);
   // MT-4.5-01 entry points: "New task" (T1 create) and each card's Edit.
   const [taskForm, setTaskForm] = useState<{ open: boolean; task: Task | null }>({
     open: false,
@@ -108,6 +115,14 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
   const progress = progressQuery.data ?? {};
   const percentFor = (task: Task): number | null => progress[task.id]?.percent ?? null;
 
+  // MT-4.4-03 production wiring: without an injected handler the board
+  // opens its own review-move dialog layer (never a plain move — the
+  // verdicts are decisions served by `POST /tasks/{id}/review`).
+  const openReviewDialog = useCallback((task: Task, dialog: MoveDialog) => {
+    setReviewDialog({ task, dialog });
+  }, []);
+  const resolveDialogHandler = onDialog ?? openReviewDialog;
+
   // MT-4.4-02: one controller serves drag and keyboard/touch — every move
   // interaction consults the MT-4.4-01 map through this single route.
   const moveController = useMemo<BoardMoveController>(
@@ -116,7 +131,7 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
       route: (task, target) => {
         routeMove(task, target, {
           onMove,
-          onDialog,
+          onDialog: resolveDialogHandler,
           announce: (message, verdict) =>
             setMoveNotice({ message, rejected: verdict.kind === 'rejected' }),
         });
@@ -128,7 +143,7 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
         ),
       endDrag: () => setDrag(null),
     }),
-    [drag, onMove, onDialog],
+    [drag, onMove, resolveDialogHandler],
   );
 
   if (tasksQuery.isPending) {
@@ -232,6 +247,19 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
             setTaskForm((current) => ({ open: current.open, task: created }))
           }
         />
+
+        {/* MT-4.4-03: approve-merge / request-changes-reassign layer —
+            only while a `dialog` verdict is pending (Section 13.2). */}
+        {reviewDialog !== null && (
+          <ReviewMoveDialogs
+            task={reviewDialog.task}
+            dialog={reviewDialog.dialog}
+            pid={pid}
+            filters={filters}
+            onNotice={setMoveNotice}
+            onClose={() => setReviewDialog(null)}
+          />
+        )}
       </div>
     </BoardMoveContext.Provider>
   );

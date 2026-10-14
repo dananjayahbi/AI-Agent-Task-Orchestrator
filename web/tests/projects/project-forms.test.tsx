@@ -287,6 +287,12 @@ describe('RulesForm', () => {
         respond: () => jsonResponse(makeProject({ system_prompt_rules: VERBATIM })),
       },
       {
+        // MT-4.10-04 preview derives the checkpoint cadence from policy.
+        method: 'GET',
+        match: /\/api\/v1\/projects\/PID00001\/policy$/,
+        respond: () => jsonResponse(makePolicy()),
+      },
+      {
         method: 'PATCH',
         match: /\/api\/v1\/projects\/PID00001$/,
         respond: () =>
@@ -318,6 +324,11 @@ describe('RulesForm', () => {
         method: 'GET',
         match: /\/api\/v1\/projects\/PID00001(\?|$)/,
         respond: () => jsonResponse(makeProject({ system_prompt_rules: 'base' })),
+      },
+      {
+        method: 'GET',
+        match: /\/api\/v1\/projects\/PID00001\/policy$/,
+        respond: () => jsonResponse(makePolicy()),
       },
       {
         method: 'PATCH',

@@ -45,6 +45,7 @@ __all__ = [
     "lease_minutes",
     "normalize_project_rules",
     "render_client_snippet",
+    "render_connect_rules",
     "render_rules",
     "render_session_rules",
 ]
@@ -187,13 +188,16 @@ def render_session_rules(
     project_rules: str,
     policy_summary: Mapping[str, Any],
 ) -> str:
-    """Connect-time render (initialize instructions, ``get_project_context``).
+    """Role-specific session render for a *known* role (MT-2.7-03).
 
     No task exists yet, so the generic slot phrasings apply; the checkpoint
     interval still derives from the lease — here the policy summary's
     ``lease_duration_minutes`` (Section 7.2 default when absent or
-    non-numeric). Both channels call *this* function with the same cached
-    context, which is what makes their output byte-identical (MT-2.7-03).
+    non-numeric). The claim channel renders one role's block via
+    :func:`render_rules`; this helper is the same render for a single role
+    with the connect-time policy-derived cadence. When the role is *not*
+    yet known (the two connect channels), use :func:`render_connect_rules`
+    so both Section 10.6 blocks are delivered (MT-3.5-03).
     """
     raw = policy_summary.get("lease_duration_minutes")
     lease = (
@@ -206,6 +210,41 @@ def render_session_rules(
         checkpoint_minutes=checkpoint_interval_minutes(lease),
         project_rules=project_rules,
     )
+
+
+def render_connect_rules(
+    *,
+    project_rules: str,
+    policy_summary: Mapping[str, Any],
+) -> str:
+    """Connect-time render carrying **both** Section 10.6 role blocks (MT-3.5-03).
+
+    At connect time the claiming role is not yet known (it is chosen at claim
+    time), so the initialize instructions and ``get_project_context`` deliver
+    the coder standard rules *and* the auditor obligations — Section 10.6 lists
+    both, and the auditor flow (MT-3.5-03) requires the auditor rules be visible
+    before a claim is made. The single-render-path discipline (G-08) holds: each
+    block is produced by :func:`render_rules`, and the owner's project rules are
+    appended **once**, after both blocks (Section 10.6 ordering). Both connect
+    channels call *this* function with the same cached context, which is what
+    keeps their output byte-identical (MT-2.7-03).
+    """
+    raw = policy_summary.get("lease_duration_minutes")
+    lease = (
+        raw
+        if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0
+        else DEFAULT_LEASE_MINUTES
+    )
+    minutes = checkpoint_interval_minutes(lease)
+    parts = [
+        render_rules("coder", checkpoint_minutes=minutes),
+        "",
+        render_rules("auditor"),
+    ]
+    project = normalize_project_rules(project_rules)
+    if project:
+        parts.extend(("", "Project rules:", project))
+    return "\n".join(parts)
 
 
 #: The Section 10.9 matrix clients the fallback snippets cover (MT-2.7-04).

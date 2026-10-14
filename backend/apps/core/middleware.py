@@ -50,7 +50,12 @@ class CorrelationIdMiddleware:
 
 
 class RequestLoggingMiddleware:
-    """Emit one structured JSON line per completed request (Section 17)."""
+    """Emit one structured JSON line per completed request (Section 17).
+
+    Also records Section 17 ``api_latency`` (WP-6.4): the label is the URL
+    resolver's route pattern, not the raw path, so no task id leaks and
+    cardinality stays bounded.
+    """
 
     def __init__(self, get_response: GetResponse) -> None:
         self.get_response = get_response
@@ -68,4 +73,24 @@ class RequestLoggingMiddleware:
                 "duration_ms": duration_ms,
             },
         )
+        from .metrics import record_api_latency
+
+        record_api_latency(
+            method=request.method or "UNSPEC",
+            route=_resolved_route(request),
+            status=response.status_code,
+            duration_ms=duration_ms,
+        )
         return response
+
+
+def _resolved_route(request: HttpRequest) -> str:
+    """URL resolver's route pattern (e.g. ``api/v1/tasks/<id>/claim``).
+
+    Falls back to ``unmatched`` when no resolver matched (a 404 before routing),
+    keeping the label bounded and free of the raw path.
+    """
+    match = getattr(request, "resolver_match", None)
+    if match is None or not getattr(match, "route", None):
+        return "unmatched"
+    return str(match.route)

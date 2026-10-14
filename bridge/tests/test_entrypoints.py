@@ -31,7 +31,7 @@ from pathlib import Path
 import pytest
 
 import orchestrator_bridge.config as config_module
-from orchestrator_bridge.config import RunMode, Settings, load_settings
+from orchestrator_bridge.config import ConfigError, RunMode, Settings, load_settings
 from orchestrator_bridge.entrypoints import (
     EXIT_CONFIG_ERROR,
     EXIT_NOT_IMPLEMENTED,
@@ -43,6 +43,7 @@ from orchestrator_bridge.entrypoints import executor as executor_module
 from orchestrator_bridge.entrypoints import http as http_module
 from orchestrator_bridge.entrypoints import stdio as stdio_module
 from orchestrator_bridge.logging import configure_logging
+from orchestrator_bridge.merge_executor import WorktreeStrategyStep, resolve_merge_step
 from orchestrator_bridge.server import create_server
 from orchestrator_bridge.tools.schemas import CORE_TOOL_NAMES, TOOL_SPECS
 from tests.conftest import StubHttpBackend
@@ -201,17 +202,60 @@ def test_http_mode_no_longer_reports_not_implemented(
     assert EXIT_NOT_IMPLEMENTED != 0  # the code still exists for the executor
 
 
-def test_executor_callable_raises_wp_boundary() -> None:
-    with pytest.raises(NotImplementedError, match="WP-3.7"):
+def test_executor_callable_validates_the_repo_allowlist() -> None:
+    """Section 10.2 binding source: no allowlist → ConfigError, no executor."""
+    with pytest.raises(ConfigError, match="ORCHESTRATOR_MERGE_REPO_PATHS"):
         executor_module.run(_settings())
 
 
-def test_executor_script_fails_fast_with_wp_reference(capsys: pytest.CaptureFixture[str]) -> None:
+def test_executor_callable_resolves_the_wired_merge_step(tmp_path: Path) -> None:
+    """Configured → resolve returns the composed worktree+strategy step
+    (MT-3.7-03/04 landed; no WP-boundary raise remains)."""
+    settings = _env_settings({"ORCHESTRATOR_MERGE_REPO_PATHS": str(tmp_path)})
+    step = resolve_merge_step(settings)
+    assert isinstance(step, WorktreeStrategyStep)
+
+
+def test_executor_script_fails_fast_on_missing_allowlist(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     code = cli(["--mode", "merge-executor"])
     captured = capsys.readouterr()
-    assert code == EXIT_NOT_IMPLEMENTED
-    assert "not yet implemented" in captured.err
-    assert "WP-3.7" in captured.err
+    assert code == EXIT_CONFIG_ERROR
+    assert "configuration error" in captured.err
+    assert "ORCHESTRATOR_MERGE_REPO_PATHS" in captured.err
+
+
+def test_executor_script_fails_fast_without_agent_token(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Allowlist set → the step resolves; the missing binding stops it (exit 1)."""
+    monkeypatch.setenv("ORCHESTRATOR_MERGE_REPO_PATHS", str(tmp_path))
+    code = cli(["--mode", "merge-executor"])
+    captured = capsys.readouterr()
+    assert code == EXIT_CONFIG_ERROR
+    assert "configuration error" in captured.err
+
+
+def test_once_flag_is_merge_executor_only(capsys: pytest.CaptureFixture[str]) -> None:
+    """Section 10.2's on-demand form belongs to the executor; other modes refuse it."""
+    code = cli(["--mode", "stdio", "--once"])
+    captured = capsys.readouterr()
+    assert code == EXIT_CONFIG_ERROR
+    assert "--once" in captured.err
+
+
+def test_executor_dispatch_passes_the_once_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def _fake_run(settings: Settings, *, once: bool = False) -> int:
+        seen["once"] = once
+        return EXIT_OK
+
+    monkeypatch.setenv("ORCHESTRATOR_MERGE_REPO_PATHS", "x")
+    monkeypatch.setattr(executor_module, "run", _fake_run)
+    assert cli(["--mode", "merge-executor", "--once"]) == EXIT_OK
+    assert seen["once"] is True
 
 
 def test_config_error_fails_fast_with_clear_message(

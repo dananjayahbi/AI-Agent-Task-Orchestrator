@@ -5,13 +5,14 @@ The atomicity-critical tool. The backend owns the claim algorithm
 the bridge's job is the honest wire call and the response assembly:
 
 * body = the ``ClaimRequest`` contract — ``session_id`` (the bridge-issued
-  ``agent_session_id``, the lease's identity half) and ``worker_agent_id``
-  (the tool's ``agent_identifier`` label). **The wire body carries no
-  ``role``**: the backend derives claimable work from the token's scopes
-  (Section 12.2); the tool-level ``role`` input is validated for the model,
-  selects the rules template (MT-2.7-03) and travels again when the claim
-  contract grows a role field (auditor claims land with backend WP-3.3 —
-  recorded in the WP changelog).
+  ``agent_session_id``, the lease's identity half), ``worker_agent_id``
+  (the tool's ``agent_identifier`` label) and ``role`` (WP-3.3 added the
+  optional ``role`` field so the backend can gate the claim: coder claims
+  only ``pending`` (T4), auditor only ``to_be_audited`` (T11), and the
+  token's scopes still gate first — Section 12.2). The tool-level ``role``
+  input is validated for the model and selects the rules template
+  (MT-2.7-03); it now travels on the wire so an auditor claim reaches the
+  backend's auditor half (MT-3.5-03, consuming WP-3.3).
 * idempotency: the POST carries an ``Idempotency-Key`` minted by the WP-2.3
   transport (NFR-12, ADR-012) — one logical claim, replayed safely.
 * response = the three Section 10.5 artifacts — **lease, rules block,
@@ -103,6 +104,9 @@ def claim_task(
     body = {
         "session_id": runtime.agent_session_id,
         "worker_agent_id": agent_identifier,
+        # WP-3.3's ClaimRequest role field (Section 10.5): the backend gates
+        # coder → pending (T4) / auditor → to_be_audited (T11) on it.
+        "role": role_key,
     }
     try:
         payload = runtime.client.request(

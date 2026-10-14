@@ -7,12 +7,14 @@ the cached set (project name, rules, policy summary) plus the bound project
 id; nothing else (Section 10.5 "compact", Section 12.4).
 
 The ``rules`` field is the **merged Section 10.6 block** (MT-2.7-02): the
-coder template plus the cached ``system_prompt_rules`` appended, rendered by
-the shared :func:`~orchestrator_bridge.rules.render_session_rules` path —
+coder standard rules *and* the auditor obligations plus the cached
+``system_prompt_rules`` appended once after both, rendered by the shared
+:func:`~orchestrator_bridge.rules.render_connect_rules` path —
 byte-identical to the initialize-time server instructions for the same
-session inputs (G-08 consistency; MT-2.7-02's one-render-path acceptance).
-The raw project-rules text alone is no longer surfaced here: the block is
-the Section 10.6 artifact agents must follow.
+session inputs (G-08 consistency; MT-2.7-02's one-render-path acceptance;
+MT-3.5-03 delivers both role blocks at connect time). The raw project-rules
+text alone is no longer surfaced here: the block is the Section 10.6
+artifact agents must follow.
 
 Miss path (a session resumed without a cache — future HTTP mode): fetch once
 through the client via the shared
@@ -31,7 +33,7 @@ from typing import Any
 
 from ..api_errors import ApiError
 from ..error_translation import translate_error
-from ..rules import render_session_rules
+from ..rules import render_connect_rules
 from .errors import ToolFailure
 from .runtime import ToolRuntime
 
@@ -47,8 +49,7 @@ def get_project_context(runtime: ToolRuntime) -> dict[str, Any]:
     return {
         "project_id": context.project_id,
         "project_name": context.name,
-        "rules": render_session_rules(
-            "coder",
+        "rules": render_connect_rules(
             project_rules=context.rules,
             policy_summary=context.policy_summary,
         ),

@@ -58,6 +58,12 @@ import 'package:orchestrator_mobile/src/model/kind_e0d_enum.dart';
 import 'package:orchestrator_mobile/src/model/lease_extension_mode_enum.dart';
 import 'package:orchestrator_mobile/src/model/lease_record.dart';
 import 'package:orchestrator_mobile/src/model/login_request.dart';
+import 'package:orchestrator_mobile/src/model/merge_queue_item.dart';
+import 'package:orchestrator_mobile/src/model/merge_queue_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/merge_result_request.dart';
+import 'package:orchestrator_mobile/src/model/merge_result_response.dart';
+import 'package:orchestrator_mobile/src/model/merge_start_request.dart';
+import 'package:orchestrator_mobile/src/model/merge_start_response.dart';
 import 'package:orchestrator_mobile/src/model/merge_strategy_enum.dart';
 import 'package:orchestrator_mobile/src/model/orchestrator_manifest.dart';
 import 'package:orchestrator_mobile/src/model/owner_session.dart';
@@ -74,6 +80,7 @@ import 'package:orchestrator_mobile/src/model/project_dashboard_card.dart';
 import 'package:orchestrator_mobile/src/model/project_list_envelope.dart';
 import 'package:orchestrator_mobile/src/model/project_policy.dart';
 import 'package:orchestrator_mobile/src/model/proposed_verdict_enum.dart';
+import 'package:orchestrator_mobile/src/model/queue_task_state.dart';
 import 'package:orchestrator_mobile/src/model/refreshed.dart';
 import 'package:orchestrator_mobile/src/model/release_request.dart';
 import 'package:orchestrator_mobile/src/model/resolution.dart';
@@ -82,6 +89,7 @@ import 'package:orchestrator_mobile/src/model/resolution_patch.dart';
 import 'package:orchestrator_mobile/src/model/resolution_submit.dart';
 import 'package:orchestrator_mobile/src/model/resolution_task_state.dart';
 import 'package:orchestrator_mobile/src/model/resolution_write_response.dart';
+import 'package:orchestrator_mobile/src/model/result_enum.dart';
 import 'package:orchestrator_mobile/src/model/review_decision_record.dart';
 import 'package:orchestrator_mobile/src/model/review_decision_request.dart';
 import 'package:orchestrator_mobile/src/model/review_decision_response.dart';
@@ -147,6 +155,12 @@ part 'serializers.g.dart';
   LeaseExtensionModeEnum,
   LeaseRecord,
   LoginRequest,
+  MergeQueueItem,
+  MergeQueueListEnvelope,
+  MergeResultRequest,
+  MergeResultResponse,
+  MergeStartRequest,
+  MergeStartResponse,
   MergeStrategyEnum,
   OrchestratorManifest,
   OwnerSession,
@@ -163,6 +177,7 @@ part 'serializers.g.dart';
   ProjectListEnvelope,
   ProjectPolicy,
   ProposedVerdictEnum,
+  QueueTaskState,
   Refreshed,
   ReleaseRequest,
   Resolution,
@@ -171,6 +186,7 @@ part 'serializers.g.dart';
   ResolutionSubmit,
   ResolutionTaskState,
   ResolutionWriteResponse,
+  ResultEnum,
   ReviewDecisionRecord,
   ReviewDecisionRequest,
   ReviewDecisionResponse,
@@ -232,6 +248,10 @@ Serializers serializers = (_$serializers.toBuilder()
         const FullType(
             BuiltMap, [FullType(String), FullType.nullable(JsonObject)]),
         () => MapBuilder<String, JsonObject?>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(MergeQueueItem)]),
+        () => ListBuilder<MergeQueueItem>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Attachment)]),

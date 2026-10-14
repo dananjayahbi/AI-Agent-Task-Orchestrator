@@ -27,14 +27,33 @@ import {
 } from '@/lib/board/move-routing';
 import type { BoardState } from '@/lib/board/states';
 import type { Task } from '@/lib/api/generated/types.gen';
-import { installBoardApi, makeTask, renderWithQueryClient, sseConnection } from '../helpers/api';
+import {
+  installBoardApi,
+  jsonResponse,
+  makeTask,
+  pageOf,
+  renderWithQueryClient,
+  sseConnection,
+} from '../helpers/api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 function mountBoard(tasks: Task[], props: Partial<ComponentProps<typeof Board>> = {}) {
-  const { calls } = installBoardApi({ tasks, sse: () => sseConnection().response });
+  const { calls } = installBoardApi({
+    tasks,
+    sse: () => sseConnection().response,
+    // MT-4.4-03: the approve dialog loads the task's submissions for the
+    // resolution binding — give it an empty (blocked) answer by default.
+    extraRoutes: [
+      {
+        method: 'GET',
+        match: /\/api\/v1\/tasks\/[^/]+\/resolutions(\?|$)/,
+        respond: () => jsonResponse(pageOf([])),
+      },
+    ],
+  });
   const view = renderWithQueryClient(<Board pid="PID00001" {...props} />);
   return { calls, ...view };
 }
@@ -245,9 +264,11 @@ describe('drag-drop integration (MT-4.4-02)', () => {
     expect(noticeText()).toBe('');
   });
 
-  it('announces an explicit seam notice when the deferred consumer is absent — never a silent no-op', async () => {
-    // Production page wiring: MT-4.4-03/04 seams are deferred with the
-    // endpoints, so no handlers are passed.
+  it('announces an explicit seam notice for allowed moves — and opens the MT-4.4-03 dialog for dialog verdicts', async () => {
+    // MT-4.4-04: the transition endpoint is still absent from the schema,
+    // so `allowed` drops keep the explicit seam notice (WP-4.4 endpoint
+    // gap). MT-4.4-03 wires the `dialog` seam in-board: the verdict opens
+    // the review layer instead of a notice (Section 13.2).
     const { calls } = mountBoard([
       makeTask({ id: 'PID00001-T001', state: 'draft' }),
       makeTask({ id: 'PID00001-T005', state: 'in_human_review' }),
@@ -260,9 +281,15 @@ describe('drag-drop integration (MT-4.4-02)', () => {
     expect(within(column('draft')).getByTestId('task-card')).toBeTruthy();
 
     dragTo('in_human_review', 'completed');
-    expect(noticeText()).toBe(dialogHandoffUnavailableNotice('approve_merge', 'in_human_review'));
+    await screen.findByTestId('approve-merge-dialog');
+    expect(
+      screen.queryByText(dialogHandoffUnavailableNotice('approve_merge', 'in_human_review')),
+    ).toBeNull();
     expect(within(column('in_human_review')).getByTestId('task-card')).toBeTruthy();
-    expect(calls.length).toBe(callsBefore);
+    // Opening sends no decision: no POST until the operator confirms
+    // (MT-4.4-03) — GETs inside the dialog are its own context loads.
+    expect(calls.filter((call) => call.method !== 'GET')).toHaveLength(0);
+    expect(calls.length - callsBefore).toBeLessThanOrEqual(2); // resolutions + audit reports context
   });
 
   it('keeps the virtualized window intact with DnD wired — mounted cards stay bounded', async () => {

@@ -114,6 +114,14 @@ def sweep_expired_leases(*, batch_size: int = DEFAULT_BATCH_SIZE) -> SweepReport
             "sweeper_skipped": report.skipped,
         },
     )
+    # Section 17 (WP-6.4): leases the sweeper touched feed `lease_expirations`;
+    # a sweep firing at all stamps the worker/beat heartbeats MT-6.4-02 alerts on.
+    from apps.core.metrics import record_heartbeat, record_lease_expirations
+
+    record_lease_expirations(report.reclaimed + report.escalated + report.audit_released)
+    record_heartbeat("worker")
+    record_heartbeat("beat")
+    record_heartbeat("sweeper")
     return report
 
 

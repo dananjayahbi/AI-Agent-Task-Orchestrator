@@ -139,3 +139,32 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   native `EventSource`, mobile WP-5.5) would require a backend contract
   change, raised in the verification notes rather than silently worked
   around.
+
+**MT-5.1-04 — completion assessment: code work complete; remaining gap is
+operator-only (not code).**
+
+Re-assessed this batch against `MT-5.1-04-sse-tunnel-stability.md`, this
+changelog and `infra/cloudflare/sse-verification.md`. Every code artifact
+the MT asks for already exists and re-verifies: `e2e/sse_tunnel_stability.py`
+runs (stdlib-only; `--help` smoke OK this batch), the LAN control run is
+recorded PASS with JSON evidence (`e2e/sse_lan_control_results.json`, 2026-10-13),
+and the exact through-tunnel invocation, prerequisites and append-results
+procedure are documented in the verification notes. The mobile client needs
+no change for this MT: Dio sends `Accept: */*`, so the recorded 406-to-strict-
+`Accept: text/event-stream` observation (DRF negotiation registers JSON only)
+cannot affect WP-5.5/WP-5.8 consumers — no backend contract change was made
+or needed. **No code work remains; the diff for this assessment is this note
+alone.** The only unmet acceptance half is the through-the-edge 1800 s × 2
+run, which is an operator action, deferred below.
+
+### Deferred
+
+- **MT-5.1-04 through-tunnel stability run (operator-only).** Blocker:
+  OQ-11 — the tunnel hostname and token are not yet provisioned, so no code
+  path can execute the run. Required: an operator with Cloudflare credentials
+  provisions the hostname/token, then runs the documented command
+  (`python e2e/sse_tunnel_stability.py --base-url
+  https://<ORCHESTRATOR_CLOUDFLARE_TUNNEL_HOSTNAME> --idle-seconds 1800
+  --cycles 2`, auth via `SSE_SOAK_USERNAME`/`SSE_SOAK_PASSWORD`) and appends
+  results per `infra/cloudflare/sse-verification.md`. Until that run passes,
+  MT-5.1-04 stays honestly open — explicitly **not** marked (done).

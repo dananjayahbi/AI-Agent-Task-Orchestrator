@@ -110,6 +110,14 @@ class TransitionReason(models.TextChoices):
     APPROVE = "approve", "approve"
     REQUEST_CHANGES = "request_changes", "request_changes"
     REASSIGN = "reassign", "reassign"
+    # WP-3.7 rows (T17/T18): the merge executor's two trigger codes as
+    # ADR-010 snake_case machine values — catalog-first (Section 20.4
+    # item 5), added with the rows that use them.
+    MERGE_SUCCEEDED = "merge_succeeded", "merge_succeeded"
+    MERGE_FAILED = "merge_failed", "merge_failed"
+    # WP-3.7 / OQ-06 queue-side guard: the manual-strategy resolution
+    # row's trigger code, added with the row that uses it (catalog-first).
+    MERGE_MANUAL = "merge_manual", "merge_manual"
 
 
 class TransitionQuerySet(models.QuerySet["TaskTransition"]):

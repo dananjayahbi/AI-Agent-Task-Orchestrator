@@ -37,6 +37,19 @@ migrate_working_dir/
 # of Git — parent plan Section 20.4 item 3; see README "Environment flavors")
 /env/*.local.json
 
+# Android/iOS release signing material (MT-5.10-01; parent plan Section 16.2
+# / 20.4 item 3): keystores, key.properties and any certificate/profile file
+# are operator-held secrets — referenced by mobile/docs/release-signing.md,
+# never committed.
+/android/key.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+*.mobileprovision
+*.cer
+*.p8
+
 # Symbolication related
 app.*.symbols
 

@@ -57,11 +57,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.exceptions import AuthForbiddenProject
 from apps.accounts.models import User
-from apps.accounts.permissions import (
-    CanOperateMergeQueue,
-    CanPublishTasks,
-    CanReadMergeQueue,
-)
+from apps.accounts.permissions import CanPublishTasks
 from apps.core.errors import (
     AUTH_FORBIDDEN_PROJECT,
     AUTH_REQUIRED,
@@ -149,13 +145,16 @@ urlpatterns = [
     # permission class is the accounts row the probe used to mount).
     # WP-3.6 retired the *Review decisions* probe the same way: the row
     # now runs on the real ``POST /api/v1/tasks/{id}/review`` route.
+    # WP-3.7 (MT-3.7-01) retired both *Merge queue* probes: the row now
+    # runs on the real ``GET /api/v1/merge/pending`` +
+    # ``POST /api/v1/merge/{task}/start`` routes (the fixture seeds the
+    # merge-pending T006 below; the *result* route's per-caller cases
+    # ride test_wp37_landed_merge_routes_enforce_their_callers).
     # The row has two allowed actors but one mutable task per request,
     # so the real route carries **two** probes — one per actor, each
     # bound to its own seeded ``in_human_review`` task (the fixture
     # seeds T004/T005 below); the row-level union keeps every actor
     # covered exactly once (traceability test above).
-    path("probe/merge-queue", _probe_view(CanReadMergeQueue).as_view()),
-    path("probe/merge-queue/start", _probe_view(CanOperateMergeQueue).as_view()),
     # WP-1.10 (MT-1.10-05) removed the *Read events* probe: the row now
     # runs on the real /api/v1/events + /api/v1/events/stream routes.
     # The real WP-1.2 surface keeps resolving while probes are active: tests
@@ -180,6 +179,9 @@ urlpatterns = [
     # WP-3.3's real audit routes (MT-3.3-04/05) — the *Submit verdict*
     # row and the landed audit-route cases below resolve here.
     path("api/v1/", include("apps.audit.urls")),
+    # WP-3.7's real merge queue routes (MT-3.7-01) — the *Merge queue*
+    # row and the landed merge-route cases below resolve here.
+    path("api/v1/", include("apps.merge.urls")),
 ]
 
 
@@ -316,11 +318,26 @@ PROBES: tuple[_Probe, ...] = (
         payload={"decision": "reassign", "version": 1},
         ok=(201,),
     ),
-    # Merge queue: Owner's cell is *Read* — the write half is the executor's.
-    _Probe("Merge queue", "/probe/merge-queue", "GET", _cells(owner=True, merge_executor=True)),
+    # *Merge queue* runs on the real WP-3.7 routes (MT-3.7-01): the
+    # read cell (Owner + Merge Executor) walks GET /merge/pending —
+    # allowed actors land 200 on the canonical envelope; the write cell
+    # walks POST /merge/{task}/start on the seeded merge-pending T006
+    # (the executor's allowed claim lands 200 pending → merging exactly
+    # once; denied actors never reach the service — 403, anonymous 401;
+    # Owner's cell is *Read*, so its POST answers ROLE_NOT_PERMITTED).
+    # The *result* route carries no printed row of its own — its
+    # per-caller cases live in
+    # test_wp37_landed_merge_routes_enforce_their_callers below and its
+    # service catalog in tests/test_merge_queue.py.
     _Probe(
         "Merge queue",
-        "/probe/merge-queue/start",
+        "/api/v1/merge/pending",
+        "GET",
+        _cells(owner=True, merge_executor=True),
+    ),
+    _Probe(
+        "Merge queue",
+        f"/api/v1/merge/{PID_ONE}-T006/start",
         "POST",
         _cells(merge_executor=True),
     ),
@@ -451,11 +468,30 @@ def matrix(owner_client: APIClient, tmp_path: Path) -> Iterator[_Authz]:
             execution_summary="matrix review probe submission",
             submitted_by_session="sess-matrix-review-coder",
         )
-    # The seeds occupy indices 1-2 and 4-5 (the Review row's two tasks):
-    # advance the allocator's counter (it lives on the project row) so
-    # the Create-drafts probe's first allocation lands on T006 instead
-    # of colliding with a seed.
-    Project.objects.filter(id=PID_ONE).update(task_counter=5)
+    # WP-3.7's *Merge queue* write-probe seed: a merge-pending carrier
+    # (in_human_review + merge_status pending) the executor's allowed
+    # start cell claims on the real route below.
+    merge_probe = Task.objects.create(
+        id=f"{PID_ONE}-T006",
+        project=project,
+        title="Merge queue probe (merge-pending)",
+        state=TaskState.IN_HUMAN_REVIEW,
+        merge_status="pending",
+        attempt_number=1,
+    )
+    TaskResolution.objects.create(
+        task=merge_probe,
+        attempt_number=1,
+        branch_name=f"feat/{PID_ONE}-T006",
+        commit_sha="0123456789abcdef0123456789abcdef01234567",  # pragma: allowlist secret
+        execution_summary="matrix merge probe submission",
+        submitted_by_session="sess-matrix-merge-coder",
+    )
+    # The seeds occupy indices 1-2, 4-6 (the Review row's two tasks and
+    # WP-3.7's merge-pending probe below): advance the allocator's
+    # counter (it lives on the project row) so the Create-drafts probe's
+    # first allocation lands on T007 instead of colliding with a seed.
+    Project.objects.filter(id=PID_ONE).update(task_counter=6)
 
     def _headers(actor: str) -> dict[str, str] | None:
         if actor in AGENT_ROLES:
@@ -1266,6 +1302,67 @@ def test_wp36_landed_review_route_enforces_its_callers(matrix: _Authz) -> None:
         assert _code(refused) == ROLE_NOT_PERMITTED, denied
 
 
+# --- WP-3.7 landing: the Merge queue row's real callers (deferred retired) ---
+
+
+def test_wp37_landed_merge_routes_enforce_their_callers(
+    matrix: _Authz, owner_client: APIClient
+) -> None:
+    """Real-route cases for all three merge routes (deferred entries removed).
+
+    Section 9.2 prints Merge Executor for start/result; Section 12.2's
+    *Merge queue* row adds Owner **Read** only. Anonymous 401
+    ``AUTH_REQUIRED``; every other agent role 403 ``ROLE_NOT_PERMITTED``
+    on both writes; the Owner's POSTs answer ``ROLE_NOT_PERMITTED`` too
+    (its cell is Read — no owner write bypass, MT-3.7-01 risk note); a
+    PID00002 executor token answers ``AUTH_FORBIDDEN_PROJECT`` before
+    role logic (ADR-004 zero-bleed). The allowed cells land on the real
+    service in the PROBES walk above (owner + executor on pending,
+    executor start on T006), and the service-level catalog — queue
+    shape, T17/T18 outcomes, exactly-once, idempotency — lives in
+    ``tests/test_merge_queue.py``.
+    """
+    pending = "/api/v1/merge/pending"
+    start = f"/api/v1/merge/{PID_ONE}-T006/start"
+    result = f"/api/v1/merge/{PID_ONE}-T006/result"
+    result_body = {"result": "conflict"}
+
+    anon = matrix.call("anonymous", "GET", pending)
+    assert anon.status_code == 401
+    assert _code(anon) == AUTH_REQUIRED
+
+    # Read cell: owner + merge_executor only (the pending PROBES entry
+    # walks their allowed 200s; here every other caller is refused).
+    for denied in ("coder", "auditor", "decomposer", "device"):
+        refused = matrix.call(denied, "GET", pending)
+        assert refused.status_code == 403, denied
+        assert _code(refused) == ROLE_NOT_PERMITTED, denied
+
+    # Write cells: merge_executor only — every other agent role and the
+    # owner (Read cell) answer ROLE_NOT_PERMITTED on start and result.
+    for path_ in (start, result):
+        for denied in ("owner", "coder", "auditor", "decomposer"):
+            refused = matrix.post(denied, path_, result_body)
+            assert refused.status_code == 403, (path_, denied)
+            assert _code(refused) == ROLE_NOT_PERMITTED, (path_, denied)
+        anon_write = matrix.post("anonymous", path_, result_body)
+        assert anon_write.status_code == 401, path_
+        assert _code(anon_write) == AUTH_REQUIRED, path_
+
+    # Scope first (ADR-004): a PID00002 executor on a PID00001 task.
+    foreign = owner_client.post(
+        "/api/v1/tokens/agent",
+        {"project_id": PID_TWO, "scopes": ["merge_executor"]},
+    )
+    assert foreign.status_code == 201, foreign.content
+    foreign_client = APIClient()
+    foreign_client.credentials(HTTP_AUTHORIZATION=f"Bearer {foreign.json()['token']}")
+    for path_ in (start, result):
+        scoped = foreign_client.post(path_, result_body, format="json")
+        assert scoped.status_code == 403, path_
+        assert _code(scoped) == AUTH_FORBIDDEN_PROJECT, path_
+
+
 # --- deferred routes: an untested row must never be silently green ----------
 
 
@@ -1311,9 +1408,12 @@ DEFERRED_ENDPOINTS: tuple[str, ...] = (
     # the *Review decisions* matrix row now runs on the real route in
     # PROBES above (two probes — one per allowed actor), so the route is
     # asserted live instead of absent.
-    "/api/v1/merge/pending",  # Merge queue read (WP-3.x)
-    "/api/v1/merge/1/start",  # Merge queue write (WP-3.x)
-    "/api/v1/merge/1/result",  # Merge queue write (WP-3.x)
+    # WP-3.7 removed its three merge entries as it landed MT-3.7-01:
+    # the *Merge queue* matrix row now runs on the real pending/start
+    # routes in PROBES above, and
+    # test_wp37_landed_merge_routes_enforce_their_callers below carries
+    # the per-caller cases for all three (including /result, which has
+    # no printed row of its own) — asserted live instead of absent.
     # WP-1.11 removed its upload/list/detail/delete entries as it landed
     # them: test_wp111_landed_attachment_routes_enforce_their_callers
     # below carries the real per-actor cases (the Section 9.2 Attachments

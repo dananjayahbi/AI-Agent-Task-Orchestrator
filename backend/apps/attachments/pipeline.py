@@ -85,6 +85,22 @@ def stage_for(mime: str) -> StageFn:
 
 
 def run_pipeline(attachment_id: str) -> PipelineOutcome:
+    """Section 17 instrumentation wrapper: time and record one pipeline run.
+
+    Delegates to ``_run_pipeline_inner`` then records duration + outcome
+    (``attachment_pipeline``). Transient exceptions still propagate to the
+    retry seam unrecorded — they are not terminal, so counting them here would
+    double-count a run that later lands ``ready``/``failed``.
+    """
+    from apps.core.metrics import record_pipeline
+
+    start = time.monotonic()
+    outcome = _run_pipeline_inner(attachment_id)
+    record_pipeline(outcome, (time.monotonic() - start) * 1000.0)
+    return outcome
+
+
+def _run_pipeline_inner(attachment_id: str) -> PipelineOutcome:
     """Run every pipeline stage for one attachment; never raises transient.
 
     Transient failures propagate to the task's retry seam (MT-1.12-07);

@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiV1AuthLoginCreateData, ApiV1AuthLoginCreateErrors, ApiV1AuthLoginCreateResponses, ApiV1AuthLogoutCreateData, ApiV1AuthLogoutCreateErrors, ApiV1AuthLogoutCreateResponses, ApiV1AuthRefreshCreateData, ApiV1AuthRefreshCreateErrors, ApiV1AuthRefreshCreateResponses, ApiV1DevicesCreateData, ApiV1DevicesCreateErrors, ApiV1DevicesCreateResponses, ApiV1DevicesDestroyData, ApiV1DevicesDestroyErrors, ApiV1DevicesDestroyResponses, ApiV1DevicesRetrieveData, ApiV1DevicesRetrieveErrors, ApiV1DevicesRetrieveResponses, ApiV1EventsRetrieveData, ApiV1EventsRetrieveErrors, ApiV1EventsRetrieveResponses, ApiV1EventsStreamRetrieveData, ApiV1EventsStreamRetrieveErrors, ApiV1EventsStreamRetrieveResponse, ApiV1EventsStreamRetrieveResponses, ApiV1TokensAgentCreateData, ApiV1TokensAgentCreateErrors, ApiV1TokensAgentCreateResponses, ApiV1TokensDestroyData, ApiV1TokensDestroyErrors, ApiV1TokensDestroyResponses, ApiV1TokensRetrieveData, ApiV1TokensRetrieveErrors, ApiV1TokensRetrieveResponses, ClaimTaskData, ClaimTaskErrors, ClaimTaskResponses, CreateCheckpointData, CreateCheckpointErrors, CreateCheckpointResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateTaskData, CreateTaskErrors, CreateTaskResponses, DeleteAttachmentData, DeleteAttachmentErrors, DeleteAttachmentResponses, EndAgentSessionData, EndAgentSessionErrors, EndAgentSessionResponses, GetResolutionPatchData, GetResolutionPatchErrors, GetResolutionPatchResponses, HealthLiveRetrieveData, HealthLiveRetrieveResponses, HealthReadyRetrieveData, HealthReadyRetrieveErrors, HealthReadyRetrieveResponses, ListAuditReportsData, ListAuditReportsErrors, ListAuditReportsResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListResolutionsData, ListResolutionsErrors, ListResolutionsResponses, ListTaskAttachmentsData, ListTaskAttachmentsErrors, ListTaskAttachmentsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListWorkData, ListWorkErrors, ListWorkResponses, OpenAgentSessionData, OpenAgentSessionErrors, OpenAgentSessionResponses, PartialUpdateProjectData, PartialUpdateProjectErrors, PartialUpdateProjectPolicyData, PartialUpdateProjectPolicyErrors, PartialUpdateProjectPolicyResponses, PartialUpdateProjectResponses, PartialUpdateTaskData, PartialUpdateTaskErrors, PartialUpdateTaskResponses, ReleaseTaskData, ReleaseTaskErrors, ReleaseTaskResponses, RetrieveAttachmentContentData, RetrieveAttachmentContentErrors, RetrieveAttachmentContentResponses, RetrieveAttachmentData, RetrieveAttachmentErrors, RetrieveAttachmentResponses, RetrieveDashboardSummaryData, RetrieveDashboardSummaryErrors, RetrieveDashboardSummaryResponses, RetrieveProjectData, RetrieveProjectErrors, RetrieveProjectManifestData, RetrieveProjectManifestErrors, RetrieveProjectManifestResponses, RetrieveProjectPolicyData, RetrieveProjectPolicyErrors, RetrieveProjectPolicyResponses, RetrieveProjectResponses, RetrieveTaskData, RetrieveTaskErrors, RetrieveTaskResponses, SubmitAuditVerdictData, SubmitAuditVerdictErrors, SubmitAuditVerdictResponses, SubmitResolutionData, SubmitResolutionErrors, SubmitResolutionResponses, SubmitReviewDecisionData, SubmitReviewDecisionErrors, SubmitReviewDecisionResponses, UploadAttachmentData, UploadAttachmentErrors, UploadAttachmentResponses } from './types.gen';
+import type { ApiV1AuthLoginCreateData, ApiV1AuthLoginCreateErrors, ApiV1AuthLoginCreateResponses, ApiV1AuthLogoutCreateData, ApiV1AuthLogoutCreateErrors, ApiV1AuthLogoutCreateResponses, ApiV1AuthRefreshCreateData, ApiV1AuthRefreshCreateErrors, ApiV1AuthRefreshCreateResponses, ApiV1DevicesCreateData, ApiV1DevicesCreateErrors, ApiV1DevicesCreateResponses, ApiV1DevicesDestroyData, ApiV1DevicesDestroyErrors, ApiV1DevicesDestroyResponses, ApiV1DevicesRetrieveData, ApiV1DevicesRetrieveErrors, ApiV1DevicesRetrieveResponses, ApiV1EventsRetrieveData, ApiV1EventsRetrieveErrors, ApiV1EventsRetrieveResponses, ApiV1EventsStreamRetrieveData, ApiV1EventsStreamRetrieveErrors, ApiV1EventsStreamRetrieveResponse, ApiV1EventsStreamRetrieveResponses, ApiV1TokensAgentCreateData, ApiV1TokensAgentCreateErrors, ApiV1TokensAgentCreateResponses, ApiV1TokensDestroyData, ApiV1TokensDestroyErrors, ApiV1TokensDestroyResponses, ApiV1TokensRetrieveData, ApiV1TokensRetrieveErrors, ApiV1TokensRetrieveResponses, ClaimTaskData, ClaimTaskErrors, ClaimTaskResponses, CreateCheckpointData, CreateCheckpointErrors, CreateCheckpointResponses, CreateProjectData, CreateProjectErrors, CreateProjectResponses, CreateTaskData, CreateTaskErrors, CreateTaskResponses, DeleteAttachmentData, DeleteAttachmentErrors, DeleteAttachmentResponses, EndAgentSessionData, EndAgentSessionErrors, EndAgentSessionResponses, GetResolutionPatchData, GetResolutionPatchErrors, GetResolutionPatchResponses, HealthLiveRetrieveData, HealthLiveRetrieveResponses, HealthReadyRetrieveData, HealthReadyRetrieveErrors, HealthReadyRetrieveResponses, ListAuditReportsData, ListAuditReportsErrors, ListAuditReportsResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListMergePendingData, ListMergePendingErrors, ListMergePendingResponses, ListProjectsData, ListProjectsErrors, ListProjectsResponses, ListResolutionsData, ListResolutionsErrors, ListResolutionsResponses, ListTaskAttachmentsData, ListTaskAttachmentsErrors, ListTaskAttachmentsResponses, ListTasksData, ListTasksErrors, ListTasksResponses, ListWorkData, ListWorkErrors, ListWorkResponses, OpenAgentSessionData, OpenAgentSessionErrors, OpenAgentSessionResponses, PartialUpdateProjectData, PartialUpdateProjectErrors, PartialUpdateProjectPolicyData, PartialUpdateProjectPolicyErrors, PartialUpdateProjectPolicyResponses, PartialUpdateProjectResponses, PartialUpdateTaskData, PartialUpdateTaskErrors, PartialUpdateTaskResponses, ReleaseTaskData, ReleaseTaskErrors, ReleaseTaskResponses, ReportMergeResultData, ReportMergeResultErrors, ReportMergeResultResponses, RetrieveAttachmentContentData, RetrieveAttachmentContentErrors, RetrieveAttachmentContentResponses, RetrieveAttachmentData, RetrieveAttachmentErrors, RetrieveAttachmentResponses, RetrieveDashboardSummaryData, RetrieveDashboardSummaryErrors, RetrieveDashboardSummaryResponses, RetrieveProjectData, RetrieveProjectErrors, RetrieveProjectManifestData, RetrieveProjectManifestErrors, RetrieveProjectManifestResponses, RetrieveProjectPolicyData, RetrieveProjectPolicyErrors, RetrieveProjectPolicyResponses, RetrieveProjectResponses, RetrieveTaskData, RetrieveTaskErrors, RetrieveTaskResponses, StartMergeData, StartMergeErrors, StartMergeResponses, SubmitAuditVerdictData, SubmitAuditVerdictErrors, SubmitAuditVerdictResponses, SubmitResolutionData, SubmitResolutionErrors, SubmitResolutionResponses, SubmitReviewDecisionData, SubmitReviewDecisionErrors, SubmitReviewDecisionResponses, UploadAttachmentData, UploadAttachmentErrors, UploadAttachmentResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -204,6 +204,53 @@ export const apiV1EventsStreamRetrieve = <ThrowOnError extends boolean = false>(
             type: 'apiKey'
         }],
     url: '/api/v1/events/stream',
+    ...options
+});
+
+/**
+ * Report one merge outcome (Section 9.2 Merge queue row; caller: Merge Executor — §12.2). `succeeded` dispatches T17 → `completed` + `merge_status = merged` (ADR-008: completed only when the result is reported), carrying the required `sha` in the payload, the history note and the `merge.succeeded` event data (Section 7.2 has no sha column — the three carriers are the contract). `conflict`/`failed` dispatch T18 → `in_human_review` with `review_reason = merge_conflict` (Section 8.4) and the Section 9.8 push, emitting `merge.failed`. Exactly one row applies: a repeat report on an exited task answers TASK_STATE_CONFLICT (409). `Idempotency-Key` replays a retried report with no second transition. Rejections: VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT (403), TASK_NOT_FOUND (404), TASK_STATE_CONFLICT / VERSION_CONFLICT (409), RATE_LIMITED (429).
+ */
+export const reportMergeResult = <ThrowOnError extends boolean = false>(options: Options<ReportMergeResultData, ThrowOnError>): RequestResult<ReportMergeResultResponses, ReportMergeResultErrors, ThrowOnError> => (options.client ?? client).post<ReportMergeResultResponses, ReportMergeResultErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/merge/{task}/result',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Claim one pending task for merging (Section 9.2 Merge queue row; caller: Merge Executor — §12.2). One transaction: verify the task is live, in a carrier state and still `merge_status = pending` (anything else answers TASK_STATE_CONFLICT, 409 — a second executor's claim or an exited task changes nothing), optional `version` CAS (VERSION_CONFLICT, 409), then set `merging`, increment `version` and write the `merge.started` event (Section 9.6) — published after commit. Not a dispatch: Section 8.2 has no start row (recorded reading). `Idempotency-Key` replays a retried claim with no second event. Rejections: VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT (403), TASK_NOT_FOUND (404), TASK_STATE_CONFLICT / VERSION_CONFLICT (409), RATE_LIMITED (429).
+ */
+export const startMerge = <ThrowOnError extends boolean = false>(options: Options<StartMergeData, ThrowOnError>): RequestResult<StartMergeResponses, StartMergeErrors, ThrowOnError> => (options.client ?? client).post<StartMergeResponses, StartMergeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/merge/{task}/start',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Tasks awaiting a merge (Section 9.2 Merge queue row; caller: Merge Executor, Owner read-only — §12.2). The queue is every live task with `merge_status = pending` in a carrier state (`in_human_review` from T15's approve, `to_be_audited` from the engine-approved T10/T13 branches — Section 8.1's sub-status, never a seventh state). Cursor pagination per pagination.md: `page_size` (default 25, maximum 100, clamped), the opaque `cursor` from the previous `next_cursor`, FIFO by task id so polling is stable. An agent token sees only its own project's queue (ADR-004 zero-bleed); the Owner sees every project. Coder/auditor/decomposer agents and devices answer ROLE_NOT_PERMITTED (403); anonymous AUTH_REQUIRED (401).
+ */
+export const listMergePending = <ThrowOnError extends boolean = false>(options?: Options<ListMergePendingData, ThrowOnError>): RequestResult<ListMergePendingResponses, ListMergePendingErrors, ThrowOnError> => (options?.client ?? client).get<ListMergePendingResponses, ListMergePendingErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }, {
+            in: 'cookie',
+            name: 'sessionid',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/merge/pending',
     ...options
 });
 

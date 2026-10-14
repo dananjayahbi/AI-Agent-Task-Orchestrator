@@ -53,7 +53,7 @@ from apps.tasks.services.ids import ensure_valid_task_id
 from apps.tasks.services.tasks import task_list_queryset
 from apps.tasks.state_machine.dispatcher import dispatch_transition
 
-from .exceptions import RoleNotAllowed, TaskAlreadyClaimed
+from .exceptions import ConcurrencyLimitReached, RoleNotAllowed, TaskAlreadyClaimed
 from .wiring import claim_extra, ensure_wired
 
 WorkRole = Literal["coder", "auditor"]
@@ -100,6 +100,39 @@ def eligible_work_queryset(
 
 
 def claim_task(
+    *,
+    task_id: str,
+    session_id: str,
+    worker_agent_id: str,
+    caller_project_id: str | None,
+    role: WorkRole = "coder",
+) -> Task:
+    """Claim *task_id* per Section 9.3; return the claimed (locked) row.
+
+    Thin Section 17 instrumentation wrapper around ``_claim_task_inner``: a
+    success records one claim (``claims_per_minute``), a lost race
+    (``TASK_ALREADY_CLAIMED``/``CONCURRENCY_LIMIT_REACHED``) records a
+    ``claim_conflict``. Every other failure is a permission/validation error,
+    not a claim race, and is left uncounted.
+    """
+    from apps.core.metrics import record_claim, record_claim_conflict
+
+    try:
+        task = _claim_task_inner(
+            task_id=task_id,
+            session_id=session_id,
+            worker_agent_id=worker_agent_id,
+            caller_project_id=caller_project_id,
+            role=role,
+        )
+    except (TaskAlreadyClaimed, ConcurrencyLimitReached):
+        record_claim_conflict()
+        raise
+    record_claim()
+    return task
+
+
+def _claim_task_inner(
     *,
     task_id: str,
     session_id: str,

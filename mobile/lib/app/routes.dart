@@ -75,7 +75,11 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
           ? const NavShell()
           : area == AppArea.taskDetail
               ? TaskDetailScreen(taskId: settings.arguments as String?)
-              : screenForArea(area),
+              : area == AppArea.review
+                  // The review sheet is id-addressed (WP-5.8 route
+                  // contract; WP-5.9 deep links reuse it).
+                  ? ReviewScreen(taskId: settings.arguments as String?)
+                  : screenForArea(area),
     );
   }
   return onUnknownRoute(settings);

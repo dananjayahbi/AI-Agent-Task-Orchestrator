@@ -739,6 +739,237 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/merge/{task}/result:
+    post:
+      operationId: report_merge_result
+      description: 'Report one merge outcome (Section 9.2 Merge queue row; caller:
+        Merge Executor — §12.2). `succeeded` dispatches T17 → `completed` + `merge_status
+        = merged` (ADR-008: completed only when the result is reported), carrying
+        the required `sha` in the payload, the history note and the `merge.succeeded`
+        event data (Section 7.2 has no sha column — the three carriers are the contract).
+        `conflict`/`failed` dispatch T18 → `in_human_review` with `review_reason =
+        merge_conflict` (Section 8.4) and the Section 9.8 push, emitting `merge.failed`.
+        Exactly one row applies: a repeat report on an exited task answers TASK_STATE_CONFLICT
+        (409). `Idempotency-Key` replays a retried report with no second transition.
+        Rejections: VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT
+        (403), TASK_NOT_FOUND (404), TASK_STATE_CONFLICT / VERSION_CONFLICT (409),
+        RATE_LIMITED (429).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of storing
+          a second claim or applying a second merge result.
+      - in: path
+        name: task
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeResultRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MergeResultRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MergeResultRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeResultResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/merge/{task}/start:
+    post:
+      operationId: start_merge
+      description: 'Claim one pending task for merging (Section 9.2 Merge queue row;
+        caller: Merge Executor — §12.2). One transaction: verify the task is live,
+        in a carrier state and still `merge_status = pending` (anything else answers
+        TASK_STATE_CONFLICT, 409 — a second executor''s claim or an exited task changes
+        nothing), optional `version` CAS (VERSION_CONFLICT, 409), then set `merging`,
+        increment `version` and write the `merge.started` event (Section 9.6) — published
+        after commit. Not a dispatch: Section 8.2 has no start row (recorded reading).
+        `Idempotency-Key` replays a retried claim with no second event. Rejections:
+        VALIDATION_ERROR (400), ROLE_NOT_PERMITTED / AUTH_FORBIDDEN_PROJECT (403),
+        TASK_NOT_FOUND (404), TASK_STATE_CONFLICT / VERSION_CONFLICT (409), RATE_LIMITED
+        (429).'
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: Caller-derived key making retries safe (ADR-012; NFR-12). Reusing
+          the key with the same request replays the original outcome instead of storing
+          a second claim or applying a second merge result.
+      - in: path
+        name: task
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeStartRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MergeStartRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MergeStartRequest'
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeStartResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/v1/merge/pending:
+    get:
+      operationId: list_merge_pending
+      description: 'Tasks awaiting a merge (Section 9.2 Merge queue row; caller: Merge
+        Executor, Owner read-only — §12.2). The queue is every live task with `merge_status
+        = pending` in a carrier state (`in_human_review` from T15''s approve, `to_be_audited`
+        from the engine-approved T10/T13 branches — Section 8.1''s sub-status, never
+        a seventh state). Cursor pagination per pagination.md: `page_size` (default
+        25, maximum 100, clamped), the opaque `cursor` from the previous `next_cursor`,
+        FIFO by task id so polling is stable. An agent token sees only its own project''s
+        queue (ADR-004 zero-bleed); the Owner sees every project. Coder/auditor/decomposer
+        agents and devices answer ROLE_NOT_PERMITTED (403); anonymous AUTH_REQUIRED
+        (401).'
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor from the previous page's next_cursor; FIFO by task
+          id so polling is stable (pagination.md rule 1).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+        description: Items per page (default 25, maximum 100; values above the maximum
+          are clamped — pagination.md documented defaults).
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeQueueListEnvelope'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/projects:
     get:
       operationId: list_projects
@@ -3750,6 +3981,143 @@ components:
       required:
       - password
       - username
+    MergeQueueItem:
+      type: object
+      description: One pending task in the queue (Section 9.2 GET /merge/pending).
+      properties:
+        id:
+          type: string
+          description: Section 7.3 task id — the `{task}` path segment.
+        project_id:
+          type: string
+          description: Project the entry belongs to (ADR-004 scope).
+        title:
+          type: string
+          description: Section 7.2 title — the queue's human label.
+        state:
+          type: string
+          description: 'Carrier state: in_human_review (T15 approve) or to_be_audited
+            (T10/T13 engine-approved) — Section 8.1''s sub-status rides these two.'
+        version:
+          type: integer
+          description: Optimistic-lock version (7.2) — chain it onto start/result.
+        merge_status:
+          type: string
+          description: Always 'pending' in this listing (the Section 8.1 sub-status).
+        branch_name:
+          type: string
+          nullable: true
+          description: Current attempt's branch (Section 7.2) the executor merges
+            into the default branch; null only if the carrier somehow lost its resolution.
+        merge_strategy:
+          type: string
+          description: The project policy's Section 7.2 strategy riding the row (squash
+            | merge_commit | fast_forward_only; default squash) — the executor never
+            configures strategy itself; manual entries are resolved by the queue-side
+            guard and never appear here (OQ-06).
+      required:
+      - branch_name
+      - id
+      - merge_status
+      - merge_strategy
+      - project_id
+      - state
+      - title
+      - version
+    MergeQueueListEnvelope:
+      type: object
+      description: 'pagination.md envelope: exactly ``results`` + ``next_cursor``.'
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MergeQueueItem'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null = end of list.
+      required:
+      - next_cursor
+      - results
+    MergeResultRequest:
+      type: object
+      description: '``POST /merge/{task}/result`` input (Section 9.2; MT-3.7-01).'
+      properties:
+        result:
+          allOf:
+          - $ref: '#/components/schemas/ResultEnum'
+          description: |-
+            succeeded | conflict | failed — the executor's reported outcome; succeeded applies T17, the other two apply T18 with that flavor (Section 7.2 values, never inferred).
+
+            * `succeeded` - succeeded
+            * `conflict` - conflict
+            * `failed` - failed
+        sha:
+          type: string
+          default: ''
+          description: The resulting merge sha — **required for succeeded** (T17's
+            Guard column; Section 11.4). Section 7.2 has no sha column, so it rides
+            this payload, the history note and the event data (recorded reading; no
+            silent schema change).
+        details:
+          type: string
+          default: ''
+          description: Free-text outcome detail (conflict file list, error summary)
+            — carried into the history note and the merge.failed event data.
+        version:
+          type: integer
+          minimum: 1
+          description: Optional task ``version`` the executor saw at start (FR-TSK-06)
+            — a stale value answers VERSION_CONFLICT (409) and applies nothing.
+      required:
+      - result
+    MergeResultResponse:
+      type: object
+      description: Result's response — the post-transition identity plus the echo.
+      properties:
+        task:
+          allOf:
+          - $ref: '#/components/schemas/QueueTaskState'
+          description: completed + merged (T17) or in_human_review + conflict/failed
+            with review_reason merge_conflict (T18).
+        result:
+          allOf:
+          - $ref: '#/components/schemas/ResultEnum'
+          description: |-
+            The reported outcome, echoed.
+
+            * `succeeded` - succeeded
+            * `conflict` - conflict
+            * `failed` - failed
+        sha:
+          type: string
+          nullable: true
+          description: The resulting sha on success; null on the T18 failure branches.
+      required:
+      - result
+      - sha
+      - task
+    MergeStartRequest:
+      type: object
+      description: '``POST /merge/{task}/start`` input — no required fields (claim
+        is id-less).'
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: Optional task ``version`` the executor saw in the listing (FR-TSK-06)
+            — a stale value answers VERSION_CONFLICT (409) and claims nothing.
+    MergeStartResponse:
+      type: object
+      description: Start's response — the post-claim identity the executor chains
+        on.
+      properties:
+        task:
+          allOf:
+          - $ref: '#/components/schemas/QueueTaskState'
+          description: merge_status is now 'merging' and version incremented (7.2).
+      required:
+      - task
     MergeStrategyEnum:
       enum:
       - squash
@@ -4259,6 +4627,33 @@ components:
         * `pass` - pass
         * `flag_risk` - flag_risk
         * `fail` - fail
+    QueueTaskState:
+      type: object
+      description: The post-mutation task identity the start/result responses carry.
+      properties:
+        id:
+          type: string
+          description: Section 7.3 task id.
+        state:
+          type: string
+          description: Canonical state after the mutation — in_human_review or to_be_audited
+            on start; completed (T17) or in_human_review (T18) after a result.
+        version:
+          type: integer
+          description: Optimistic-lock version after the row (7.2).
+        review_reason:
+          type: string
+          nullable: true
+          description: Section 8.4 member — merge_conflict after T18, else unchanged.
+        merge_status:
+          type: string
+          description: none | pending | merging | merged | conflict | failed (7.2).
+      required:
+      - id
+      - merge_status
+      - review_reason
+      - state
+      - version
     Refreshed:
       type: object
       description: 'POST /auth/refresh: the extended expiry (same lifetime settings).'
@@ -4525,6 +4920,16 @@ components:
       - scope_violations
       - task
       - trigger
+    ResultEnum:
+      enum:
+      - succeeded
+      - conflict
+      - failed
+      type: string
+      description: |-
+        * `succeeded` - succeeded
+        * `conflict` - conflict
+        * `failed` - failed
     ReviewDecisionRecord:
       type: object
       description: One recorded Section 7.2 Review Decision row, field for field.

@@ -17,6 +17,7 @@ from drf_spectacular.utils import extend_schema
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.health import HealthLive, HealthReady
+from apps.core.metrics import metrics_view
 from apps.projects.views.dashboard import DashboardSummaryView
 
 
@@ -42,6 +43,10 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # probed by infra/compose (Section 16.1: GET /health/ready).
     path("health/live", HealthLive.as_view(), name="health-live"),
     path("health/ready", HealthReady.as_view(), name="health-ready"),
+    # Section 17 observability (NFR-10; WP-6.4) — the /metrics JSON endpoint.
+    # A plain Django view (not DRF) so it stays out of the OpenAPI document;
+    # internal/LAN-only posture like Health. Gated by METRICS_ENABLED.
+    path("metrics", metrics_view, name="metrics"),
     # The OpenAPI contract itself (ADR-005; NFR-11). Serving path decided
     # once in MT-1.1-04: the document at /api/v1/schema (YAML by default,
     # ?format=json for JSON), Swagger UI at /api/v1/schema/swagger-ui.
@@ -75,6 +80,9 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # WP-3.3 audit surface (MT-3.3-04/05 — the Section 9.2 Audit row:
     # verdict POST and audit-reports GET).
     path("api/v1/", include("apps.audit.urls")),
+    # WP-3.7 merge queue (MT-3.7-01 — the Section 9.2 Merge queue row:
+    # pending GET, start/result POSTs for the Merge Executor).
+    path("api/v1/", include("apps.merge.urls")),
     # Section 9.2 Dashboard row (MT-1.15-06): the Owner-facing summary the
     # mobile Overview consumes (FR-MOB-01). Mounted directly because it is
     # a cross-cutting roll-up, not a /projects/{pid} sub-resource.

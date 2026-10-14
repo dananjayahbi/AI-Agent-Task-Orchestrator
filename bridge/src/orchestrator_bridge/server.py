@@ -12,9 +12,10 @@ enhancement per ADR-011; ``build_prompts`` is the only seam that adds
 prompts), and carries the Section 10.6 **rules block as the initialize-time
 server instructions** (MT-2.7-03; gap G-08 channel one) — rendered from the
 same :mod:`~orchestrator_bridge.rules` path the claim response and
-``get_project_context`` use, with the coder template (role is only chosen at
-claim time, so connect delivers the standard block — MT-2.7-03 risk note) and
-the session's cached ``system_prompt_rules`` appended. Without a bound
+``get_project_context`` use. At connect time the claiming role is not yet
+known, so both the coder standard rules and the auditor obligations are
+delivered (MT-3.5-03), with the session's cached ``system_prompt_rules``
+appended once after both blocks. Without a bound
 runtime — the WP-2.1 skeleton acceptance and pure unit tests — the tool and
 prompt sets are empty and no instructions are advertised, exactly as before.
 """
@@ -29,7 +30,7 @@ from mcp.server import MCPServer
 
 from .config import Settings
 from .prompts import build_prompts
-from .rules import render_session_rules
+from .rules import render_connect_rules
 from .tools.registration import build_tools
 from .tools.runtime import ToolRuntime
 
@@ -44,18 +45,20 @@ def _package_version() -> str:
 
 
 def _initialize_instructions(runtime: ToolRuntime) -> str:
-    """The connect-time rules block (G-08 channel one; MT-2.7-03).
+    """The connect-time rules block (G-08 channel one; MT-2.7-03, MT-3.5-03).
 
-    Coder template, generic slot phrasings (no task exists yet), checkpoint
-    interval derived from the cached policy summary's lease, project rules
-    appended — :func:`render_session_rules` is the single render path shared
-    with ``get_project_context`` and the claim response.
+    Both Section 10.6 role blocks — the coder standard rules *and* the
+    auditor obligations — with generic slot phrasings (no task exists yet),
+    the checkpoint interval derived from the cached policy summary's lease,
+    and the project rules appended once after both. Role is chosen at claim
+    time, so connect-time delivery shows both (MT-3.5-03).
+    :func:`render_connect_rules` is the single render path shared with
+    ``get_project_context``.
     """
     context = runtime.context
     if context is None:  # a resumed runtime self-heals through the client
         context = runtime.project_context()
-    return render_session_rules(
-        "coder",
+    return render_connect_rules(
         project_rules=context.rules,
         policy_summary=context.policy_summary,
     )

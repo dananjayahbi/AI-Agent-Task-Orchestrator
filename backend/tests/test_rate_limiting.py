@@ -247,10 +247,13 @@ AGENT_OR_DEVICE_ROUTES: tuple[_Route, ...] = (
     # same per-token budget (the shared-row recording of WP-1.8/WP-3.2/
     # WP-3.3, once more — recorded in the WP-3.6 changelog).
     _Route("/api/v1/tasks/1/review", DeviceEndpointThrottle, "WP-3.6", True),
-    # --- Merge queue row (Merge Executor): WP-3.x
-    _Route("/api/v1/merge/pending", AgentEndpointThrottle, "WP-3.x", False),
-    _Route("/api/v1/merge/1/start", AgentEndpointThrottle, "WP-3.x", False),
-    _Route("/api/v1/merge/1/result", AgentEndpointThrottle, "WP-3.x", False),
+    # --- Merge queue row (Merge Executor): landed with WP-3.7 ----------
+    # All three views carry AgentEndpointThrottle on the view class
+    # (FR-SEC-05; the row's caller is the agent executor — recorded in
+    # the WP-3.7 changelog).
+    _Route("/api/v1/merge/pending", AgentEndpointThrottle, "WP-3.7", True),
+    _Route("/api/v1/merge/1/start", AgentEndpointThrottle, "WP-3.7", True),
+    _Route("/api/v1/merge/1/result", AgentEndpointThrottle, "WP-3.7", True),
     # --- Sessions row: landed with MT-1.6-09 (WP-1.6; the bridge caller
     # uses these routes from WP-2.x)
     _Route("/api/v1/agent-sessions", AgentEndpointThrottle, "MT-1.6-09", True),

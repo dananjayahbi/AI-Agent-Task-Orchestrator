@@ -4,18 +4,12 @@
  * backend's authoritative diff stats (Section 9.7 — never recomputed
  * client-side), audit-report pairing by resolution id (Section 8.5
  * auditor-less flows render without one), fetch-on-expand
- * (Section 13.3/13.4), `latest_feedback` visibility (WP-3.6 field), and
- * the explicit endpoint-gap notice in place of a transitions endpoint
- * that Section 9.2 does not publish (WP-4.4 precedent: never invent a
- * contract).
+ * (Section 13.3/13.4), and `latest_feedback` visibility (WP-3.6 field).
  */
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ResolutionsSection,
-  TransitionsHistorySection,
-} from '@/components/task/detail/resolutions-section';
+import { ResolutionsSection } from '@/components/task/detail/resolutions-section';
 import {
   errorResponse,
   installApi,
@@ -162,15 +156,5 @@ describe('ResolutionsSection (MT-4.6-03)', () => {
     const alert = screen.getByRole('alert');
     expect(alert.textContent).toContain('Something went wrong');
     expect(alert.textContent).not.toContain('orm traceback');
-  });
-});
-
-describe('TransitionsHistorySection (MT-4.6-03 deferred part)', () => {
-  it('renders an explicit endpoint-gap notice — never a silent no-op', () => {
-    renderWithQueryClient(<TransitionsHistorySection />);
-    expect(screen.getByTestId('task-detail-section-transitions')).toBeTruthy();
-    expect(document.body.textContent).toContain(
-      'Transition history needs a task-transitions endpoint',
-    );
   });
 });
