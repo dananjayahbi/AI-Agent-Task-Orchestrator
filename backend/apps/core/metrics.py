@@ -142,6 +142,20 @@ def record_heartbeat(kind: str) -> None:
     cache.set(f"{_PREFIX}:heartbeat:{kind}", timezone.now().isoformat(), None)
 
 
+def heartbeat_age_seconds(kind: str, now: datetime | None = None) -> float | None:
+    """Age of one heartbeat stamp (``worker``/``beat``/``sweeper``), or None
+    if never stamped — the MT-6.4-02 sweeper alert's public signal reader."""
+    now = now or timezone.now()
+    raw = cache.get(f"{_PREFIX}:heartbeat:{kind}")
+    return _heartbeat_age_seconds(raw, now)
+
+
+def push_counts() -> tuple[int, int]:
+    """``(dispatched, succeeded)`` — the MT-6.4-02 push-failure alert's
+    public signal reader over the same counters the metric exposes."""
+    return _get(f"{_PREFIX}:push:dispatched"), _get(f"{_PREFIX}:push:succeeded")
+
+
 # --- DB gauges (computed at scrape) ------------------------------------------
 
 

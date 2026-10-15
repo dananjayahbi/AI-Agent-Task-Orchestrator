@@ -89,7 +89,12 @@ describe('Board — six canonical columns (MT-4.3-01)', () => {
     await waitFor(() => expect(screen.getAllByTestId('task-card-merge-badge')).toHaveLength(2));
 
     const audited = within(screen.getByTestId('board-column-to_be_audited'));
-    expect(audited.getByTestId('task-card-merge-badge').textContent).toBe('approved, merging');
+    // MT-4.8-04: pending reads "approved, waiting"; merging keeps
+    // Section 8.1's verbatim "approved, merging".
+    expect(audited.getByTestId('task-card-merge-badge').textContent).toBe('approved, waiting');
+    expect(audited.getByTestId('task-card-merge-badge').getAttribute('data-merge-status')).toBe(
+      'pending',
+    );
     expect(
       within(screen.getByTestId('board-column-in_human_review')).getAllByTestId(
         'task-card-merge-badge',

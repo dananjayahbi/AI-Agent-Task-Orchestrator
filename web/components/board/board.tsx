@@ -49,6 +49,7 @@ import { BOARD_STATES, groupTasksByState } from '@/lib/board/states';
 import { DEFAULT_STALLED_AFTER_MINUTES } from '@/lib/board/stalled';
 import { useNow } from '@/lib/board/use-now';
 import { resolveError } from '@/lib/errors';
+import { layout } from '@/lib/layout/styles';
 import { useBoardLiveUpdates } from '@/lib/queries/board-live';
 import { useCheckpointProgressQuery } from '@/lib/queries/checkpoint-progress';
 import { usePolicyQuery } from '@/lib/queries/policy';
@@ -166,8 +167,8 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
 
   return (
     <BoardMoveContext.Provider value={moveController}>
-      <div data-testid="board" className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div data-testid="board" className={layout.pageStack}>
+        <div className={layout.pageHeaderRow}>
           <h1 className="text-lg font-semibold text-foreground">Board — {pid}</h1>
           <div className="flex items-center gap-2">
             <Button
@@ -221,7 +222,7 @@ export function Board({ pid, onMove, onDialog }: BoardProps) {
             }
           />
         ) : (
-          <div data-testid="board-columns" className="flex snap-x gap-3 overflow-x-auto pb-2">
+          <div data-testid="board-columns" className={layout.boardColumns}>
             {BOARD_STATES.map((state) => (
               <BoardColumn
                 key={state}

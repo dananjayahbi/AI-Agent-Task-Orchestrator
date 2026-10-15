@@ -82,6 +82,52 @@ export type AgentTokenIssueResponse = {
 };
 
 /**
+ * One MT-6.4-02 rule's state — field names are the alert contract.
+ */
+export type AlertState = {
+    /**
+     * Stable rule id: sweeper_not_running, attachment_backlog, push_failures, tunnel_down, repeated_auth_failures, media_disk_usage (Section 17 Alerts row, plan order).
+     */
+    id: string;
+    /**
+     * The Section 17 alert name, verbatim.
+     */
+    name: string;
+    /**
+     * 'critical' or 'warning' (docs/plan/alerts.md).
+     */
+    severity: string;
+    /**
+     * True while the rule's condition holds.
+     */
+    firing: boolean;
+    /**
+     * 'firing', 'ok', or 'unknown' (signal never reported — never fires).
+     */
+    status: string;
+    /**
+     * ISO onset of the current firing stretch, or null when resting.
+     */
+    since?: string | null;
+    /**
+     * Numbers only — counts, ages, rates. No identities, no secrets (12.4).
+     */
+    signal: {
+        [key: string]: unknown;
+    };
+    /**
+     * The configurable threshold(s) in force.
+     */
+    threshold: {
+        [key: string]: unknown;
+    };
+    /**
+     * Section 17 runbook name where one exists (else null).
+     */
+    runbook?: string | null;
+};
+
+/**
  * One attachment descriptor — FR-ATT-03's field shape, locked here.
  *
  * One documented addition by WP-1.12 (MT-1.12-07, FR-ATT-07
@@ -925,6 +971,50 @@ export type MergeStartResponse = {
  * * `fast_forward_only` - fast forward only
  */
 export type MergeStrategyEnum = 'squash' | 'merge_commit' | 'fast_forward_only';
+
+/**
+ * Section 17 Health row: live plus the ready checks' reachability.
+ */
+export type OpsHealth = {
+    /**
+     * Always true in a 200 body — this process served the request.
+     */
+    live: boolean;
+    /**
+     * 'database'/'cache' → 'ok' or 'unreachable' (same pings as /health/ready).
+     */
+    checks: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * ``GET /api/v1/ops/overview`` body — one snapshot for the ops view.
+ */
+export type OpsOverview = {
+    /**
+     * Payload contract version; bump on breaking shape changes.
+     */
+    schema_version: string;
+    /**
+     * ISO timestamp of this snapshot — the view shows it as data freshness so a frozen view is recognizable as stale (MT-6.4-03 risk note; polling is the recorded update mode).
+     */
+    generated_at: string;
+    /**
+     * MT-6.4-01's nine Section 17 metrics plus heartbeats, verbatim from the /metrics collector (docs/plan/metrics.md is the semantics table; this payload and /metrics cannot disagree — same collect()).
+     */
+    metrics: {
+        [key: string]: unknown;
+    };
+    /**
+     * MT-6.4-02's six Section 17 rules in plan order, with firing state and context (docs/plan/alerts.md).
+     */
+    alerts: Array<AlertState>;
+    /**
+     * Section 17 Health row — live/ready plus heartbeat visibility via metrics.
+     */
+    health: OpsHealth;
+};
 
 export type OrchestratorManifest = {
     /**
@@ -2587,6 +2677,26 @@ export type ListMergePendingResponses = {
 };
 
 export type ListMergePendingResponse = ListMergePendingResponses[keyof ListMergePendingResponses];
+
+export type RetrieveOpsOverviewData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/ops/overview';
+};
+
+export type RetrieveOpsOverviewErrors = {
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type RetrieveOpsOverviewError = RetrieveOpsOverviewErrors[keyof RetrieveOpsOverviewErrors];
+
+export type RetrieveOpsOverviewResponses = {
+    200: OpsOverview;
+};
+
+export type RetrieveOpsOverviewResponse = RetrieveOpsOverviewResponses[keyof RetrieveOpsOverviewResponses];
 
 export type ListProjectsData = {
     body?: never;

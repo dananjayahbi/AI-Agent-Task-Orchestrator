@@ -122,4 +122,9 @@ export const queryKeys = {
    */
   auditEvents: (filters: { project: string | null; task: string | null }) =>
     ['events', 'history', filters] as const,
+  /**
+   * Operations snapshot (MT-6.4-03; Section 17 Dashboards row): one
+   * cross-project entry, polled (never SSE-patched) — see lib/queries/ops.
+   */
+  opsOverview: ['ops', 'overview'] as const,
 };

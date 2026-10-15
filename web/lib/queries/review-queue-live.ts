@@ -13,6 +13,10 @@
  *    `{review_reason, task_version}`, never a row: MT-3.9-01) and insert
  *    it; if the fetch says the task already left `in_human_review`, the
  *    insert drops it instead (server truth);
+ *  - `merge.started` / `merge.succeeded` / `merge.failed` (MT-4.8-04) —
+ *    a targeted refetch for rows the queue holds, so the row's merge
+ *    badge tracks the executor; a row that left review on the way
+ *    (merge.succeeded → completed) is dropped by the same upsert;
  *  - transition-shaped events (every dispatch carries
  *    `{from_state, to_state, reason_code}`): `to_state` outside
  *    `in_human_review` **removes** the row (a decision resolved it);
@@ -67,6 +71,20 @@ export function useReviewQueueLiveUpdates(): {
 
       if (event.type === 'review.requested') {
         void refreshRow(taskId);
+        return;
+      }
+
+      // MT-4.8-04: keep the row's merge badge fresh while the executor
+      // works — one targeted refetch for rows the queue actually holds.
+      if (
+        event.type === 'merge.started' ||
+        event.type === 'merge.succeeded' ||
+        event.type === 'merge.failed'
+      ) {
+        const current = queryClient.getQueryData<Task[]>(queryKeys.reviewQueue);
+        if (current !== undefined && current.some((task) => task.id === taskId)) {
+          void refreshRow(taskId);
+        }
         return;
       }
 

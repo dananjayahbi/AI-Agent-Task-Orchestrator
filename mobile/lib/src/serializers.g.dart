@@ -13,6 +13,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(AgentSessionCreate.serializer)
       ..add(AgentTokenIssueRequest.serializer)
       ..add(AgentTokenIssueResponse.serializer)
+      ..add(AlertState.serializer)
       ..add(Attachment.serializer)
       ..add(AttachmentContent.serializer)
       ..add(AttachmentDelete.serializer)
@@ -58,6 +59,8 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(MergeStartRequest.serializer)
       ..add(MergeStartResponse.serializer)
       ..add(MergeStrategyEnum.serializer)
+      ..add(OpsHealth.serializer)
+      ..add(OpsOverview.serializer)
       ..add(OrchestratorManifest.serializer)
       ..add(OwnerSession.serializer)
       ..add(PatchedProjectPolicy.serializer)
@@ -215,6 +218,31 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(
               BuiltMap, const [const FullType(String), const FullType(String)]),
           () => MapBuilder<String, String>())
+      ..addBuilderFactory(
+          const FullType(
+              BuiltMap, const [const FullType(String), const FullType(String)]),
+          () => MapBuilder<String, String>())
+      ..addBuilderFactory(
+          const FullType(BuiltMap, const [
+            const FullType(String),
+            const FullType.nullable(JsonObject)
+          ]),
+          () => MapBuilder<String, JsonObject?>())
+      ..addBuilderFactory(
+          const FullType(BuiltMap, const [
+            const FullType(String),
+            const FullType.nullable(JsonObject)
+          ]),
+          () => MapBuilder<String, JsonObject?>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(AlertState)]),
+          () => ListBuilder<AlertState>())
+      ..addBuilderFactory(
+          const FullType(BuiltMap, const [
+            const FullType(String),
+            const FullType.nullable(JsonObject)
+          ]),
+          () => MapBuilder<String, JsonObject?>())
       ..addBuilderFactory(
           const FullType(BuiltMap, const [
             const FullType(String),

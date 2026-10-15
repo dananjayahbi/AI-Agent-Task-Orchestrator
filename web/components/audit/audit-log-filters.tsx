@@ -120,7 +120,7 @@ export function AuditLogFiltersBar({ filters, onChange, onClearAll }: AuditLogFi
             aria-label="Filter by actor (requires contract change)"
             data-testid="audit-filter-actor"
             disabled
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground opacity-60"
+            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground"
           >
             <option value="">All actors</option>
             <option value="owner">owner</option>
@@ -139,7 +139,7 @@ export function AuditLogFiltersBar({ filters, onChange, onClearAll }: AuditLogFi
             data-testid="audit-filter-from"
             type="date"
             disabled
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground opacity-60"
+            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground"
           />
         </label>
 
@@ -153,7 +153,7 @@ export function AuditLogFiltersBar({ filters, onChange, onClearAll }: AuditLogFi
             data-testid="audit-filter-to"
             type="date"
             disabled
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground opacity-60"
+            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground"
           />
         </label>
 
@@ -166,7 +166,7 @@ export function AuditLogFiltersBar({ filters, onChange, onClearAll }: AuditLogFi
             aria-label="Filter by event type (requires contract change)"
             data-testid="audit-filter-type"
             disabled
-            className="h-9 max-w-64 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground opacity-60"
+            className="h-9 max-w-64 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground"
           >
             <option value="">All types</option>
             {EVENT_CATALOG.map((type) => (

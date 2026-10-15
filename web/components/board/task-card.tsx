@@ -33,6 +33,7 @@ import { useState } from 'react';
 
 import { MoveDestinationDialog } from '@/components/board/move-destination-dialog';
 import { PriorityChip } from '@/components/board/priority-chip';
+import { MergeStatusBadge } from '@/components/review/merge-status-badge';
 import { useBoardMove } from '@/components/board/move-context';
 import type { Task } from '@/lib/api/generated/types.gen';
 import { formatLeaseRemaining, leaseRemainingMs } from '@/lib/board/lease';
@@ -52,9 +53,17 @@ type TaskCardProps = {
   onEdit?: ((task: Task) => void) | undefined;
 };
 
-/** Section 8.1 note: merge-pending is a sub-status badge, never a column. */
-export function isMergePending(task: Task): boolean {
-  return task.merge_status === 'pending' || task.merge_status === 'merging';
+/**
+ * MT-4.8-04: the card shows the shared merge badge for every active
+ * sub-status — pending / merging (Section 8.1) plus the T18 failure
+ * branch (conflict / failed, back in human review). `merged` stays off
+ * the card: the Completed column already states the outcome; the
+ * detail page carries the merged marker. (Replaces the old
+ * `isMergePending` pending/merging-only check — same Section 8.1
+ * "sub-status badge, never a column" rule, wider status set.)
+ */
+function showMergeBadge(task: Task): boolean {
+  return task.merge_status !== 'none' && task.merge_status !== 'merged';
 }
 
 export function TaskCard({
@@ -70,7 +79,7 @@ export function TaskCard({
   const remainingMs = leaseRemainingMs(task, nowMs);
   const stalled = isTaskStalled(task, stalledAfterMinutes, nowMs);
   const escalated = task.state === 'in_human_review';
-  const merging = isMergePending(task);
+  const mergeBadge = showMergeBadge(task);
   const knownPercent = typeof percent === 'number' && Number.isFinite(percent);
 
   return (
@@ -192,7 +201,7 @@ export function TaskCard({
         </div>
       </div>
 
-      {(stalled || escalated || merging) && (
+      {(stalled || escalated || mergeBadge) && (
         <div className="flex flex-wrap gap-1">
           {stalled && (
             <span
@@ -213,14 +222,8 @@ export function TaskCard({
               Needs review
             </span>
           )}
-          {merging && (
-            <span
-              data-testid="task-card-merge-badge"
-              aria-label="Approved, merging"
-              className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-secondary-foreground"
-            >
-              approved, merging
-            </span>
+          {mergeBadge && (
+            <MergeStatusBadge status={task.merge_status} testId="task-card-merge-badge" />
           )}
         </div>
       )}

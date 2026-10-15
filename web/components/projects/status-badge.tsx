@@ -9,7 +9,7 @@ import { cn } from 'cn';
  */
 const STATUS_STYLE: Record<Project['active_status'], string> = {
   active: 'border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  paused: 'border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  paused: 'border-transparent bg-amber-500/15 text-amber-800 dark:text-amber-400',
   archived: 'border-transparent bg-muted text-muted-foreground',
 };
 

@@ -45,12 +45,19 @@ PLAN_PATH = Path(__file__).resolve().parents[3] / "ai_agent_task_orchestrator_ar
 #: the endpoints that exist in the generated OpenAPI document but print no
 #: plan row — each entry is a *documented plan gap*, never a silent allowance:
 #: when the plan gains the row, the gap entry must be deleted (the gap test
-#: below fails while it lingers). ``GET /api/v1/devices`` is the sole entry:
+#: below fails while it lingers). ``GET /api/v1/devices`` and
+#: ``GET /api/v1/ops/overview`` are the entries:
 #: the device list landed with WP-1.2's devices surface, the Section 9.2
 #: Devices row prints only POST/DELETE, and the omission was flagged when the
 #: plan-doc series transcribed the table (its case lives in
-#: ``tests/test_device_list.py``).
-GAPS: frozenset[tuple[str, str]] = frozenset({("GET", "/api/v1/devices")})
+#: ``tests/test_device_list.py``); the ops overview is the MT-6.4-03
+#: operations view's data source on the Section 17 Dashboards row, which
+#: Section 9.2 folds under the Dashboard row — when the plan prints the
+#: row, the gap entry must be deleted (its case lives in
+#: ``tests/test_ops_overview.py``).
+GAPS: frozenset[tuple[str, str]] = frozenset(
+    {("GET", "/api/v1/devices"), ("GET", "/api/v1/ops/overview")},
+)
 
 #: Rows whose endpoints print in Section 9.2 but do not exist yet. Their
 #: "proof" is exactly the adopted drift guard: the sample path below must be a
@@ -269,6 +276,10 @@ PROOF: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # --- documented plan gap (see GAPS)
     ("GET", "/api/v1/devices"): ("tests.test_device_list", "test_list_requires_an_owner_session"),
+    ("GET", "/api/v1/ops/overview"): (
+        "tests.test_ops_overview",
+        "test_overview_is_owner_only",
+    ),
 }
 
 _METHODS = frozenset({"get", "put", "post", "delete", "patch"})

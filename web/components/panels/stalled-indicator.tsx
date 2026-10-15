@@ -41,7 +41,7 @@ export function StalledIndicator({ join, stalledAfterMinutes }: StalledIndicator
     <span
       data-testid="stalled-indicator"
       title={`No checkpoint within stalled_after_minutes (${stalledAfterMinutes ?? DEFAULT_STALLED_AFTER_MINUTES} min)`}
-      className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+      className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-400"
     >
       Stalled
     </span>

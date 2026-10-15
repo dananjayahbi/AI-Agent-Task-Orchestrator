@@ -79,6 +79,13 @@ class LoginView(APIView):
         # built-in exception down to 403 — the envelope contract here is the
         # 401 AUTH_REQUIRED (MT-1.2-01; Section 9.2).
         if authenticated is None:
+            # MT-6.4-02: Section 15.3 layer-4 anomaly signal — one failed
+            # login attempt counted (hashed source, fixed window). The
+            # counter is read by the repeated-auth-failures alert; nothing
+            # else changes here.
+            from apps.core.alerts import record_auth_failure
+
+            record_auth_failure(request._request.META.get("REMOTE_ADDR", "unknown"))
             raise AuthRequired("Invalid username or password.")
         if not isinstance(authenticated, User):  # pragma: no cover - defensive
             raise AuthRequired("Invalid username or password.")

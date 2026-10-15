@@ -19,6 +19,7 @@ dependencies = [
     "uvicorn>=0.54.0",
     "pillow>=12.3.0",
     "pypdf>=6.20.1",
+    "firebase-admin>=7.7.0",
 ]
 
 [dependency-groups]
@@ -72,6 +73,13 @@ plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
 # typed and the two @shared_task decorators carry per-site ignores.
 [[tool.mypy.overrides]]
 module = ["celery", "celery.*"]
+ignore_missing_imports = true
+
+# firebase-admin ships no py.typed marker; the transport keeps every call
+# behind its own narrow protocol (apps/notifications/sender.py), and the
+# lazy imports carry per-site ignores where values are consumed.
+[[tool.mypy.overrides]]
+module = ["firebase_admin", "firebase_admin.*"]
 ignore_missing_imports = true
 
 # django-stubs plugin options (typeddjango/django-stubs): type-check settings

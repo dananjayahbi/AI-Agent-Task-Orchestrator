@@ -18,6 +18,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.health import HealthLive, HealthReady
 from apps.core.metrics import metrics_view
+from apps.core.ops import OpsOverviewView
 from apps.projects.views.dashboard import DashboardSummaryView
 
 
@@ -87,4 +88,9 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # mobile Overview consumes (FR-MOB-01). Mounted directly because it is
     # a cross-cutting roll-up, not a /projects/{pid} sub-resource.
     path("api/v1/dashboard/summary", DashboardSummaryView.as_view(), name="dashboard-summary"),
+    # Section 17 Dashboards row (NFR-10; MT-6.4-03 — WP-6.4): the operations
+    # view's data source — MT-6.4-01's metrics + MT-6.4-02's alert states +
+    # Health, in one owner-scoped read. Cross-cutting roll-up, so mounted
+    # directly like Dashboard.
+    path("api/v1/ops/overview", OpsOverviewView.as_view(), name="ops-overview"),
 ]

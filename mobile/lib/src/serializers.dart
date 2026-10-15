@@ -20,6 +20,7 @@ import 'package:orchestrator_mobile/src/model/agent_session.dart';
 import 'package:orchestrator_mobile/src/model/agent_session_create.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_request.dart';
 import 'package:orchestrator_mobile/src/model/agent_token_issue_response.dart';
+import 'package:orchestrator_mobile/src/model/alert_state.dart';
 import 'package:orchestrator_mobile/src/model/attachment.dart';
 import 'package:orchestrator_mobile/src/model/attachment_content.dart';
 import 'package:orchestrator_mobile/src/model/attachment_delete.dart';
@@ -65,6 +66,8 @@ import 'package:orchestrator_mobile/src/model/merge_result_response.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_request.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_response.dart';
 import 'package:orchestrator_mobile/src/model/merge_strategy_enum.dart';
+import 'package:orchestrator_mobile/src/model/ops_health.dart';
+import 'package:orchestrator_mobile/src/model/ops_overview.dart';
 import 'package:orchestrator_mobile/src/model/orchestrator_manifest.dart';
 import 'package:orchestrator_mobile/src/model/owner_session.dart';
 import 'package:orchestrator_mobile/src/model/patched_project_policy.dart';
@@ -117,6 +120,7 @@ part 'serializers.g.dart';
   AgentSessionCreate,
   AgentTokenIssueRequest,
   AgentTokenIssueResponse,
+  AlertState,
   Attachment,
   AttachmentContent,
   AttachmentDelete,
@@ -162,6 +166,8 @@ part 'serializers.g.dart';
   MergeStartRequest,
   MergeStartResponse,
   MergeStrategyEnum,
+  OpsHealth,
+  OpsOverview,
   OrchestratorManifest,
   OwnerSession,
   PatchedProjectPolicy,
@@ -239,6 +245,10 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Checkpoint)]),
         () => ListBuilder<Checkpoint>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(AlertState)]),
+        () => ListBuilder<AlertState>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Project)]),

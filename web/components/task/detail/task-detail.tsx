@@ -38,6 +38,8 @@ import { AttachmentViewer } from '@/components/task/detail/attachment-viewer';
 import { CheckpointFeed } from '@/components/task/detail/checkpoint-feed';
 import { ResolutionsSection } from '@/components/task/detail/resolutions-section';
 import { TransitionsHistorySection } from '@/components/task/detail/transitions-section';
+import { MergeStatusBadge } from '@/components/review/merge-status-badge';
+import { ReviewPanel } from '@/components/review/review-panel';
 import { PriorityChip } from '@/components/board/priority-chip';
 import { ErrorState } from '@/components/errors/error-state';
 import { LoadingState } from '@/components/states/loading-state';
@@ -187,6 +189,11 @@ export function TaskDetail({ pid, taskId }: TaskDetailProps) {
           >
             {STATE_LABELS[task.state]}
           </span>
+          {/* MT-4.8-04: the merge sub-status rides the header whenever the
+              review panel is not hosting it (e.g. merged after T17). */}
+          {task.state !== 'in_human_review' && (
+            <MergeStatusBadge status={task.merge_status} testId="task-detail-merge-badge" />
+          )}
           {task.worker_agent_id !== null && (
             <span
               data-testid="task-detail-worker"
@@ -210,6 +217,12 @@ export function TaskDetail({ pid, taskId }: TaskDetailProps) {
           </div>
         )}
       </header>
+
+      {/* WP-4.8 MT-4.8-02: the review panel mounts only while the task
+          sits in human review — other states keep the plain detail view. */}
+      {task.state === 'in_human_review' && (
+        <ReviewPanel pid={pid} taskId={taskId} task={task} streamStatus={status} />
+      )}
 
       <TaskFacts
         description={task.description}

@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### Done — MT-3.9-03 (reason-coverage tests)
+
+- **MT-3.9-03 reason coverage complete — every Section 8.4 reason
+  exercised by the transition that owns it.** The table-driven suite
+  `tests/test_escalation_reasons.py` (`pytest backend/tests -k
+  escalation_reasons -q`, 16 tests green) drives one row per canonical
+  reason through the real machinery, never a synthetic hook call:
+  **T8** (`self_flagged` in-scope self-flag, `scope_violation`
+  out-of-scope submit) and **T9** (`retry_exhausted` at the ceiling)
+  through the endpoints/dispatch; **T14** with each of R1–R9 failing
+  alone through the real verdict endpoint with the engine installed;
+  **T18** (`merge_conflict`) through WP-3.7's now-wired merge row —
+  the gap this MT was deferred on is closed (the executor's
+  `merge_failed` dispatch lands in `in_human_review` and flows through
+  the generic entry hook exactly as MT-3.9-02 predicted).
+- **Per-row contract:** exactly one `review.requested`; the Section 9.6
+  envelope verbatim (catalog `type`, `project_id`, `task_id`,
+  `occurred_at`, the driving `actor`); the canonical reason on the task
+  and in the event data; the Section 9.8 dedupe-key `task_version`
+  matching the post-transition row. T14 rows key the rule details on
+  the **failed rule id** (exactly `[R*n*]` failed, that outcome's
+  `review_reason` the escalation reason) — never message text, per the
+  MT's risk note; T8/T9/T18 rows assert `data` is exactly
+  `{review_reason, task_version}` — no fabricated rule set.
+- **Coverage guard:** the suite asserts its rows cover exactly
+  `ReviewReason.values` *and* an independently-written copy of the
+  canonical twelve (plan-first, Section 20.5) — a future enum addition
+  fails the suite until this table grows a row, so the anti-rot device
+  lives in the tests, not in review checklists.
+- **Negative controls:** T4 (claim), T7 (clean submit → `to_be_audited`)
+  and T17 (merge completion) emit no `review.requested` while their own
+  catalog events (`task.claimed`, `task.transitioned`,
+  `merge.succeeded`) all fire — non-entry transitions stay quiet.
+- CI: the suite runs in the existing backend unit job (Section 20.4
+  item 2 — `pytest` picks up `tests/`); no pipeline change needed.
+  Only Section 9.6 catalog types and Section 8.4 reasons appear
+  (items 5–6).
+
 ### Done — MT-3.9-01 + MT-3.9-02 (payload contract + entry emission)
 
 - **MT-3.9-01 payload contract.** The `review.requested` event uses
@@ -54,17 +92,3 @@
   WP-1.5 matrix/system suites updated for the second entry event
   (their "exactly one event" assertions now assert the MT-3.9-02
   shape); full backend suite green.
-
-### Deferred — MT-3.9-03 (reason-coverage tests)
-
-- **Deferred with this WP's convergence note:** MT-3.9-03 drives the
-  `merge_conflict` reason through **T18**, which does not exist until
-  WP-3.7 wires the merge queue (the registry holds T2–T16 + T19
-  today). Per the MT's own dependencies it waits; the emission hook
-  is already generic over `to_state`, so T18 will flow through it
-  the moment its row lands. The remaining reason values
-  (`test_failure`, `migration_detected`, `sensitive_config_changed`,
-  `diff_over_threshold`, `low_confidence`, `auditor_flagged`,
-  `policy_forced_review`) are produced by the policy suites' own
-  escalations; MT-3.9-03's exhaustive per-reason table joins them
-  then.

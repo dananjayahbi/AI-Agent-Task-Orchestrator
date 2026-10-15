@@ -8,6 +8,8 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { ProjectSwitcher } from '@/components/projects/project-switcher';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { SessionProvider } from '@/components/session/session-context';
+import { layout } from '@/lib/layout/styles';
+import { cn } from 'cn';
 
 /**
  * Protected app segment (MT-4.1-01): every Section 13.1 page except Login
@@ -23,15 +25,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <QueryProvider>
         <div className="flex min-h-svh flex-col">
           <header className="border-b border-border bg-card">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3">
-              <div className="flex items-center gap-4">
+            {/* MT-4.11-01: the shared wrapping header row keeps every
+                control reachable at phone widths (Section 13.4 fallback). */}
+            <div className={layout.appHeader}>
+              <div className={layout.chromeCluster}>
                 <Link href="/" className="text-sm font-semibold text-foreground">
                   AI Agent Task Orchestrator
                 </Link>
                 <ProjectSwitcher />
               </div>
               <AppNav />
-              <div className="flex items-center gap-1">
+              <div className={cn(layout.chromeCluster, 'gap-1')}>
                 <SessionControls />
                 <ThemeToggle />
               </div>

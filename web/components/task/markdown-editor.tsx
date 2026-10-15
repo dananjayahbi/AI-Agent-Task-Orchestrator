@@ -62,6 +62,9 @@ export function MarkdownEditor({ id, value, onChange, error }: MarkdownEditorPro
           data-testid="markdown-editor-input"
           value={value}
           aria-invalid={error !== undefined}
+          // MT-4.11-03: the validation message is announced with the
+          // field (WCAG 3.3.1), not as unassociated alert text.
+          aria-describedby={error !== undefined && error !== '' ? `${id}-error` : undefined}
           placeholder="Markdown description — headings, lists, code fences, **bold**, `code`."
           onChange={(event) => onChange(event.target.value)}
         />
@@ -76,7 +79,7 @@ export function MarkdownEditor({ id, value, onChange, error }: MarkdownEditorPro
       )}
 
       {error !== undefined && error !== '' && (
-        <p role="alert" className="text-xs text-destructive">
+        <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
           {error}
         </p>
       )}

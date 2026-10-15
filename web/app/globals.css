@@ -25,14 +25,32 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /*
+   * MT-4.11-03 (NFR-13, WCAG 1.4.3/1.4.11): darkened from oklch(0.556)
+   * so muted text clears 4.5:1 both on the page background (5.28:1) and
+   * on muted/secondary surfaces such as chips (4.84:1) — the previous
+   * value measured 4.34:1 on muted surfaces.
+   */
+  --muted-foreground: oklch(0.53 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /*
+   * MT-4.11-03: darkened from oklch(0.577 0.245 27.325) (red-600) —
+   * text-destructive on the shared bg-destructive/10 tint (form banners,
+   * merge-failure badges) measured 4.17:1, under AA; red-700 measures
+   * 5.59:1 on the tint and 6.7:1 on the page background, and near-white
+   * chip text on it improves to ~6.5:1.
+   */
+  --destructive: oklch(0.505 0.213 27.518);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /*
+   * MT-4.11-03: darkened from oklch(0.708) — the old focus-ring colour
+   * measured only 2.59:1 against the white background, below the 3:1
+   * WCAG 1.4.11 minimum for focus indicators (now 4.73:1).
+   */
+  --ring: oklch(0.556 0 0);
 }
 
 .dark {
@@ -51,7 +69,13 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
+  /*
+   * MT-4.11-03: dark-on-light like --primary-foreground above — the old
+   * near-white value measured ~2.65:1 on this light red (urgent chip,
+   * stalled/failed badges), far below the 4.5:1 chip-text minimum; dark
+   * text measures ~5.4:1.
+   */
+  --destructive-foreground: oklch(0.205 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -90,5 +114,16 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /*
+   * MT-4.11-02 (WCAG 2.1 AA, NFR-13): keyboard focus is always visibly
+   * indicated. Base layer so explicit `outline-none` utilities (buttons,
+   * inputs — which ship their own focus-visible ring) still win; elements
+   * without a component-level ring (links, roving list rows) gain this
+   * outline automatically.
+   */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }

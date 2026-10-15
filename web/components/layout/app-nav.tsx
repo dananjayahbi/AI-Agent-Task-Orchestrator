@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 
 import { cn } from 'cn';
 
+import { layout } from '@/lib/layout/styles';
+
 type NavItem = {
   href: string;
   label: string;
@@ -21,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/review', label: 'Review queue' },
   { href: '/agents', label: 'Agents' },
   { href: '/audit-log', label: 'Audit log' },
+  { href: '/ops', label: 'Operations' },
   { href: '/settings', label: 'Settings' },
 ];
 
@@ -28,7 +31,7 @@ export function AppNav() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Primary" className="flex flex-wrap items-center gap-1">
+    <nav aria-label="Primary" className={layout.appNav}>
       {NAV_ITEMS.map((item) => {
         const active =
           item.href === '/'

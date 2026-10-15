@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/errors/error-state';
 import { EmptyState } from '@/components/states/empty-state';
 import { LoadingState } from '@/components/states/loading-state';
 import { resolveError } from '@/lib/errors';
+import { layout } from '@/lib/layout/styles';
 import { useProjectsQuery } from '@/lib/queries/projects';
 
 /**
@@ -50,7 +51,7 @@ export function ProjectList() {
   }
 
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <ul className={layout.cardGrid}>
       {projects.data.map((project) => (
         <ProjectCard key={project.id} project={project} />
       ))}

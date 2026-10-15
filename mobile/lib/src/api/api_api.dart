@@ -40,6 +40,7 @@ import 'package:orchestrator_mobile/src/model/merge_result_request.dart';
 import 'package:orchestrator_mobile/src/model/merge_result_response.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_request.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_response.dart';
+import 'package:orchestrator_mobile/src/model/ops_overview.dart';
 import 'package:orchestrator_mobile/src/model/orchestrator_manifest.dart';
 import 'package:orchestrator_mobile/src/model/owner_session.dart';
 import 'package:orchestrator_mobile/src/model/patched_project_policy.dart';
@@ -3700,6 +3701,92 @@ class ApiApi {
     }
 
     return Response<DashboardSummary>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// retrieveOpsOverview
+  /// Operations view snapshot (Section 17 Dashboards row): the nine metrics MT-6.4-01 exposes at /metrics (same collect() — this payload is authoritative and the client never recomputes), the six MT-6.4-02 alert states in plan order, and the Health row (live + ready checks; heartbeats ride &#x60;metrics.heartbeats&#x60;). Single-resource GET — no pagination. Caller: Owner only (Section 12.2); agents and devices answer ROLE_NOT_PERMITTED, anonymous callers AUTH_REQUIRED. Read-only: alert acknowledgement, threshold tuning and runbook execution are out of scope (Section 17 &#39;One operations view&#39;).
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [OpsOverview] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<OpsOverview>> retrieveOpsOverview({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/ops/overview';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    OpsOverview? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(OpsOverview),
+            ) as OpsOverview;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OpsOverview>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -17,9 +17,9 @@ const waves = [
   { id: 5, name: "Bridge skeleton & web",  total: 33, done: 33, status: "done" },
   { id: 6, name: "Bridge core tools",      total: 36, done: 36, status: "done" },
   { id: 7, name: "Policy core & Kanban",   total: 34, done: 34, status: "done" },
-  { id: 8, name: "Agent loop completion",  total: 42, done: 36, status: "active" },
-  { id: 9, name: "Merge & review UIs",     total: 40, done: 37, status: "active" },
-  { id: 10, name: "Release & hardening",   total: 40, done: 4,  status: "active" },
+  { id: 8, name: "Agent loop completion",  total: 42, done: 41, status: "active" },
+  { id: 9, name: "Merge & review UIs",     total: 40, done: 40, status: "done" },
+  { id: 10, name: "Release & hardening",   total: 40, done: 10, status: "active" },
 ];
 
 /** Timeline of execution (append newest at the bottom; mark status). */
@@ -81,6 +81,13 @@ const timeline = [
       "auditor-flow mt-3.5-03/04, metrics scaffold mt-6.4-01, web review dialogs/queue/optimistic + agents/audit/policy panels (362 tests), " +
       "mobile review sheet + audit log + release signing (243 tests). Gates: backend 1512 + 27 PG, bridge 834 incl. live, web 362, " +
       "mobile 243; OpenAPI regenerated (+405 lines).",
+  },
+  {
+    date: "2026-10-14",
+    status: "active",
+    event: "Batch 10 complete — 298/330 micro-docs (90.3%)",
+    detail:
+      "Escalation reason-coverage mt-3.9-03 closed wp-3.9; push-sender foundation mt-5.4-01..04 (FCM behind transport protocol, dedupe, delivery tracking); review panel mt-4.8-02..04 closed wp-4.8; web a11y+perf mt-4.11-01..04 (responsive, keyboard, contrast audit, 500-card perf report; 442 web tests); alert rules mt-6.4-02 + ops dashboard mt-6.4-03 closed wp-6.4. Mobile release mt-5.10-02/04 deferred (WP-5.4/5.9 chain). Gates parallel x5: backend 1597 + 27 PG, bridge 822, web 442, mobile 243, hygiene/clients green.",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

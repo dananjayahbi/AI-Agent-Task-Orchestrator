@@ -35,6 +35,8 @@ import {
   type UIEvent,
 } from 'react';
 
+import { nextRovingIndex } from '@/lib/a11y/roving';
+import { scrollOffsetForIndex, visibleWindow } from '@/lib/board/windowing';
 import { cn } from 'cn';
 
 /** Fallback viewport when the container is unmeasured (SSR / jsdom). */
@@ -110,26 +112,23 @@ export function VirtualList<T>({
 
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      const count = items.length;
-      if (count === 0) return;
-      let next: number | null = null;
-      if (event.key === 'ArrowDown') next = Math.min((focusedIndex ?? -1) + 1, count - 1);
-      else if (event.key === 'ArrowUp') next = Math.max((focusedIndex ?? count) - 1, 0);
-      else if (event.key === 'Home') next = 0;
-      else if (event.key === 'End') next = count - 1;
+      // MT-4.11-02: shared roving math (lib/a11y/roving) — Arrow/Home/End
+      // only; every other key (Tab, Enter, …) passes through untouched.
+      const next = nextRovingIndex(event.key, focusedIndex, items.length);
       if (next === null) return;
       event.preventDefault();
       setFocusedIndex(next);
-      // Bring the target into the window before the focus effect runs.
+      // Bring the target into the window before the focus effect runs
+      // (MT-4.11-04: shared clamp math in lib/board/windowing).
       const container = containerRef.current;
       if (container !== null) {
-        const top = next * itemHeight;
-        const bottom = top + itemHeight;
-        let targetScrollTop = container.scrollTop;
-        if (top < targetScrollTop) targetScrollTop = top;
-        else if (bottom > targetScrollTop + resolvedHeight) {
-          targetScrollTop = bottom - resolvedHeight;
-        }
+        const targetScrollTop = scrollOffsetForIndex(
+          next,
+          itemHeight,
+          resolvedHeight,
+          items.length,
+          container.scrollTop,
+        );
         if (targetScrollTop !== container.scrollTop) {
           container.scrollTop = targetScrollTop;
           setScrollTop(targetScrollTop);
@@ -149,10 +148,15 @@ export function VirtualList<T>({
     container.querySelector<HTMLElement>(`[data-index="${clamped}"]`)?.focus();
   }, [focusedIndex, items.length]);
 
-  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
-  const endIndex = Math.min(
+  // MT-4.11-04: window bounds come from the pure helper in
+  // lib/board/windowing — the tested math and the rendered window are
+  // the same code path.
+  const { startIndex, endIndex } = visibleWindow(
+    scrollTop,
+    itemHeight,
+    resolvedHeight,
     items.length,
-    Math.ceil((scrollTop + resolvedHeight) / itemHeight) + overscan,
+    overscan,
   );
 
   // Imperative scroll (MT-4.7-03 jump-to-file): clamp, align the

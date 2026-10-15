@@ -970,6 +970,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/ops/overview:
+    get:
+      operationId: retrieve_ops_overview
+      description: 'Operations view snapshot (Section 17 Dashboards row): the nine
+        metrics MT-6.4-01 exposes at /metrics (same collect() — this payload is authoritative
+        and the client never recomputes), the six MT-6.4-02 alert states in plan order,
+        and the Health row (live + ready checks; heartbeats ride `metrics.heartbeats`).
+        Single-resource GET — no pagination. Caller: Owner only (Section 12.2); agents
+        and devices answer ROLE_NOT_PERMITTED, anonymous callers AUTH_REQUIRED. Read-only:
+        alert acknowledgement, threshold tuning and runbook execution are out of scope
+        (Section 17 ''One operations view'').'
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsOverview'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/projects:
     get:
       operationId: list_projects
@@ -3011,6 +3046,53 @@ components:
       - project_id
       - scopes
       - token
+    AlertState:
+      type: object
+      description: One MT-6.4-02 rule's state — field names are the alert contract.
+      properties:
+        id:
+          type: string
+          description: 'Stable rule id: sweeper_not_running, attachment_backlog, push_failures,
+            tunnel_down, repeated_auth_failures, media_disk_usage (Section 17 Alerts
+            row, plan order).'
+        name:
+          type: string
+          description: The Section 17 alert name, verbatim.
+        severity:
+          type: string
+          description: '''critical'' or ''warning'' (docs/plan/alerts.md).'
+        firing:
+          type: boolean
+          description: True while the rule's condition holds.
+        status:
+          type: string
+          description: '''firing'', ''ok'', or ''unknown'' (signal never reported
+            — never fires).'
+        since:
+          type: string
+          nullable: true
+          description: ISO onset of the current firing stretch, or null when resting.
+        signal:
+          type: object
+          additionalProperties: {}
+          description: Numbers only — counts, ages, rates. No identities, no secrets
+            (12.4).
+        threshold:
+          type: object
+          additionalProperties: {}
+          description: The configurable threshold(s) in force.
+        runbook:
+          type: string
+          nullable: true
+          description: Section 17 runbook name where one exists (else null).
+      required:
+      - firing
+      - id
+      - name
+      - severity
+      - signal
+      - status
+      - threshold
     Attachment:
       type: object
       description: |-
@@ -4128,6 +4210,57 @@ components:
         * `squash` - squash
         * `merge_commit` - merge commit
         * `fast_forward_only` - fast forward only
+    OpsHealth:
+      type: object
+      description: 'Section 17 Health row: live plus the ready checks'' reachability.'
+      properties:
+        live:
+          type: boolean
+          description: Always true in a 200 body — this process served the request.
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+          description: '''database''/''cache'' → ''ok'' or ''unreachable'' (same pings
+            as /health/ready).'
+      required:
+      - checks
+      - live
+    OpsOverview:
+      type: object
+      description: '``GET /api/v1/ops/overview`` body — one snapshot for the ops view.'
+      properties:
+        schema_version:
+          type: string
+          description: Payload contract version; bump on breaking shape changes.
+        generated_at:
+          type: string
+          description: ISO timestamp of this snapshot — the view shows it as data
+            freshness so a frozen view is recognizable as stale (MT-6.4-03 risk note;
+            polling is the recorded update mode).
+        metrics:
+          type: object
+          additionalProperties: {}
+          description: MT-6.4-01's nine Section 17 metrics plus heartbeats, verbatim
+            from the /metrics collector (docs/plan/metrics.md is the semantics table;
+            this payload and /metrics cannot disagree — same collect()).
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertState'
+          description: MT-6.4-02's six Section 17 rules in plan order, with firing
+            state and context (docs/plan/alerts.md).
+        health:
+          allOf:
+          - $ref: '#/components/schemas/OpsHealth'
+          description: Section 17 Health row — live/ready plus heartbeat visibility
+            via metrics.
+      required:
+      - alerts
+      - generated_at
+      - health
+      - metrics
+      - schema_version
     OrchestratorManifest:
       type: object
       properties:

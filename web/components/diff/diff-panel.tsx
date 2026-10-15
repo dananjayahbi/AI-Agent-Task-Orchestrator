@@ -35,6 +35,7 @@ import { buildTreeEntries, groupByDirectory } from '@/lib/diff/file-tree';
 import { interpretPatchPayload } from '@/lib/diff/parse';
 import { extractFlaggedFiles } from '@/lib/diff/rule-flags';
 import { resolveError } from '@/lib/errors';
+import { layout } from '@/lib/layout/styles';
 import { useResolutionPatchQuery } from '@/lib/queries/resolution-patch';
 
 type DiffPanelProps = {
@@ -116,10 +117,7 @@ export function DiffPanel({ resolution, report, testId }: DiffPanelProps) {
       );
     } else {
       body = (
-        <div
-          className="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)]"
-          data-testid="diff-panel-ready"
-        >
+        <div className={layout.diffPanes} data-testid="diff-panel-ready">
           <FileTree
             entries={entries}
             groups={groups}

@@ -27,6 +27,7 @@
  */
 import { useRef } from 'react';
 
+import { nextRovingIndex } from '@/lib/a11y/roving';
 import type { TreeEntry } from '@/lib/diff/file-tree';
 import { STATUS_LABELS, STATUS_MARKERS } from '@/lib/diff/file-tree';
 import type { FlaggedFiles } from '@/lib/diff/rule-flags';
@@ -148,20 +149,17 @@ export function FileTree({
   // Roving focus (Section 13.4): arrows move between treeitems, the
   // focused row scrolls into view before focusing.
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
-    if (!keys.includes(event.key)) return;
     const container = containerRef.current;
     if (container === null) return;
     const items = Array.from(container.querySelectorAll<HTMLElement>('[role="treeitem"]'));
-    if (items.length === 0) return;
-    event.preventDefault();
+    // MT-4.11-02: shared roving math (lib/a11y/roving). `currentIndex` is
+    // -1 when nothing is focused — ArrowDown then lands on the first row
+    // and ArrowUp clamps to it, matching the pre-shared behavior.
     const currentIndex = items.findIndex((item) => item === document.activeElement);
-    let nextIndex: number;
-    if (event.key === 'Home') nextIndex = 0;
-    else if (event.key === 'End') nextIndex = items.length - 1;
-    else if (event.key === 'ArrowDown') nextIndex = Math.min(currentIndex + 1, items.length - 1);
-    else nextIndex = Math.max(currentIndex - 1, 0);
-    const next = items[nextIndex === -1 ? 0 : nextIndex];
+    const nextIndex = nextRovingIndex(event.key, currentIndex, items.length);
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = items[nextIndex];
     // Optional call: environments without layout (jsdom) may not
     // implement scrollIntoView; focus must not depend on it.
     next?.scrollIntoView?.({ block: 'nearest' });

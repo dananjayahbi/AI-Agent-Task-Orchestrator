@@ -22,6 +22,12 @@
  *     `VERSION_CONFLICT` and `TASK_STATE_CONFLICT` map to distinct
  *     friendly copy (Section 13.3), never raw envelope text (G-07).
  *
+ * The same optimistic / settle / server-truth discipline is applied to
+ * the **task detail** cache row (`queryKeys.taskDetail`) when present —
+ * the review panel (WP-4.8) mounts on the detail page and must move
+ * with the decision exactly like the board entry does; a missing detail
+ * row is a no-op, so board-only callers are unaffected.
+ *
  * The dialog stays open on failure (Section 13.3) — only success closes
  * it, via `onSettled` after the announcement.
  */
@@ -52,6 +58,8 @@ export type ReviewNotice = { message: string; rejected: boolean };
 type MutationContext = {
   key: readonly unknown[];
   snapshot: Task[] | undefined;
+  detailKey: readonly unknown[];
+  detailSnapshot: Task | undefined;
 };
 
 /** The mutation shape the dialogs consume (typed hand-off, no `any`). */
@@ -88,14 +96,29 @@ export function useReviewDecision({ pid, filters, onNotice, onSuccess }: UseRevi
           ? tasks
           : optimisticDecisionPatch(tasks, input.task.id, input.decision, input.note ?? ''),
       );
-      return { key, snapshot };
+      // Detail-page parity: the review panel (WP-4.8) hosts the dialogs
+      // on the task detail. Only `approve` seeds optimistically there
+      // (T15 flips merge_status, state stays — the panel and its open
+      // dialog survive); the T16 return-to-pending preview would unmount
+      // the panel hosting the in-flight dialog, so the detail row moves
+      // only when the server's verdict settles it (onSuccess).
+      const detailKey = queryKeys.taskDetail(pid, input.task.id);
+      const detailSnapshot = queryClient.getQueryData<Task>(detailKey);
+      if (input.decision === 'approve') {
+        queryClient.setQueryData<Task>(detailKey, (row) =>
+          row === undefined || row.id !== input.task.id
+            ? row
+            : optimisticDecisionPatch([row], input.task.id, input.decision, input.note ?? '')[0],
+        );
+      }
+      return { key, snapshot, detailKey, detailSnapshot };
     },
 
     onError: (error, _input, context) => {
       const friendly = resolveError(error);
       const refreshNote =
         friendly.code === 'VERSION_CONFLICT' || friendly.code === 'TASK_STATE_CONFLICT'
-          ? ' The board now shows the server’s current state.'
+          ? ' The view now shows the server’s current state.'
           : '';
       // Server truth first: re-read the row, never trust the pre-move
       // snapshot alone (MT-4.4-04 risk note).
@@ -107,14 +130,20 @@ export function useReviewDecision({ pid, filters, onNotice, onSuccess }: UseRevi
             queryClient.setQueryData<Task[]>(context.key, (tasks) =>
               tasks === undefined ? tasks : mergeRefetchedTask(tasks, row, server),
             );
+            queryClient.setQueryData<Task>(context.detailKey, (current) =>
+              current === undefined || current.id !== row.id ? current : row,
+            );
             return;
           } catch {
             // Fall through to the snapshot — a failed refresh must not
             // strand the optimistic row on screen.
           }
-          const { key, snapshot } = context;
+          const { key, snapshot, detailKey, detailSnapshot } = context;
           if (snapshot !== undefined) {
             queryClient.setQueryData(key, snapshot);
+          }
+          if (detailSnapshot !== undefined) {
+            queryClient.setQueryData(detailKey, detailSnapshot);
           }
         }
       })();
@@ -137,6 +166,11 @@ export function useReviewDecision({ pid, filters, onNotice, onSuccess }: UseRevi
         // (MT-4.3-03 discipline).
         return settled.filter((task) => matchesServerFilters(task, server));
       });
+      queryClient.setQueryData<Task>(queryKeys.taskDetail(pid, input.task.id), (row) =>
+        row === undefined || row.id !== input.task.id
+          ? row
+          : settleDecisionPatch([row], input.task.id, data.task)[0],
+      );
       onNotice({ message: decisionSuccessNotice(input.decision, input.task.id), rejected: false });
       onSuccess?.();
     },

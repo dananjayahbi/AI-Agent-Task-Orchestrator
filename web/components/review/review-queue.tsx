@@ -33,6 +33,8 @@ import { resolveError } from '@/lib/errors';
 import { useReviewQueueQuery } from '@/lib/queries/review-queue';
 import { useReviewQueueLiveUpdates } from '@/lib/queries/review-queue-live';
 import { formatQueueAge, queueAgeMs, sortQueueRows } from '@/lib/review/queue';
+import { layout } from '@/lib/layout/styles';
+import { MergeStatusBadge } from '@/components/review/merge-status-badge';
 import { reviewReasonLabel } from '@/lib/review/review-reasons';
 import type { Task } from '@/lib/api/generated/types.gen';
 
@@ -55,6 +57,7 @@ function ReviewQueueRow({ task, nowMs }: { task: Task; nowMs: number }) {
           </span>
           <span className="font-mono text-[11px] text-muted-foreground">{task.id}</span>
           <PriorityChip priority={task.priority} />
+          <MergeStatusBadge status={task.merge_status} testId={`review-queue-merge-${task.id}`} />
         </span>
         <span data-testid="review-queue-age" className="text-[11px] text-muted-foreground">
           {age === null ? 'Age unknown' : `waiting ${formatQueueAge(age)}`}
@@ -87,7 +90,7 @@ export function ReviewQueue() {
 
   return (
     <div data-testid="review-queue" className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={layout.pageHeaderRow}>
         <h1 className="text-lg font-semibold text-foreground">Review queue</h1>
         <StreamStatusIndicator status={status} />
       </div>

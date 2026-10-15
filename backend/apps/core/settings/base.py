@@ -8,6 +8,7 @@ configuration.md) and carries a documented default (Section 9.10).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from urllib.parse import quote, unquote, urlparse
 
@@ -235,6 +236,75 @@ if _missing_description_settings:
         "only in the environment — Section 12.4)."
     )
 
+# --- Section 9.10 group: push notifications / FCM credentials (WP-5.4) ------
+# Section 9.8 dispatches via FCM from the worker; Section 9.10 lists FCM
+# credentials among the environment-driven config groups with fail-fast
+# validation on missing required values. Push is off unless explicitly
+# enabled so a fresh clone, the unit suite and non-notification flows run
+# cleanly with no FCM project (MT-5.4-01 risk note: a fail-fast that
+# bricked the stack on a push-only setting would be wrong — validation is
+# scoped to enabled push; "clean skip when push disabled" is the AC).
+PUSH_ENABLED = get_bool("ORCHESTRATOR_PUSH_ENABLED", False)
+FCM_PROJECT_ID = get_str("ORCHESTRATOR_FCM_PROJECT_ID", "")
+FCM_CREDENTIALS_JSON = get_str("ORCHESTRATOR_FCM_CREDENTIALS_JSON", "")
+# Section 9.9's push job is "on event | Dedupe + retry": transient
+# failures retry with exponential backoff (base × 2^(n-1), the same shape
+# as the attachment pipeline's MT-1.12-07). Defaults are WP-5.4's
+# recorded choice, flagged for owner confirmation in configuration.md.
+PUSH_RETRY_MAX_ATTEMPTS = get_int("ORCHESTRATOR_PUSH_RETRY_MAX_ATTEMPTS", 3)
+PUSH_RETRY_BACKOFF_SECONDS = get_int("ORCHESTRATOR_PUSH_RETRY_BACKOFF_SECONDS", 1)
+
+
+def missing_fcm_settings(enabled: bool, project_id: str, credentials_json: str) -> list[str]:
+    """Environment names required when push dispatch is enabled (9.10).
+
+    Pure so the fail-fast rule is unit-testable without re-importing
+    this module (the description-provider precedent above): disabled
+    push — the default — requires nothing, so startup never needs FCM
+    values unless the operator turned push on.
+    """
+    if not enabled:
+        return []
+    required = {
+        "ORCHESTRATOR_FCM_PROJECT_ID": project_id,
+        "ORCHESTRATOR_FCM_CREDENTIALS_JSON": credentials_json,
+    }
+    return [name for name, value in required.items() if not value]
+
+
+def fcm_credentials_wellformed(credentials_json: str) -> bool:
+    """A "strong" service-account JSON: an object carrying ``private_key``.
+
+    The weak-credentials half of the startup validation (Sections 9.10,
+    16.2): empty input counts as missing (covered by
+    :func:`missing_fcm_settings`); anything present must parse as a JSON
+    object with a non-empty ``private_key`` — a truncated paste or a
+    wrong-file paste fails at startup, not at the first push.
+    """
+    if not credentials_json:
+        return True
+    try:
+        parsed = json.loads(credentials_json)
+    except ValueError:
+        return False
+    return isinstance(parsed, dict) and bool(parsed.get("private_key"))
+
+
+_missing_fcm_settings = missing_fcm_settings(PUSH_ENABLED, FCM_PROJECT_ID, FCM_CREDENTIALS_JSON)
+if _missing_fcm_settings:
+    raise ImproperlyConfigured(
+        f"ORCHESTRATOR_PUSH_ENABLED=true requires "
+        f"{', '.join(_missing_fcm_settings)} (Section 9.10 startup validation "
+        "fails fast on missing required values; the FCM service-account JSON "
+        "lives only in the environment — Section 12.4, plan 20.4 item 3)."
+    )
+if PUSH_ENABLED and not fcm_credentials_wellformed(FCM_CREDENTIALS_JSON):
+    raise ImproperlyConfigured(
+        "ORCHESTRATOR_FCM_CREDENTIALS_JSON must be the service-account JSON "
+        "object with a non-empty private_key (Section 16.2 weak-credential "
+        "fail-fast; WP-5.4)."
+    )
+
 # --- Section 9.10 group: attachment pipeline (Section 9.5 stages; WP-1.12) ---
 # Documented defaults chosen by WP-1.12 (plan 20.4 item 3 — the plan fixes
 # "configurable", not the values; each is recorded in the WP changelog and
@@ -283,6 +353,45 @@ FEATURE_FLAGS = get_list("ORCHESTRATOR_FEATURE_FLAGS", [])
 # the tunnel allowlist). The flag turns its body on/off without changing the
 # surface; default on so the unit layer and a LAN scrape both see it.
 METRICS_ENABLED = get_bool("ORCHESTRATOR_METRICS_ENABLED", True)
+
+# MT-6.4-02 alert thresholds (docs/plan/alerts.md is the rules catalog).
+# Every value is a documented, configurable default: plan-anchored ones cite
+# the anchor inline; the rest are flagged for owner confirmation there
+# (Section 20.4 item 1 — no invented magic numbers presented as plan values).
+# Sweeper: Section 9.9 cadence is 60 s; 3× that is the missed-beat margin
+# (RISK-12's "metrics and alerts" mitigation).
+ALERT_SWEEPER_MAX_HEARTBEAT_SECONDS = get_int(
+    "ORCHESTRATOR_ALERT_SWEEPER_MAX_HEARTBEAT_SECONDS", 180
+)
+# Backlog age: the pipeline's documented retry envelope (60 s backoff ×
+# 2^attempt over ATTACHMENT_RETRY_MAX_ATTEMPTS) is minutes — 15 min is the
+# outer bound past which a non-terminal row is a backlog, not a retry.
+ALERT_ATTACHMENT_BACKLOG_MAX_AGE_SECONDS = get_int(
+    "ORCHESTRATOR_ALERT_ATTACHMENT_BACKLOG_MAX_AGE_SECONDS", 900
+)
+# Backlog depth: configurable default, owner-confirmation flagged.
+ALERT_ATTACHMENT_BACKLOG_MAX_DEPTH = get_int("ORCHESTRATOR_ALERT_ATTACHMENT_BACKLOG_MAX_DEPTH", 25)
+# Push floor: NFR-03 (10 s dispatch) is the related contract; the rate floor
+# and sample size are configurable defaults, owner-confirmation flagged.
+ALERT_PUSH_MIN_SUCCESS_RATE_PERCENT = get_int(
+    "ORCHESTRATOR_ALERT_PUSH_MIN_SUCCESS_RATE_PERCENT", 90
+)
+ALERT_PUSH_MIN_DISPATCHES = get_int("ORCHESTRATOR_ALERT_PUSH_MIN_DISPATCHES", 10)
+# Tunnel: 3× the Compose healthcheck's normal cadence (Section 16.1 probes
+# cloudflared's own readiness every 30 s) — a silent reporter is treated as
+# a down tunnel (Section 15.4: warning, LAN and agents continue).
+ALERT_TUNNEL_MAX_STALE_SECONDS = get_int("ORCHESTRATOR_ALERT_TUNNEL_MAX_STALE_SECONDS", 300)
+# Binary the report_tunnel_status command probes (Section 16.1's exact
+# healthcheck command); empty keeps the default name from the PATH.
+CLOUDFLARED_BINARY = get_str("ORCHESTRATOR_CLOUDFLARED_BINARY", "cloudflared")
+# Auth failures (Section 15.3 layer 4): per-identity/IP counts over a fixed
+# window; both values are configurable defaults, owner-confirmation flagged.
+ALERT_AUTH_FAILURES_MAX_PER_WINDOW = get_int("ORCHESTRATOR_ALERT_AUTH_FAILURES_MAX_PER_WINDOW", 10)
+ALERT_AUTH_FAILURE_WINDOW_SECONDS = get_int("ORCHESTRATOR_ALERT_AUTH_FAILURE_WINDOW_SECONDS", 300)
+# Media volume (Sections 16.1/16.3): configurable default, owner-confirmation
+# flagged; the backup destination's second-location disk (16.5) is not
+# visible from this process (documented limitation).
+ALERT_DISK_USAGE_MAX_PERCENT = get_int("ORCHESTRATOR_ALERT_DISK_USAGE_MAX_PERCENT", 90)
 
 # --- Section 9.10 group: token lifetimes ------------------------------------
 # Documented defaults fixed by WP-1.2 (configuration.md per-setting rows);
