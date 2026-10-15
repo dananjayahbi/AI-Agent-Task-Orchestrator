@@ -1,0 +1,31 @@
+{
+  "$comment": "Plan-derived threshold constants for the WP-6.3 performance scenarios (MT-6.3-01). Sources: parent plan Section 5.2 (NFR-02, NFR-03, NFR-09) and Section 13.4 (board first-load). NEVER edit these values to make a run pass — MT-6.3-03 lists threshold edits as out of scope (plan NFRs are not this task's to change).",
+  "nfr02": {
+    "source": "Section 5.2 NFR-02 — claim and checkpoint p95 < 300 ms locally",
+    "claim_p95_ms": 300,
+    "checkpoint_p95_ms": 300
+  },
+  "nfr03": {
+    "source": "Section 5.2 NFR-03 — event delivery p95 < 2 s; push dispatch within 10 s",
+    "event_delivery_p95_ms": 2000,
+    "push_dispatch_ms": 10000
+  },
+  "nfr09": {
+    "source": "Section 5.2 NFR-09 — scale envelope without architectural change",
+    "projects": 10,
+    "concurrent_sessions": 20,
+    "tasks": 10000,
+    "attachment_gb": 50
+  },
+  "scenario": {
+    "source": "Section 18 Performance row — 20 simulated agents with checkpoints every 30 s; 10,000 tasks; board load; SSE fan-out",
+    "agents": 20,
+    "checkpoint_interval_s": 30,
+    "board_cards": 500
+  },
+  "board": {
+    "source": "Section 13.4 web first-load target (browser side owned by MT-4.11-04, see docs/plan/web-performance-report.md); api_share_p95_ms is a DERIVED necessary condition for that budget (if the API alone exceeds it the web target cannot hold) — it is not an NFR",
+    "web_first_load_ms": 3000,
+    "api_share_p95_ms": 3000
+  }
+}

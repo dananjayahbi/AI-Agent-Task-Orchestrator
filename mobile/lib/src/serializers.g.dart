@@ -46,6 +46,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(EventEnvelope.serializer)
       ..add(EventEnvelopeTypeEnum.serializer)
       ..add(EventListEnvelope.serializer)
+      ..add(EventTypeEnum.serializer)
       ..add(HealthLive.serializer)
       ..add(HealthReady.serializer)
       ..add(KindE0dEnum.serializer)
@@ -59,6 +60,9 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(MergeStartRequest.serializer)
       ..add(MergeStartResponse.serializer)
       ..add(MergeStrategyEnum.serializer)
+      ..add(NotificationPreference.serializer)
+      ..add(NotificationPreferencesRequest.serializer)
+      ..add(NotificationPreferencesResponse.serializer)
       ..add(OpsHealth.serializer)
       ..add(OpsOverview.serializer)
       ..add(OrchestratorManifest.serializer)
@@ -129,6 +133,14 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(MergeQueueItem)]),
           () => ListBuilder<MergeQueueItem>())
+      ..addBuilderFactory(
+          const FullType(
+              BuiltList, const [const FullType(NotificationPreference)]),
+          () => ListBuilder<NotificationPreference>())
+      ..addBuilderFactory(
+          const FullType(
+              BuiltList, const [const FullType(NotificationPreference)]),
+          () => ListBuilder<NotificationPreference>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Project)]),
           () => ListBuilder<Project>())

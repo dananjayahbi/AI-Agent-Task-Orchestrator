@@ -970,6 +970,92 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
           description: ''
+  /api/v1/notifications/preferences:
+    get:
+      operationId: retrieve_notification_preferences
+      description: 'All Section 9.8 notification preference types with their switches
+        (the closed set — clients render toggles from this list and never invent types).
+        Defaults: escalation triggers on, `completion_digest` off (OQ-13). Caller:
+        Owner session or device token (Section 13.1 / Section 14.1 — one record, both
+        surfaces); agents are denied.'
+      tags:
+      - api
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    put:
+      operationId: update_notification_preferences
+      description: 'Update any subset of the per-event-type switches (`preferences`
+        is a list of `{event_type, enabled}` pairs; unknown or duplicated `event_type`
+        values are rejected with VALIDATION_ERROR). The response carries the full
+        current set. Caller: Owner session or device token.'
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesRequest'
+        required: true
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
   /api/v1/ops/overview:
     get:
       operationId: retrieve_ops_overview
@@ -3970,6 +4056,18 @@ components:
       required:
       - next_cursor
       - results
+    EventTypeEnum:
+      enum:
+      - in_human_review
+      - merge_failure
+      - retry_exhaustion
+      - completion_digest
+      type: string
+      description: |-
+        * `in_human_review` - in_human_review
+        * `merge_failure` - merge_failure
+        * `retry_exhaustion` - retry_exhaustion
+        * `completion_digest` - completion_digest
     HealthLive:
       type: object
       description: Response body of GET /health/live.
@@ -4210,6 +4308,38 @@ components:
         * `squash` - squash
         * `merge_commit` - merge commit
         * `fast_forward_only` - fast forward only
+    NotificationPreference:
+      type: object
+      description: One ``{event_type, enabled}`` pair — the wire shape both clients
+        edit.
+      properties:
+        event_type:
+          $ref: '#/components/schemas/EventTypeEnum'
+        enabled:
+          type: boolean
+      required:
+      - enabled
+      - event_type
+    NotificationPreferencesRequest:
+      type: object
+      description: '``PUT`` body: a non-empty list of preference pairs to update.'
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationPreference'
+      required:
+      - preferences
+    NotificationPreferencesResponse:
+      type: object
+      description: '``GET``/``PUT`` response: every Section 9.8 type with its switch.'
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationPreference'
+      required:
+      - preferences
     OpsHealth:
       type: object
       description: 'Section 17 Health row: live plus the ready checks'' reachability.'

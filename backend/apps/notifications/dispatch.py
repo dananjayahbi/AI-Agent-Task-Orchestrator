@@ -25,8 +25,11 @@ the start, as the MT fixes: the ``in_human_review`` entry seam the
 dispatcher already fires covers "in_human_review entry (all reasons)"
 and, by the same hook, T9's retry exhaustion; merge failure and retry
 exhaustion reach the same seam via their review-requested entries
-(T18; WP-3.7 wiring). MT-5.4-05 inserts its preference filter as a
-downstream step here, never at the seam.
+(T18; WP-3.7 wiring). MT-5.4-05's preference gate sits downstream of
+this seam, inside :func:`dispatch_push` — after trigger selection and
+**before dedupe/send** (its Scope's ordering), so a disabled type
+records no send attempt, no dedupe claim and no tracking row (the
+Section 17 metric cannot be skewed by muted types).
 
 **Payload minimization** (Section 9.8: "ids and a short title") is
 MT-5.4-02's :func:`apps.notifications.payloads.build_push_payload` —
@@ -57,6 +60,7 @@ from apps.tasks.models import Task
 
 from .dedupe import claim_dedupe
 from .payloads import build_push_payload
+from .preferences import preference_enabled
 from .sender import send_to_token
 from .tracking import prune_invalid_token, record_delivery
 
@@ -90,18 +94,24 @@ def task_short_title(task_id: str) -> str:
 def dispatch_push(trigger: PushTrigger) -> dict[str, int]:
     """Fan out one committed trigger to every active device (the job body).
 
-    Per device: **dedupe claim first** (MT-5.4-03 — the Section 9.8
+    Per device: **preference gate first** (MT-5.4-05 — the Section 9.8
+    per-event-type consultation, *after trigger selection and before
+    dedupe/send*): a disabled type returns with every device counted
+    ``suppressed`` and touches neither the dedupe nor the tracking table,
+    so re-enabling notifies only events dispatched afterwards (no queue,
+    no retro-fire) and the Section 17 success-rate metric never sees a
+    muted type. Then **dedupe claim** (MT-5.4-03 — the Section 9.8
     ``(event type, task id, state version)`` key, atomic insert, one
     send per device per key even across retries and worker restarts),
-    then build the Section 9.8 minimal payload (MT-5.4-02's allowlist
-    builder — ids plus the short title) and run the retrying sender
-    once. Every send records a delivery row (MT-5.4-04 — ids, outcome,
-    attempts, FCM classification, never payload); a definitive
-    invalid-token verdict prunes the token so future dispatches skip
-    the device. The return value counts outcomes (``accepted`` /
-    ``transient_failed`` / ``permanent_failed`` / ``suppressed``) —
-    the same numbers :func:`apps.notifications.tracking.push_success_stats`
-    aggregates from the persisted rows.
+    the Section 9.8 minimal payload (MT-5.4-02's allowlist builder —
+    ids plus the short title) and the retrying sender once. Every send
+    records a delivery row (MT-5.4-04 — ids, outcome, attempts, FCM
+    classification, never payload); a definitive invalid-token verdict
+    prunes the token so future dispatches skip the device. The return
+    value counts outcomes (``accepted`` / ``transient_failed`` /
+    ``permanent_failed`` / ``suppressed``) — the same numbers
+    :func:`apps.notifications.tracking.push_success_stats` aggregates
+    from the persisted rows.
     """
     summary = {
         "accepted": 0,
@@ -109,8 +119,15 @@ def dispatch_push(trigger: PushTrigger) -> dict[str, int]:
         "permanent_failed": 0,
         "suppressed": 0,
     }
+    devices = active_devices()
+    if not preference_enabled(trigger):
+        # MT-5.4-05: zero FCM attempts for the disabled type — no payload
+        # build, no dedupe claim, no tracking row (Scope: consultation
+        # before dedupe/send; the risk note about skewing Section 17).
+        summary["suppressed"] += len(devices)
+        return summary
     data = build_push_payload(trigger, title=task_short_title(str(trigger["task_id"])))
-    for device in active_devices():
+    for device in devices:
         claimed = claim_dedupe(
             device,
             event_type=data["event_type"],

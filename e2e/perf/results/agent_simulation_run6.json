@@ -1,0 +1,208 @@
+{
+  "scenario": "agent_simulation_run6",
+  "mt": "MT-6.3-01",
+  "environment": {
+    "host": "Windows-11-10.0.26120-SP0",
+    "python": "3.14.0",
+    "cpus": 16,
+    "api_base": "http://127.0.0.1:8063/api/v1",
+    "generated_at": "2026-10-15T12:20:20+00:00"
+  },
+  "run_id": 6,
+  "duration_s": 150.0,
+  "agents_requested": 20,
+  "agents_started": 20,
+  "checkpoint_interval_s": 30.0,
+  "checkpoints_per_task": 3,
+  "seed": 6301,
+  "nfr09_shape": {
+    "projects": 10,
+    "concurrent_sessions": 20,
+    "tasks": 10000,
+    "attachment_gb": 50
+  },
+  "counts": {
+    "orient_ok": 60,
+    "claim_ok": 60,
+    "claim_conflicts": 13,
+    "rate_limit_hits": 0,
+    "checkpoint_ok": 140,
+    "submit_ok": 40,
+    "tasks_cycled": 40,
+    "http_errors": 0
+  },
+  "latency_ms": {
+    "claim": {
+      "count": 60,
+      "p50_ms": 221.56,
+      "p95_ms": 502.03,
+      "p99_ms": 591.87,
+      "max_ms": 658.52,
+      "min_ms": 72.29,
+      "mean_ms": 260.7
+    },
+    "checkpoint": {
+      "count": 140,
+      "p50_ms": 140.91,
+      "p95_ms": 492.29,
+      "p99_ms": 557.61,
+      "max_ms": 561.42,
+      "min_ms": 56.94,
+      "mean_ms": 188.37
+    },
+    "orient": {
+      "count": 60,
+      "p50_ms": 585.27,
+      "p95_ms": 3076.57,
+      "p99_ms": 3105.87,
+      "max_ms": 3125.29,
+      "min_ms": 126.87,
+      "mean_ms": 1228.82
+    },
+    "submit": {
+      "count": 40,
+      "p50_ms": 221.46,
+      "p95_ms": 538.41,
+      "p99_ms": 568.8,
+      "max_ms": 572.76,
+      "min_ms": 57.33,
+      "mean_ms": 252.39
+    }
+  },
+  "verdicts": {
+    "nfr02_claim_p95": {
+      "budget_ms": 300,
+      "p95_ms": 502.03,
+      "pass": false
+    },
+    "nfr02_checkpoint_p95": {
+      "budget_ms": 300,
+      "p95_ms": 492.29,
+      "pass": false
+    }
+  },
+  "thresholds_source": "e2e/perf/thresholds.json (plan-derived, Section 5.2)",
+  "errors": [],
+  "workers": [
+    {
+      "agent": 0,
+      "project_id": "PID00001",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 1,
+      "project_id": "PID00002",
+      "conflicts": 2,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 2,
+      "project_id": "PID00003",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 3,
+      "project_id": "PID00004",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 4,
+      "project_id": "PID00005",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 5,
+      "project_id": "PID00006",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 6,
+      "project_id": "PID00007",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 7,
+      "project_id": "PID00008",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 8,
+      "project_id": "PID00009",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 9,
+      "project_id": "PID00010",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 10,
+      "project_id": "PID00001",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 11,
+      "project_id": "PID00002",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 12,
+      "project_id": "PID00003",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 13,
+      "project_id": "PID00004",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 14,
+      "project_id": "PID00005",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 15,
+      "project_id": "PID00006",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 16,
+      "project_id": "PID00007",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 17,
+      "project_id": "PID00008",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 18,
+      "project_id": "PID00009",
+      "conflicts": 0,
+      "tasks_cycled": 2
+    },
+    {
+      "agent": 19,
+      "project_id": "PID00010",
+      "conflicts": 1,
+      "tasks_cycled": 2
+    }
+  ]
+}

@@ -40,6 +40,8 @@ import 'package:orchestrator_mobile/src/model/merge_result_request.dart';
 import 'package:orchestrator_mobile/src/model/merge_result_response.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_request.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_response.dart';
+import 'package:orchestrator_mobile/src/model/notification_preferences_request.dart';
+import 'package:orchestrator_mobile/src/model/notification_preferences_response.dart';
 import 'package:orchestrator_mobile/src/model/ops_overview.dart';
 import 'package:orchestrator_mobile/src/model/orchestrator_manifest.dart';
 import 'package:orchestrator_mobile/src/model/owner_session.dart';
@@ -3712,6 +3714,93 @@ class ApiApi {
     );
   }
 
+  /// retrieveNotificationPreferences
+  /// All Section 9.8 notification preference types with their switches (the closed set — clients render toggles from this list and never invent types). Defaults: escalation triggers on, &#x60;completion_digest&#x60; off (OQ-13). Caller: Owner session or device token (Section 13.1 / Section 14.1 — one record, both surfaces); agents are denied.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [NotificationPreferencesResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<NotificationPreferencesResponse>>
+      retrieveNotificationPreferences({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/notifications/preferences';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    NotificationPreferencesResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(NotificationPreferencesResponse),
+            ) as NotificationPreferencesResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<NotificationPreferencesResponse>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// retrieveOpsOverview
   /// Operations view snapshot (Section 17 Dashboards row): the nine metrics MT-6.4-01 exposes at /metrics (same collect() — this payload is authoritative and the client never recomputes), the six MT-6.4-02 alert states in plan order, and the Health row (live + ready checks; heartbeats ride &#x60;metrics.heartbeats&#x60;). Single-resource GET — no pagination. Caller: Owner only (Section 12.2); agents and devices answer ROLE_NOT_PERMITTED, anonymous callers AUTH_REQUIRED. Read-only: alert acknowledgement, threshold tuning and runbook execution are out of scope (Section 17 &#39;One operations view&#39;).
   ///
@@ -4616,6 +4705,115 @@ class ApiApi {
     }
 
     return Response<ReviewDecisionResponse>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// updateNotificationPreferences
+  /// Update any subset of the per-event-type switches (&#x60;preferences&#x60; is a list of &#x60;{event_type, enabled}&#x60; pairs; unknown or duplicated &#x60;event_type&#x60; values are rejected with VALIDATION_ERROR). The response carries the full current set. Caller: Owner session or device token.
+  ///
+  /// Parameters:
+  /// * [notificationPreferencesRequest]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [NotificationPreferencesResponse] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<NotificationPreferencesResponse>>
+      updateNotificationPreferences({
+    required NotificationPreferencesRequest notificationPreferencesRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/notifications/preferences';
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+          {
+            'type': 'apiKey',
+            'name': 'sessionAuth',
+            'keyName': 'sessionid',
+            'where': '',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(NotificationPreferencesRequest);
+      _bodyData = _serializers.serialize(notificationPreferencesRequest,
+          specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    NotificationPreferencesResponse? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(NotificationPreferencesResponse),
+            ) as NotificationPreferencesResponse;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<NotificationPreferencesResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

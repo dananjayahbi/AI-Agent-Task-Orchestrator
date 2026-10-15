@@ -4,7 +4,9 @@ import 'package:orchestrator_mobile/orchestrator_mobile.dart';
 import '../features/audit_log/audit_log_screen.dart';
 import '../features/board/board_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/notifications/notification_tap_screen.dart';
 import '../features/notifications/notifications_screen.dart';
+import '../features/notifications/push_payload.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/review/review_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -47,6 +49,16 @@ abstract final class AppRoutes {
   /// Attachment viewer (MT-5.7-03) — arguments carry the [Attachment]
   /// row (deep-link readiness by id is WP-5.9).
   static const String attachmentViewer = '/attachment-viewer';
+
+  /// Notification-tap destination picker (MT-5.9-01) — arguments carry
+  /// the parsed [PushTapPayload]; pushed only after unlock (Section 14.2).
+  static const String notificationTap = '/notifications/tap';
+
+  /// App-level navigator handle (MT-5.9-01): the tap binder and the
+  /// foreground banner host (MT-5.9-02) sit *above* the navigator in the
+  /// `MaterialApp.builder` chain, so they address routes through this key.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'orchestrator-app-navigator');
 }
 
 /// Builds the [MaterialPageRoute] for [settings.name].
@@ -57,6 +69,16 @@ abstract final class AppRoutes {
 /// pushes `arguments: task.id`); the attachment viewer takes the
 /// attachment row.
 Route<dynamic> onGenerateRoute(RouteSettings settings) {
+  if (settings.name == AppRoutes.notificationTap) {
+    final Object? arguments = settings.arguments;
+    if (arguments is PushTapPayload) {
+      return MaterialPageRoute<dynamic>(
+        settings: settings,
+        builder: (context) => NotificationTapScreen(payload: arguments),
+      );
+    }
+    return onUnknownRoute(settings);
+  }
   if (settings.name == AppRoutes.attachmentViewer) {
     final Object? arguments = settings.arguments;
     if (arguments is Attachment) {

@@ -147,7 +147,87 @@ pruned" and Section 17's observability rows:
   delivery records persist **90 days** on `created_at`
   (`prune_delivery_records`) — operational, not audit data.
 
-**MT-5.4-05 — Notification preferences (deferred).** Chain stop:
-WP-5.9's toggle-UI consumer — outside this backend batch's scope — so
-the WP-5.4 chain ends here; its backend half (storage + endpoint)
-remains for the batch that carries WP-5.9.
+**MT-5.4-05 — Per-event-type notification preferences (done).**
+
+Section 9.8's preference set as storage, endpoint and dispatch
+consultation (OQ-13's decided default honored: per-event toggles only,
+digest off):
+
+* **Dependency ruling (recorded explicitly, per the batch-11
+  interpretation brief):** this MT's "WP-5.9 (toggle UI consumer)"
+  dependency names the **consumer only** — the MT's own Scope says
+  "this task is storage, endpoint and dispatch consultation" and puts
+  the toggle UIs (web account settings and the mobile Notifications
+  screen) out of scope. The backend half therefore ships **before**
+  MT-5.9-03 consumes it (built and tested in the same batch, backend
+  first), not after the consumer exists. MT-5.9-03's changelog records
+  the consuming side.
+* **Model** (`NotificationPreference`, migration
+  `0002_notificationpreference`): one row per Section 9.8 type,
+  unique on `event_type` — `in_human_review`, `merge_failure`,
+  `retry_exhaustion`, `completion_digest` (the closed
+  `PREFERENCE_EVENT_TYPES` the API and MT-5.9-03's toggle list share).
+  **Account-level, no owner/foreign-key scoping** (the MT's storage-
+  granularity risk note): the same single-owner reading as MT-5.4-01's
+  fan-out — one record both named surfaces (Section 13.1 web settings,
+  Section 14.1 mobile toggles) read and write. Defaults where rows are
+  created: escalations **on** (FR-MOB-04 out of the box), digest
+  **off** (OQ-13). No mandatory-escalation carve-out is hard-coded
+  (the MT's risk note): the policy question stays open, defaults on.
+* **Trigger → preference-key ruling (recorded):** every push arrives
+  through the one `in_human_review`-entry seam, so each trigger
+  resolves to exactly **one** key — reason `retry_exhausted` (T9) →
+  `retry_exhaustion`; a merge-failure row (T18: event
+  `merge.failed`/`merge_failed`) → `merge_failure`; every other entry
+  (T8/T10/T14, …) → the `in_human_review` umbrella; unknown → the
+  umbrella, never the digest. `completion_digest` is stored and
+  exposed but never consulted — no trigger can select it until the
+  digest itself is built (OQ-13 keeps it off).
+* **Endpoint** `GET/PUT /api/v1/notifications/preferences`
+  (`apps/notifications/{views,serializers,urls}.py`): the read
+  materializes the full closed set (clients never guess a default);
+  the PUT accepts a partial list and answers with the full current
+  set; strict input (`StrictSerializerMixin` + duplicate/empty
+  rejection → `VALIDATION_ERROR`, Section 9.2 discipline). Operation
+  ids `retrieve_notification_preferences` /
+  `update_notification_preferences`.
+* **Authorization (the MT's "confirm against the matrix and record the
+  choice"):** the Section 12.2 matrix has no preferences row and
+  Section 9.2 no notifications row, so the guard is its own named
+  class `HasNotificationPreferencesAccess` (the `IsOwnerSession`
+  precedent for non-row guards) granting **Owner and Device** — the
+  two actors the plan hands these surfaces — and denying every agent
+  (push stays the owner's surface, like the events row). Both verbs
+  covered; anonymous → `AUTH_REQUIRED`. The Section 9.2 contract test
+  carries the two operations as **documented plan gaps** with PROOF
+  pointers (its established GAPS mechanism).
+* **Dispatch consultation** (`dispatch.py`): the gate runs after
+  trigger selection and **before dedupe/send** (the MT's Scope
+  ordering) — a disabled type produces **zero FCM attempts, zero
+  dedupe claims and zero tracking rows** (the Section 17
+  success-rate metric cannot be skewed), counts as `suppressed` in
+  the job summary, and the payload/title fetch is skipped entirely.
+  Nothing is stored anywhere, so re-enabling notifies only events
+  dispatched afterwards (no retro-fire by construction); the
+  recorded nuance, pinned by a test: because the key was never
+  claimed, a *re-dispatch* of the same never-delivered trigger after
+  re-enabling delivers once — re-enabling itself fires nothing.
+* **Contracts:** OpenAPI snapshot regenerated (`manage.py
+  spectacular`, schema diff = the two operations + three components)
+  and kept; the mobile client was regenerated from it (MT-5.9-03
+  consumes the generated operations, NFR-11).
+* **Tests** (`backend/tests/test_notification_preferences.py`, 19):
+  OQ-13 defaults + materialization; idempotent reads; PUT round trip
+  (persist + full-set answer); unknown type / unknown fields /
+  duplicates / empty list all refuse with `VALIDATION_ERROR`; the
+  Owner+Device+denied-agent+anonymous authorization matrix on both
+  verbs; the trigger→key mapping table (incl. unknown → umbrella,
+  never digest); disabled type → zero transport calls, zero dedupe
+  rows, zero delivery rows, both devices counted suppressed;
+  per-type isolation (umbrella off, merge/retry still send; retry
+  toggle governs only the retry trigger); re-enable notifies future
+  events only; the ordering pin; digest never selectable by dispatch.
+  Lint/type clean (`ruff check`, `ruff format --check`, full
+  `mypy .` → Success, 419 files); full backend suite
+  (`uv run pytest tests/ -q --ignore=tests/integration`) →
+  **1616 passed, 4 skipped** (1597 baseline + 19 new).

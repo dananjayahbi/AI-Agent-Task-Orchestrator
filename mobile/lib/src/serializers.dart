@@ -53,6 +53,7 @@ import 'package:orchestrator_mobile/src/model/event_actor_type_enum.dart';
 import 'package:orchestrator_mobile/src/model/event_envelope.dart';
 import 'package:orchestrator_mobile/src/model/event_envelope_type_enum.dart';
 import 'package:orchestrator_mobile/src/model/event_list_envelope.dart';
+import 'package:orchestrator_mobile/src/model/event_type_enum.dart';
 import 'package:orchestrator_mobile/src/model/health_live.dart';
 import 'package:orchestrator_mobile/src/model/health_ready.dart';
 import 'package:orchestrator_mobile/src/model/kind_e0d_enum.dart';
@@ -66,6 +67,9 @@ import 'package:orchestrator_mobile/src/model/merge_result_response.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_request.dart';
 import 'package:orchestrator_mobile/src/model/merge_start_response.dart';
 import 'package:orchestrator_mobile/src/model/merge_strategy_enum.dart';
+import 'package:orchestrator_mobile/src/model/notification_preference.dart';
+import 'package:orchestrator_mobile/src/model/notification_preferences_request.dart';
+import 'package:orchestrator_mobile/src/model/notification_preferences_response.dart';
 import 'package:orchestrator_mobile/src/model/ops_health.dart';
 import 'package:orchestrator_mobile/src/model/ops_overview.dart';
 import 'package:orchestrator_mobile/src/model/orchestrator_manifest.dart';
@@ -153,6 +157,7 @@ part 'serializers.g.dart';
   EventEnvelope,
   EventEnvelopeTypeEnum,
   EventListEnvelope,
+  EventTypeEnum,
   HealthLive,
   HealthReady,
   KindE0dEnum,
@@ -166,6 +171,9 @@ part 'serializers.g.dart';
   MergeStartRequest,
   MergeStartResponse,
   MergeStrategyEnum,
+  NotificationPreference,
+  NotificationPreferencesRequest,
+  NotificationPreferencesResponse,
   OpsHealth,
   OpsOverview,
   OrchestratorManifest,
@@ -219,6 +227,10 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(TokenSummary)]),
         () => ListBuilder<TokenSummary>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(NotificationPreference)]),
+        () => ListBuilder<NotificationPreference>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(AuditReport)]),

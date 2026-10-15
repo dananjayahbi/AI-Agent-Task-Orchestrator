@@ -1,0 +1,54 @@
+{
+  "scenario": "board_load_run1",
+  "mt": "MT-6.3-01",
+  "environment": {
+    "host": "Windows-11-10.0.26120-SP0",
+    "python": "3.14.0",
+    "cpus": 16,
+    "api_base": "http://127.0.0.1:8063/api/v1",
+    "generated_at": "2026-10-15T11:56:12+00:00"
+  },
+  "run_id": 1,
+  "iterations": 10,
+  "project_id": "PID00001",
+  "page_size": 100,
+  "pages_per_iteration": 5,
+  "cards_per_iteration": [
+    500
+  ],
+  "expected_cards": 500,
+  "shape_ok": true,
+  "page_statuses": [
+    "200"
+  ],
+  "latency_ms": {
+    "page": {
+      "count": 50,
+      "p50_ms": 499.42,
+      "p95_ms": 674.74,
+      "p99_ms": 763.54,
+      "max_ms": 766.01,
+      "min_ms": 366.74,
+      "mean_ms": 516.02
+    },
+    "board_total": {
+      "count": 10,
+      "p50_ms": 2578.8,
+      "p95_ms": 2887.22,
+      "p99_ms": 2965.51,
+      "max_ms": 2985.08,
+      "min_ms": 2161.42,
+      "mean_ms": 2580.08
+    }
+  },
+  "verdicts": {
+    "board_api_total_p95_derived": {
+      "budget_ms": 3000,
+      "p95_ms": 2887.22,
+      "pass": true,
+      "basis": "DERIVED necessary condition for Section 13.4's 3 s web first-load (web side: MT-4.11-04 / docs/plan/web-performance-report.md) \u2014 not an NFR"
+    }
+  },
+  "thresholds_source": "e2e/perf/thresholds.json (board.api_share_p95_ms, derived)",
+  "division_of_labor": "API side here (MT-6.3-01); browser side owned by MT-4.11-04 \u2014 cross-reference docs/plan/web-performance-report.md"
+}

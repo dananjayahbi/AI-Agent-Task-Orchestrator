@@ -14,6 +14,8 @@ This directory holds planning documentation that lives with the repository.
 | [Pagination conventions](conventions/pagination.md) | Cursor-based pagination for all list endpoints, plus the Section 9.5 attachment `content` exception — WP-0.5 (MT-0.5-04). |
 | [Backup retention decision](wp-6.2-backup-retention-decision.md) | Dump retention policy (14 days, keep-floor 7) and media-mirror stance — WP-6.2 (MT-6.2-03), the sibling decision to Section 22's OQ-10, flagged for plan-owner confirmation. |
 | [Restore drill record](wp-6.2-restore-drill-2026-10-14.md) | The WP-6.2 (MT-6.2-04) drill record: date, artifacts, environment, steps, smoke result, duration, findings — one record per rehearsal, dated by file name. |
+| [Security threat-to-test mapping](security-threat-test-mapping.md) | Every Section 12.1 threat, the 12.3 limitations, Section 12.5 properties and the Section 18 Security-row gates mapped to named tests/review steps — WP-6.1 (MT-6.1-01, appended by MT-6.1-02…05). |
+| [Security findings log](security-findings-log.md) | Severity scale + findings F-01…F-08 with status, owners and revisits — WP-6.1's shared review log (zero open critical/high at close). |
 
 Notes:
 

@@ -1,0 +1,128 @@
+{
+  "scenario": "push_dispatch_probe_run1",
+  "mt": "MT-6.3-01",
+  "environment": {
+    "host": "Windows-11-10.0.26120-SP0",
+    "python": "3.14.0",
+    "cpus": 16,
+    "api_base": "http://127.0.0.1:8063/api/v1",
+    "generated_at": "2026-10-15T12:03:17+00:00"
+  },
+  "run_id": 1,
+  "triggers_requested": 10,
+  "triggers_ok": 10,
+  "triggers_timed": 10,
+  "method": "host wall clock at escalation-POST send -> worker log timestamp of the dispatch_push line (on_commit enqueue happens inside the request, so the span is an upper bound of backend->sender dispatch); zero registered devices, so the FCM transport is never built and the device leg stays with MT-5.10-05 / WP-5.4",
+  "latency_ms": {
+    "count": 10,
+    "p50_ms": 119.74,
+    "p95_ms": 197.61,
+    "p99_ms": 211.39,
+    "max_ms": 214.84,
+    "min_ms": 106.35,
+    "mean_ms": 135.45
+  },
+  "verdicts": {
+    "nfr03_push_dispatch_backend_leg": {
+      "budget_ms": 10000,
+      "p95_ms": 197.61,
+      "pass": true,
+      "measured": true,
+      "clock": "completed_ms",
+      "label": "backend-trigger -> dispatch-job completion (zero devices; FCM never contacted)"
+    }
+  },
+  "thresholds_source": "e2e/perf/thresholds.json (plan-derived, Section 5.2)",
+  "attempts": [
+    {
+      "index": 0,
+      "task_id": "PID00001-T253",
+      "ok": true,
+      "received_ms": 104.02,
+      "completed_ms": 134.2,
+      "celery_task_uuid": "22a63366-86d3-4df7-8d0a-0f273d3f2034",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 1,
+      "task_id": "PID00002-T861",
+      "ok": true,
+      "received_ms": 165.55,
+      "completed_ms": 214.84,
+      "celery_task_uuid": "7abdc870-1265-4746-b5b9-d8c346de41a0",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 2,
+      "task_id": "PID00003-T252",
+      "ok": true,
+      "received_ms": 136.76,
+      "completed_ms": 176.54,
+      "celery_task_uuid": "3beab74c-cb81-4fa3-82e0-819a5e076b20",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 3,
+      "task_id": "PID00004-T969",
+      "ok": true,
+      "received_ms": 101.62,
+      "completed_ms": 134.46,
+      "celery_task_uuid": "c5704f69-32b3-4e89-b2ef-d7d88c8428ff",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 4,
+      "task_id": "PID00005-T251",
+      "ok": true,
+      "received_ms": 87.79,
+      "completed_ms": 118.63,
+      "celery_task_uuid": "bf8dd2be-3b25-45ae-a3a0-48d3af288c0b",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 5,
+      "task_id": "PID00006-T254",
+      "ok": true,
+      "received_ms": 87.94,
+      "completed_ms": 113.84,
+      "celery_task_uuid": "b6f4a5e7-f4e4-49d7-8139-68f70993d073",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 6,
+      "task_id": "PID00007-T253",
+      "ok": true,
+      "received_ms": 92.18,
+      "completed_ms": 120.58,
+      "celery_task_uuid": "f41d6022-cdf5-43af-b3a9-87ec8686193f",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 7,
+      "task_id": "PID00008-T909",
+      "ok": true,
+      "received_ms": 90.23,
+      "completed_ms": 118.9,
+      "celery_task_uuid": "70166583-7588-4511-82b3-c5365e1bddb4",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 8,
+      "task_id": "PID00009-T815",
+      "ok": true,
+      "received_ms": 76.54,
+      "completed_ms": 106.35,
+      "celery_task_uuid": "5ee97a7c-6f02-4333-af93-36ec0cdc470f",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    },
+    {
+      "index": 9,
+      "task_id": "PID00010-T925",
+      "ok": true,
+      "received_ms": 84.02,
+      "completed_ms": 116.2,
+      "celery_task_uuid": "2a7a3f7e-9f4f-4681-8da8-04ffab5ccc6a",
+      "clock": "host wall clock -> docker log timestamp (same host, UTC)"
+    }
+  ]
+}

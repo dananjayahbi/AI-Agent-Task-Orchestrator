@@ -17,9 +17,9 @@ const waves = [
   { id: 5, name: "Bridge skeleton & web",  total: 33, done: 33, status: "done" },
   { id: 6, name: "Bridge core tools",      total: 36, done: 36, status: "done" },
   { id: 7, name: "Policy core & Kanban",   total: 34, done: 34, status: "done" },
-  { id: 8, name: "Agent loop completion",  total: 42, done: 41, status: "active" },
+  { id: 8, name: "Agent loop completion",  total: 42, done: 42, status: "done" },
   { id: 9, name: "Merge & review UIs",     total: 40, done: 40, status: "done" },
-  { id: 10, name: "Release & hardening",   total: 40, done: 10, status: "active" },
+  { id: 10, name: "Release & hardening",   total: 40, done: 24, status: "active" },
 ];
 
 /** Timeline of execution (append newest at the bottom; mark status). */
@@ -88,6 +88,13 @@ const timeline = [
     event: "Batch 10 complete — 298/330 micro-docs (90.3%)",
     detail:
       "Escalation reason-coverage mt-3.9-03 closed wp-3.9; push-sender foundation mt-5.4-01..04 (FCM behind transport protocol, dedupe, delivery tracking); review panel mt-4.8-02..04 closed wp-4.8; web a11y+perf mt-4.11-01..04 (responsive, keyboard, contrast audit, 500-card perf report; 442 web tests); alert rules mt-6.4-02 + ops dashboard mt-6.4-03 closed wp-6.4. Mobile release mt-5.10-02/04 deferred (WP-5.4/5.9 chain). Gates parallel x5: backend 1597 + 27 PG, bridge 822, web 442, mobile 243, hygiene/clients green.",
+  },
+  {
+    date: "2026-10-15",
+    status: "active",
+    event: "Batch 11 complete — 313/330 micro-docs (94.8%)",
+    detail:
+      "Notify chain mt-5.9-01..03 + mt-5.4-05 closed wp-5.4/wp-5.9 (cycle ruling recorded); mobile release mt-5.10-02/04 (signed prod APK built+verified; 5.10-05 checklist-deferred); perf suite mt-6.3-01..03 (honest: claim p95 MISS escalated after worker tuning cut it 77%); security review mt-6.1-01..05 (freeze ruling verified, 8 findings, 0 open critical/high, js-yaml remediated); operator setup guide mt-6.5-01 (real compose dry-run). Gates parallel x5: backend 1670 + 27 PG, bridge 826/837 live, web 442, mobile 268, hygiene green.",
   },
   { date: "next", status: "pending", event: "Wave 3 — State machine, leases, tunnel start (27 docs)", detail: "wp-1.5 → wp-1.6 → wp-1.8 → wp-1.7; wp-5.1 in parallel." },
   { date: "next", status: "pending", event: "Wave 4 — Events, realtime, attachments, edge (32 docs)", detail: "Event log + SSE, attachment pipeline, edge policies, device auth." },

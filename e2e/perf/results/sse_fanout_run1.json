@@ -1,0 +1,311 @@
+{
+  "scenario": "sse_fanout_run1",
+  "mt": "MT-6.3-01",
+  "environment": {
+    "host": "Windows-11-10.0.26120-SP0",
+    "python": "3.14.0",
+    "cpus": 16,
+    "api_base": "http://127.0.0.1:8063/api/v1",
+    "generated_at": "2026-10-15T11:49:58+00:00"
+  },
+  "run_id": 1,
+  "duration_s": 120.0,
+  "grace_s": 10.0,
+  "method": "publish->receipt upper bound = frame receipt - request send (publish is post-commit inside the checkpoint request, so the true publish instant lies in [t_send, t_resp]); lower bound = receipt - response as the delivery-only floor; NFR-03 judged on the upper bound; MT-1.10-06 percentile method",
+  "fanout": {
+    "connections_opened": 11,
+    "connection_set": [
+      "global",
+      "project:PID00001",
+      "project:PID00002",
+      "project:PID00003",
+      "project:PID00004",
+      "project:PID00005",
+      "project:PID00006",
+      "project:PID00007",
+      "project:PID00008",
+      "project:PID00009",
+      "project:PID00010"
+    ],
+    "per_connection": {
+      "global": {
+        "events": 160,
+        "heartbeats": 5
+      },
+      "project:PID00008": {
+        "events": 16,
+        "heartbeats": 6
+      },
+      "project:PID00006": {
+        "events": 16,
+        "heartbeats": 6
+      },
+      "project:PID00004": {
+        "events": 16,
+        "heartbeats": 6
+      },
+      "project:PID00002": {
+        "events": 16,
+        "heartbeats": 6
+      },
+      "project:PID00005": {
+        "events": 16,
+        "heartbeats": 6
+      },
+      "project:PID00010": {
+        "events": 16,
+        "heartbeats": 6
+      },
+      "project:PID00007": {
+        "events": 16,
+        "heartbeats": 6
+      },
+      "project:PID00009": {
+        "events": 16,
+        "heartbeats": 7
+      },
+      "project:PID00001": {
+        "events": 16,
+        "heartbeats": 7
+      },
+      "project:PID00003": {
+        "events": 16,
+        "heartbeats": 7
+      }
+    },
+    "stream_faults": [],
+    "checkpoint_responses": 100,
+    "deliveries_timed": 100,
+    "missing_deliveries": 0,
+    "correlated_frames": 200,
+    "avg_deliveries_per_checkpoint": 2.0
+  },
+  "latency_ms": {
+    "publish_to_receipt_upper": {
+      "count": 100,
+      "p50_ms": 431.62,
+      "p95_ms": 1303.28,
+      "p99_ms": 1373.55,
+      "max_ms": 1385.18,
+      "min_ms": 78.99,
+      "mean_ms": 570.9
+    },
+    "delivery_lower_bound": {
+      "count": 100,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "max_ms": 0.0,
+      "min_ms": 0.0,
+      "mean_ms": 0.0
+    }
+  },
+  "verdicts": {
+    "nfr03_event_delivery_p95": {
+      "budget_ms": 2000,
+      "p95_ms": 1303.28,
+      "pass": true,
+      "missing_deliveries": 0
+    }
+  },
+  "thresholds_source": "e2e/perf/thresholds.json (plan-derived, Section 5.2)",
+  "agent_load": {
+    "run_id": 1,
+    "duration_s": 120.0,
+    "agents_requested": 20,
+    "agents_started": 20,
+    "checkpoint_interval_s": 30.0,
+    "checkpoints_per_task": 3,
+    "seed": 6301,
+    "nfr09_shape": {
+      "projects": 10,
+      "concurrent_sessions": 20,
+      "tasks": 10000,
+      "attachment_gb": 50
+    },
+    "counts": {
+      "orient_ok": 40,
+      "claim_ok": 40,
+      "claim_conflicts": 13,
+      "rate_limit_hits": 0,
+      "checkpoint_ok": 100,
+      "submit_ok": 20,
+      "tasks_cycled": 20,
+      "http_errors": 0
+    },
+    "latency_ms": {
+      "claim": {
+        "count": 40,
+        "p50_ms": 1321.54,
+        "p95_ms": 1687.45,
+        "p99_ms": 1776.32,
+        "max_ms": 1829.2,
+        "min_ms": 120.46,
+        "mean_ms": 1273.44
+      },
+      "checkpoint": {
+        "count": 100,
+        "p50_ms": 510.44,
+        "p95_ms": 1510.37,
+        "p99_ms": 1608.15,
+        "max_ms": 1633.0,
+        "min_ms": 87.53,
+        "mean_ms": 696.01
+      },
+      "orient": {
+        "count": 40,
+        "p50_ms": 2527.97,
+        "p95_ms": 3441.18,
+        "p99_ms": 3533.12,
+        "max_ms": 3541.54,
+        "min_ms": 218.88,
+        "mean_ms": 2514.14
+      },
+      "submit": {
+        "count": 20,
+        "p50_ms": 1242.62,
+        "p95_ms": 1383.75,
+        "p99_ms": 1385.95,
+        "max_ms": 1386.5,
+        "min_ms": 100.85,
+        "mean_ms": 924.34
+      }
+    },
+    "verdicts": {
+      "nfr02_claim_p95": {
+        "budget_ms": 300,
+        "p95_ms": 1687.45,
+        "pass": false
+      },
+      "nfr02_checkpoint_p95": {
+        "budget_ms": 300,
+        "p95_ms": 1510.37,
+        "pass": false
+      }
+    },
+    "thresholds_source": "e2e/perf/thresholds.json (plan-derived, Section 5.2)",
+    "errors": [],
+    "workers": [
+      {
+        "agent": 0,
+        "project_id": "PID00001",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 1,
+        "project_id": "PID00002",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 2,
+        "project_id": "PID00003",
+        "conflicts": 2,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 3,
+        "project_id": "PID00004",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 4,
+        "project_id": "PID00005",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 5,
+        "project_id": "PID00006",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 6,
+        "project_id": "PID00007",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 7,
+        "project_id": "PID00008",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 8,
+        "project_id": "PID00009",
+        "conflicts": 2,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 9,
+        "project_id": "PID00010",
+        "conflicts": 1,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 10,
+        "project_id": "PID00001",
+        "conflicts": 2,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 11,
+        "project_id": "PID00002",
+        "conflicts": 1,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 12,
+        "project_id": "PID00003",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 13,
+        "project_id": "PID00004",
+        "conflicts": 1,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 14,
+        "project_id": "PID00005",
+        "conflicts": 1,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 15,
+        "project_id": "PID00006",
+        "conflicts": 1,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 16,
+        "project_id": "PID00007",
+        "conflicts": 1,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 17,
+        "project_id": "PID00008",
+        "conflicts": 1,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 18,
+        "project_id": "PID00009",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      },
+      {
+        "agent": 19,
+        "project_id": "PID00010",
+        "conflicts": 0,
+        "tasks_cycled": 1
+      }
+    ]
+  }
+}

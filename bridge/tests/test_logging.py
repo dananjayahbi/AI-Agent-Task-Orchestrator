@@ -231,3 +231,75 @@ def test_retry_and_stale_session_event_shapes() -> None:
     assert stale["session_id"] == "SID0001"
     assert stale["reason"] == "lease expired without checkpoint"
     assert stale["stale_for_seconds"] == 95.0
+
+
+# --- MT-6.1-04 (WP-6.1): redaction depth audit -------------------------------
+
+
+def test_redaction_covers_every_registered_secret_key_name() -> None:
+    """Probes come from the runtime registry - a new key is covered by construction."""
+    from orchestrator_bridge.scrub import (
+        _SECRET_KEY_NAMES,
+        _SECRET_KEY_SUFFIXES,
+        scrub_value,
+    )
+
+    probe = "wp61-bridge-secret-value"  # pragma: allowlist secret
+    for key in sorted(_SECRET_KEY_NAMES):
+        assert scrub_value(key, probe) == "[REDACTED]", key
+    for suffix in _SECRET_KEY_SUFFIXES:
+        assert scrub_value(f"session{suffix}", probe) == "[REDACTED]", suffix
+
+
+def test_redaction_survives_every_log_level_including_debug() -> None:
+    """The dev profile's most verbose level keeps the scrubbing rules (12.4)."""
+    stream = io.StringIO()
+    _stream_settings(stream, {"ORCHESTRATOR_LOG_LEVEL": "DEBUG"})
+    secret = "wp61-bridge-level-token"  # pragma: allowlist secret
+    logger = get_logger("unit")
+    for level in (
+        std_logging.DEBUG,
+        std_logging.INFO,
+        std_logging.WARNING,
+        std_logging.ERROR,
+        std_logging.CRITICAL,
+    ):
+        logger.log(level, f"authorization: {secret}", extra={"session_token": secret})
+    raw = stream.getvalue()
+    assert secret not in raw
+    records = _records(stream)
+    assert len(records) == 5
+    assert all(record["session_token"] == "[REDACTED]" for record in records)
+
+
+def test_redaction_applies_to_exception_tracebacks() -> None:
+    """logger.exception paths are scrubbed through the single redaction point."""
+    stream = io.StringIO()
+    _stream_settings(stream)
+    secret = "wp61-bridge-exception-token"  # pragma: allowlist secret
+    logger = get_logger("unit")
+    try:
+        raise RuntimeError(f"probe exploded with token={secret}")
+    except RuntimeError:
+        logger.exception("operation failed")
+    raw = stream.getvalue()
+    assert secret not in raw
+    [record] = _records(stream)
+    assert "exception" in record and "RuntimeError" in str(record["exception"])
+    assert "[REDACTED]" in str(record["exception"])
+
+
+def test_redaction_keeps_correlation_ids_intact() -> None:
+    """Scrubbing never removes the NFR-10 join key from a redacted line."""
+    stream = io.StringIO()
+    _stream_settings(stream)
+    secret = "wp61-bridge-corr-token"  # pragma: allowlist secret
+    token = set_correlation_id("wp61-bridge-corr-01")
+    try:
+        get_logger("unit").warning(f"authorization: {secret}")
+    finally:
+        reset_correlation_id(token)
+    [record] = _records(stream)
+    assert record["correlation_id"] == "wp61-bridge-corr-01"
+    assert secret not in str(record["message"])
+    assert "[REDACTED]" in str(record["message"])

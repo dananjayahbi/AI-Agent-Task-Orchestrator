@@ -45,8 +45,9 @@ PLAN_PATH = Path(__file__).resolve().parents[3] / "ai_agent_task_orchestrator_ar
 #: the endpoints that exist in the generated OpenAPI document but print no
 #: plan row — each entry is a *documented plan gap*, never a silent allowance:
 #: when the plan gains the row, the gap entry must be deleted (the gap test
-#: below fails while it lingers). ``GET /api/v1/devices`` and
-#: ``GET /api/v1/ops/overview`` are the entries:
+#: below fails while it lingers). ``GET /api/v1/devices``, ``GET/PUT
+#: /api/v1/notifications/preferences`` and ``GET /api/v1/ops/overview``
+#: are the entries:
 #: the device list landed with WP-1.2's devices surface, the Section 9.2
 #: Devices row prints only POST/DELETE, and the omission was flagged when the
 #: plan-doc series transcribed the table (its case lives in
@@ -54,9 +55,17 @@ PLAN_PATH = Path(__file__).resolve().parents[3] / "ai_agent_task_orchestrator_ar
 #: operations view's data source on the Section 17 Dashboards row, which
 #: Section 9.2 folds under the Dashboard row — when the plan prints the
 #: row, the gap entry must be deleted (its case lives in
-#: ``tests/test_ops_overview.py``).
+#: ``tests/test_ops_overview.py``); the notifications preferences endpoint
+#: is MT-5.4-05's contract addition (Section 9.2 lists no Notifications
+#: row — the MT ships the endpoint with its OpenAPI schema diff; its case
+#: lives in ``tests/test_notification_preferences.py``).
 GAPS: frozenset[tuple[str, str]] = frozenset(
-    {("GET", "/api/v1/devices"), ("GET", "/api/v1/ops/overview")},
+    {
+        ("GET", "/api/v1/devices"),
+        ("GET", "/api/v1/ops/overview"),
+        ("GET", "/api/v1/notifications/preferences"),
+        ("PUT", "/api/v1/notifications/preferences"),
+    },
 )
 
 #: Rows whose endpoints print in Section 9.2 but do not exist yet. Their
@@ -279,6 +288,14 @@ PROOF: dict[tuple[str, str], tuple[str, str]] = {
     ("GET", "/api/v1/ops/overview"): (
         "tests.test_ops_overview",
         "test_overview_is_owner_only",
+    ),
+    ("GET", "/api/v1/notifications/preferences"): (
+        "tests.test_notification_preferences",
+        "test_owner_and_device_read_and_adjust_agents_are_denied",
+    ),
+    ("PUT", "/api/v1/notifications/preferences"): (
+        "tests.test_notification_preferences",
+        "test_owner_and_device_read_and_adjust_agents_are_denied",
     ),
 }
 

@@ -6,11 +6,17 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:orchestrator_mobile/app/routes.dart';
 import 'package:orchestrator_mobile/features/audit_log/audit_log_screen.dart';
+import 'package:orchestrator_mobile/features/notifications/notification_history.dart';
+import 'package:orchestrator_mobile/features/notifications/notification_preferences.dart';
 import 'package:orchestrator_mobile/features/notifications/notifications_screen.dart';
 import 'package:orchestrator_mobile/features/task_detail/task_detail_screen.dart';
 import 'package:orchestrator_mobile/orchestrator_mobile.dart';
 
 import '../board/board_test_support.dart' show makeTask;
+import '../notifications/notifications_test_support.dart'
+    show
+        FakeNotificationPreferencesRepository,
+        InMemoryNotificationHistoryStore;
 import '../task_detail/task_detail_test_support.dart';
 import 'audit_log_test_support.dart';
 
@@ -310,7 +316,18 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: auditLogOverrides(repository: repository),
+        // The Notifications screen (MT-5.9-03) loads its history and
+        // preferences on mount — the two notification seams ride along
+        // with the audit-log one this test already fakes.
+        overrides: <Override>[
+          ...auditLogOverrides(repository: repository),
+          notificationHistoryStoreProvider.overrideWithValue(
+            InMemoryNotificationHistoryStore(),
+          ),
+          notificationPreferencesRepositoryProvider.overrideWithValue(
+            FakeNotificationPreferencesRepository(),
+          ),
+        ],
         child: MaterialApp(
           onGenerateRoute: onGenerateRoute,
           onUnknownRoute: onUnknownRoute,

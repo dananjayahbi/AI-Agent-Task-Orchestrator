@@ -1,0 +1,35 @@
+# WP-6.3 performance-stack override (MT-6.3-01).
+#
+# Adds ONLY the push-dispatch environment passthrough the base
+# `infra/compose/compose.yaml` environment block does not carry, so the
+# sender-side dispatch probe can run without editing the shared compose
+# file. Defaults preserve the base behavior (`false` = push off).
+#
+# Pairing (always pass both files — see e2e/perf/perf_common.compose_argv):
+#   docker compose -f infra/compose/compose.yaml -f e2e/perf/compose.perf.yaml ...
+#
+# ORCHESTRATOR_FCM_CREDENTIALS_JSON is a wellformed *fixture* service
+# account that fails no startup validation; with zero registered Device
+# rows the dispatch job never builds the FCM transport, so the fixture
+# never contacts Google.
+services:
+  backend:
+    environment:
+      ORCHESTRATOR_PUSH_ENABLED: ${ORCHESTRATOR_PUSH_ENABLED:-false}
+      ORCHESTRATOR_FCM_PROJECT_ID: ${ORCHESTRATOR_FCM_PROJECT_ID:-}
+      ORCHESTRATOR_FCM_CREDENTIALS_JSON: ${ORCHESTRATOR_FCM_CREDENTIALS_JSON:-}
+  worker:
+    environment:
+      ORCHESTRATOR_PUSH_ENABLED: ${ORCHESTRATOR_PUSH_ENABLED:-false}
+      ORCHESTRATOR_FCM_PROJECT_ID: ${ORCHESTRATOR_FCM_PROJECT_ID:-}
+      ORCHESTRATOR_FCM_CREDENTIALS_JSON: ${ORCHESTRATOR_FCM_CREDENTIALS_JSON:-}
+  beat:
+    environment:
+      ORCHESTRATOR_PUSH_ENABLED: ${ORCHESTRATOR_PUSH_ENABLED:-false}
+      ORCHESTRATOR_FCM_PROJECT_ID: ${ORCHESTRATOR_FCM_PROJECT_ID:-}
+      ORCHESTRATOR_FCM_CREDENTIALS_JSON: ${ORCHESTRATOR_FCM_CREDENTIALS_JSON:-}
+  migrate:
+    environment:
+      ORCHESTRATOR_PUSH_ENABLED: ${ORCHESTRATOR_PUSH_ENABLED:-false}
+      ORCHESTRATOR_FCM_PROJECT_ID: ${ORCHESTRATOR_FCM_PROJECT_ID:-}
+      ORCHESTRATOR_FCM_CREDENTIALS_JSON: ${ORCHESTRATOR_FCM_CREDENTIALS_JSON:-}

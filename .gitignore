@@ -54,3 +54,9 @@ bridge/tests/.live-media/
 # ORCHESTRATOR_BACKUP_HOST_DIR can point elsewhere, but this default must
 # stay untracked even when the directory exists locally.
 infra/compose/backup-data/
+
+# --- Perf suite runtime state (WP-6.3; MT-6.3-01): seed manifest with live
+# per-run agent tokens, generated stack secrets and the exported HEAD build
+# context — recreated per run, never staged. Scenario results (no secrets)
+# live in e2e/perf/results/ and are committed.
+e2e/perf/.run/

@@ -358,6 +358,7 @@ affected layers — that is the no-stale-cache check.
 
 ## Documentation
 
+- [Operator setup guide](docs/setup.md) — fresh-clone bring-up, configuration and secrets, health verification, profiles, tear-down, upgrade and rollback (WP-6.5, MT-6.5-01)
 - [Plan documents](docs/plan/) — parent architecture plan index and micro-document series
 - [Architecture decision records](docs/adr/) — ADR-001 through ADR-013 (statuses tracked in the index; records written by WP-0.4)
 - [Runbooks](docs/runbooks/) — one stub per parent plan Section 17 runbook (content: WP-6.5)

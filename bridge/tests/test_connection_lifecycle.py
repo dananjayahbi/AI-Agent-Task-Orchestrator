@@ -282,8 +282,11 @@ def test_connection_lifecycle_backend_down_teardown_never_blocks() -> None:
             message="teardown completes despite the dead backend",
         )
         assert time.monotonic() - started < 8.0
-        events = [r.get("event") for r in bridge.log_records()]
-        assert "session_end_failed" in events  # logged, not raised (10.10)
+        wait_for(
+            lambda: "session_end_failed" in [r.get("event") for r in bridge.log_records()],
+            timeout=8.0,
+            message="teardown logs session_end_failed despite the dead backend (10.10)",
+        )
         assert bridge.stop() == 0  # and shutdown stays clean
 
 

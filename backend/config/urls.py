@@ -84,6 +84,10 @@ urlpatterns: list[URLPattern | URLResolver] = [
     # WP-3.7 merge queue (MT-3.7-01 — the Section 9.2 Merge queue row:
     # pending GET, start/result POSTs for the Merge Executor).
     path("api/v1/", include("apps.merge.urls")),
+    # WP-5.4 preferences (MT-5.4-05 — the per-event-type switches backing
+    # Section 14.1's toggles and Section 13.1's account settings; Section
+    # 9.2 has no notifications row, so the path is this MT's addition).
+    path("api/v1/", include("apps.notifications.urls")),
     # Section 9.2 Dashboard row (MT-1.15-06): the Owner-facing summary the
     # mobile Overview consumes (FR-MOB-01). Mounted directly because it is
     # a cross-cutting roll-up, not a /projects/{pid} sub-resource.

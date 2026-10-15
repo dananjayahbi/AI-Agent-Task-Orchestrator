@@ -795,6 +795,14 @@ export type EventListEnvelope = {
 };
 
 /**
+ * * `in_human_review` - in_human_review
+ * * `merge_failure` - merge_failure
+ * * `retry_exhaustion` - retry_exhaustion
+ * * `completion_digest` - completion_digest
+ */
+export type EventTypeEnum = 'in_human_review' | 'merge_failure' | 'retry_exhaustion' | 'completion_digest';
+
+/**
  * Response body of GET /health/live.
  */
 export type HealthLive = {
@@ -971,6 +979,28 @@ export type MergeStartResponse = {
  * * `fast_forward_only` - fast forward only
  */
 export type MergeStrategyEnum = 'squash' | 'merge_commit' | 'fast_forward_only';
+
+/**
+ * One ``{event_type, enabled}`` pair — the wire shape both clients edit.
+ */
+export type NotificationPreference = {
+    event_type: EventTypeEnum;
+    enabled: boolean;
+};
+
+/**
+ * ``PUT`` body: a non-empty list of preference pairs to update.
+ */
+export type NotificationPreferencesRequest = {
+    preferences: Array<NotificationPreference>;
+};
+
+/**
+ * ``GET``/``PUT`` response: every Section 9.8 type with its switch.
+ */
+export type NotificationPreferencesResponse = {
+    preferences: Array<NotificationPreference>;
+};
 
 /**
  * Section 17 Health row: live plus the ready checks' reachability.
@@ -2677,6 +2707,48 @@ export type ListMergePendingResponses = {
 };
 
 export type ListMergePendingResponse = ListMergePendingResponses[keyof ListMergePendingResponses];
+
+export type RetrieveNotificationPreferencesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/notifications/preferences';
+};
+
+export type RetrieveNotificationPreferencesErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type RetrieveNotificationPreferencesError = RetrieveNotificationPreferencesErrors[keyof RetrieveNotificationPreferencesErrors];
+
+export type RetrieveNotificationPreferencesResponses = {
+    200: NotificationPreferencesResponse;
+};
+
+export type RetrieveNotificationPreferencesResponse = RetrieveNotificationPreferencesResponses[keyof RetrieveNotificationPreferencesResponses];
+
+export type UpdateNotificationPreferencesData = {
+    body: NotificationPreferencesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/notifications/preferences';
+};
+
+export type UpdateNotificationPreferencesErrors = {
+    400: ErrorEnvelope;
+    401: ErrorEnvelope;
+    403: ErrorEnvelope;
+};
+
+export type UpdateNotificationPreferencesError = UpdateNotificationPreferencesErrors[keyof UpdateNotificationPreferencesErrors];
+
+export type UpdateNotificationPreferencesResponses = {
+    200: NotificationPreferencesResponse;
+};
+
+export type UpdateNotificationPreferencesResponse = UpdateNotificationPreferencesResponses[keyof UpdateNotificationPreferencesResponses];
 
 export type RetrieveOpsOverviewData = {
     body?: never;

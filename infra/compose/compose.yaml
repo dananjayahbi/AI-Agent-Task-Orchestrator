@@ -103,6 +103,27 @@ services:
     build:
       context: ../../backend
     environment: *backend-env
+    # WP-6.3 MT-6.3-03 (miss M-1, serving-layer classification): uvicorn
+    # process count. The image CMD runs ONE process, so sync Django views
+    # serialize behind a single event loop/ASGI bridge at 20-way load
+    # (captured in docs/plan/performance-report.md §5). Documented value:
+    # default 1 = unchanged image behavior; the perf stack steps
+    # ORCHESTRATOR_BACKEND_WORKERS through 4 then 8 (more serving
+    # processes ≈ absorb the Section 18 scenario's 20 concurrent agents
+    # without oversubscribing a shared local host) — the measured series
+    # lives in performance-report.md §7 (MT-6.3-03).
+    command:
+      - python
+      - -m
+      - uvicorn
+      - config.asgi:application
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --no-access-log
+      - --workers
+      - ${ORCHESTRATOR_BACKEND_WORKERS:-1}
     ports:
       # LAN-interface-only binding (Section 16.1); the bind address comes from
       # the environment so the same file works on Docker Desktop and a VPS

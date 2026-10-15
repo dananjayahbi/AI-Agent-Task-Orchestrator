@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/realtime/sse_lifecycle_binder.dart';
 import '../core/security/lock_gate.dart';
 import '../core/theme/app_theme.dart';
+import '../features/notifications/foreground_banner.dart';
+import '../features/notifications/notification_tap_binder.dart';
 import 'routes.dart';
 
 /// Root widget of the mobile client (parent plan Section 14.1).
@@ -26,10 +28,19 @@ class OrchestratorApp extends StatelessWidget {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       initialRoute: AppRoutes.root,
+      navigatorKey: AppRoutes.navigatorKey,
       onGenerateRoute: onGenerateRoute,
       onUnknownRoute: onUnknownRoute,
+      // LockGate outermost (gate precedence over routing — Section 14.2);
+      // the notification-tap binder (MT-5.9-01) mounts only inside the
+      // unlocked branch, so a pending tap routes *after unlock*, and the
+      // foreground banner host (MT-5.9-02) never renders while locked.
       builder: (context, child) => LockGate(
-        child: SseLifecycleBinder(child: child ?? const SizedBox()),
+        child: NotificationTapBinder(
+          child: ForegroundBannerHost(
+            child: SseLifecycleBinder(child: child ?? const SizedBox()),
+          ),
+        ),
       ),
     );
   }

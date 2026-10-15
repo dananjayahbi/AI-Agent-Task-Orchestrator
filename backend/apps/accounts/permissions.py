@@ -72,6 +72,27 @@ def _is_owner(request: Request) -> bool:
     return token is not None and token.kind == TokenKind.OWNER_SESSION
 
 
+class HasNotificationPreferencesAccess(BasePermission):
+    """MT-5.4-05 notification preferences — **not** a Section 12.2 row.
+
+    The matrix prints no notification-preferences capability (and Section
+    9.2 lists no notifications endpoint), so — like ``IsOwnerSession``, this
+    is its own named guard rather than a capability alias of a printed row.
+    The recorded choice (the MT's "confirm against the matrix and record the
+    choice"): **Owner and Device** may read/adjust, because the plan places
+    the editing surfaces on both clients over *one* record — Section 13.1
+    Account settings (web, Owner) and Section 14.1 per-event-type toggles
+    (mobile, Device bearer). Every agent token is denied: push preferences
+    are the owner's surface, matching how the events row treats agents.
+    """
+
+    message = "Only the owner or a device can manage notification preferences."
+
+    def has_permission(self, request: Request, view: Any) -> bool:
+        """Owner session or device credential; every agent denied."""
+        return _is_owner_or_device(request)
+
+
 class IsOwnerSession(BasePermission):
     """Owner-session-only endpoints (the 9.2 Owner-caller rows).
 

@@ -21,6 +21,16 @@ from django.db import models
 
 from apps.accounts.models import Device
 
+#: The Section 9.8 preference set — the closed list of toggleable event
+#: types (MT-5.4-05; MT-5.9-03 shows exactly these). Lives here so the
+#: model's choices and :mod:`apps.notifications.preferences` cannot drift.
+PREFERENCE_EVENT_TYPES: tuple[str, ...] = (
+    "in_human_review",
+    "merge_failure",
+    "retry_exhaustion",
+    "completion_digest",
+)
+
 
 class DeliveryOutcome(models.TextChoices):
     """The sender's three-valued verdict, persisted (MT-5.4-01)."""
@@ -84,3 +94,34 @@ class PushDedupeRecord(models.Model):
     def __str__(self) -> str:
         """Identify the row without any payload content (Section 12.4)."""
         return f"push-dedupe:{self.device_id}:{self.event_type}:{self.task_id}:{self.state_version}"
+
+
+class NotificationPreference(models.Model):
+    """One per-event-type notification switch (Section 9.8; MT-5.4-05).
+
+    **Account-level, not per-device** (the MT's risk note: storage
+    granularity is unset by the plan — account-level fits both named
+    surfaces, Section 13.1 web settings and Section 14.1 mobile toggles,
+    which edit the *same* record): like MT-5.4-01's fan-out, this is a
+    single-owner product, so there is no user/owner foreign key to hang the
+    rows on — one row per Section 9.8 preference type, unique on
+    ``event_type``.
+
+    Defaults are applied where rows are created (``preferences.
+    get_or_create_preference``): escalations on, completion digest off
+    (OQ-13). Rows hold no payload or task content (Section 12.4: this table
+    is not a leak channel either).
+    """
+
+    event_type = models.CharField(
+        max_length=64,
+        unique=True,
+        choices=[(key, key) for key in PREFERENCE_EVENT_TYPES],
+    )
+    enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        """Identify the switch without any content beyond type + state."""
+        return f"notification-preference:{self.event_type}:{self.enabled}"

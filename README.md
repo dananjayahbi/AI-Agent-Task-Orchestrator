@@ -30,6 +30,8 @@ The layout follows Appendix A of the parent plan (ADR-001: single monorepo):
 
 The documentation tree (parent plan Appendix A):
 
+- [Operator setup guide](docs/setup.md) — fresh-clone bring-up, configuration and
+  secrets, health verification, upgrade and rollback (WP-6.5, MT-6.5-01)
 - [Plan documents](docs/plan/) — index of the parent plan and micro-document series
 - [Architecture decision records](docs/adr/) — ADR-001 through ADR-013
 - [Runbooks](docs/runbooks/) — one stub per Section 17 runbook (content: WP-6.5)

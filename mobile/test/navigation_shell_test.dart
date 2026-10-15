@@ -13,6 +13,8 @@ import 'package:orchestrator_mobile/features/board/board_repository.dart';
 import 'package:orchestrator_mobile/features/board/projects_repository.dart';
 import 'package:orchestrator_mobile/features/audit_log/audit_log_repository.dart'
     show auditLogRepositoryProvider;
+import 'package:orchestrator_mobile/features/notifications/notification_history.dart';
+import 'package:orchestrator_mobile/features/notifications/notification_preferences.dart';
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary.dart';
 import 'package:orchestrator_mobile/features/dashboard/dashboard_summary_source.dart';
 import 'package:orchestrator_mobile/orchestrator_mobile.dart'
@@ -21,6 +23,10 @@ import 'package:orchestrator_mobile/orchestrator_mobile.dart'
 import 'audit_log/audit_log_test_support.dart' show FakeAuditLogRepository;
 import 'board/board_test_support.dart';
 import 'dashboard/dashboard_test_support.dart';
+import 'notifications/notifications_test_support.dart'
+    show
+        FakeNotificationPreferencesRepository,
+        InMemoryNotificationHistoryStore;
 import 'realtime/realtime_test_support.dart';
 import 'security/security_test_support.dart';
 
@@ -59,6 +65,14 @@ void main() {
           // route-table sweep never touches flavor/HTTP configuration.
           auditLogRepositoryProvider
               .overrideWithValue(FakeAuditLogRepository()),
+          // Notifications (MT-5.9-03) loads history + preferences on
+          // mount — same harness rule as the audit log seam above.
+          notificationHistoryStoreProvider.overrideWithValue(
+            InMemoryNotificationHistoryStore(),
+          ),
+          notificationPreferencesRepositoryProvider.overrideWithValue(
+            FakeNotificationPreferencesRepository(),
+          ),
           sseClientProvider.overrideWithValue(
             buildTestSseClient(transport: FakeSseTransport()),
           ),
@@ -97,7 +111,9 @@ void main() {
       // The last flag says whether the area is still a placeholder.
       const List<(String, String, bool)> tabs = <(String, String, bool)>[
         ('Board', 'Select a project above to see its board.', false),
-        ('Notifications', 'per-event-type toggles', true),
+        // Notifications is real now (MT-5.9-03): history + per-type
+        // toggles — the placeholder flag retires with the placeholder.
+        ('Notifications', 'per-event-type toggles', false),
         ('Settings', 'Device info', true),
         ('Home', 'Nav project', false),
       ];
