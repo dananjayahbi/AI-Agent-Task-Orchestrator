@@ -31,10 +31,11 @@ the `dev`-profile `mailhog` helper; only `backend` (API, default host port
   agent connection steps are MT-6.5-02's, linked in
   [Next steps](#next-steps).
 * **Operations board** — Next.js app in [`web/`](../web/); runs per
-  [`web/README.md`](../web/README.md). *As of this guide the Compose `web`
-  service still serves the Section 16.1 health-check placeholder*
-  (`infra/compose/stubs/web/default.conf`, "WP-4.1 replaces this"), so the real
-  board is started from `web/` as documented there — see
+  [`web/README.md`](../web/README.md). The Compose `web` service now
+  serves the **real board image** (`web/Dockerfile`, default tag
+  `orchestrator-web:dev`, rebuild with `docker compose build web`) — the
+  Section 16.1 health-check placeholder is retired; host-run instructions
+  remain valid for hot-reload development — see
   [Running the board](#running-the-operations-board).
 * **Mobile client** — Flutter app in [`mobile/`](../mobile/); Android internal
   distribution is the live path, per
@@ -317,25 +318,31 @@ the Deferred entries cited at the top of this guide.
 
 ## Running the operations board
 
-The board is the Next.js app in `web/`, an API-only client of the backend:
+The board is the Next.js app in `web/`, an API-only client of the backend.
+**Normal (hosting) path:** the Compose `web` service runs the real board
+image (`web/Dockerfile`, tag `orchestrator-web:dev`; rebuild with
+`docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml
+build web`) — start everything with the one-click `start-orchestrator.cmd`
+at the repository root (board on `http://localhost:19191`, API on
+`http://localhost:19192/api/v1`).
+
+Development path (hot reload) — run the board on the host instead:
 
 ```powershell
 npm ci --prefix web              # once, from the repository root
 npm --prefix web run dev         # dev server — commands table: web/README.md
 ```
 
-Configuration: `ORCHESTRATOR_API_BASE_URL` (default
-`http://localhost:8000/api/v1`) is what `next.config.ts` proxies `/api/v1/*`
-to server-side — the browser only talks to the board's own origin (same-origin
-cookies/CSRF, Section 12.2); see [`web/README.md`](../web/README.md).
-
-The Compose `web` service currently serves only the health-check placeholder
-and binds `ORCHESTRATOR_PORT_WEB` when the stack is up — stop it before
-starting the board on the same port:
-
-```powershell
-docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml stop web
-```
+Configuration: `ORCHESTRATOR_API_BASE_URL` is what `next.config.ts` proxies
+`/api/v1/*` to server-side — the browser only talks to the board's own
+origin (same-origin cookies/CSRF, Section 12.2); see
+[`web/README.md`](../web/README.md). The compose image bakes the
+internal `http://backend:8000/api/v1`; a host dev server must point at the
+published API instead (`$env:ORCHESTRATOR_API_BASE_URL='http://localhost:19192/api/v1'`
+with this machine's `.env` values), and the dev origin must be listed in
+`ORCHESTRATOR_CORS_ORIGINS`/`ORCHESTRATOR_CSRF_ORIGINS`. Stop the compose
+`web` service first if the dev server would otherwise share the published
+port.
 
 ## Next steps
 

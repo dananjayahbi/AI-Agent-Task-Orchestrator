@@ -228,11 +228,15 @@ services:
       redis:
         condition: service_healthy
 
-  # --- web: Next.js image, LAN-published web port, no volumes --------------
+  # --- web: real Next.js board image (web/Dockerfile — the WP-4.1 wiring
+  # promised by .env.example), LAN-published web port, no volumes ----------
   web:
-    image: ${ORCHESTRATOR_IMAGE_WEB:-orchestrator-web:stub}
+    image: ${ORCHESTRATOR_IMAGE_WEB:-orchestrator-web:dev}
     build:
-      context: ./stubs/web
+      # Real board (WP-4.1); the M0 stub tree stays at ./stubs/web for
+      # reference and for e2e/perf's prebuilt :stub image (perf's stack.py
+      # never runs compose build).
+      context: ../../web
     ports:
       # LAN-interface-only binding, environment-driven like `backend`.
       - "${ORCHESTRATOR_BIND_ADDR:-127.0.0.1}:${ORCHESTRATOR_PORT_WEB:-3000}:3000"

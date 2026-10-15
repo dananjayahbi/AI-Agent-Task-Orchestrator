@@ -1,0 +1,10 @@
+# Build-context exclusions for web/Dockerfile (Section 16.1 image builds).
+# Host-built artifacts must never enter the Linux image: Windows node_modules
+# binaries do not run in alpine, and .next is rebuilt inside the image.
+node_modules
+.next
+coverage
+test-results
+*.tsbuildinfo
+.env*
+npm-debug.log*

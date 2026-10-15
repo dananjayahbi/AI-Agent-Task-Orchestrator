@@ -267,3 +267,21 @@ Short note per completed micro-task (parent plan Section 20.4, item 7).
   regenerated `lib/api/generated/` (sanctioned command, byte-stable across
   two runs) so `check:api`'s drift gate compares cleanly against the
   regenerated client — no generated file hand-edited.
+- **Real board container image — the ".env.example WP-4.1 replaces with the
+  real image" wiring lands (2026-10-15, local-hosting decision).**
+  `web/Dockerfile` (node:24-alpine — matches the host toolchain: the
+  package-lock is npm-11-written and npm 10's `npm ci` rejects it) +
+  `web/.dockerignore` (host `node_modules`/`.next` never enter the Linux
+  image); compose `web` now builds from `web/` and defaults to tag
+  `orchestrator-web:dev` (was `orchestrator-web:stub` from `./stubs/web`).
+  The container's baked `ORCHESTRATOR_API_BASE_URL=http://backend:8000/api/v1`
+  is the Section 16.1 internal service name — the host-published ports
+  (19191 UI / 19192 API, owner-chosen uncommon ports) are unrelated to the
+  rewrite target. Verified live: real app HTML on the published UI port
+  (placeholder retired) and `/api/v1/*` rewritten to Django through the web
+  container. The M0 stub tree stays at `infra/compose/stubs/web` (referenced
+  by e2e/perf's prebuilt `:stub` image, which perf's stack never rebuilds);
+  CI's pattern-based container-build gate discovers `web/Dockerfile`
+  automatically (MT-0.3-03). One-click `start-orchestrator.cmd` /
+  `stop-orchestrator.cmd` at the repository root bring the whole group up
+  (profiles base+prod, tunnel included) or stop it.
